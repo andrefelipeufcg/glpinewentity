@@ -33,8 +33,7 @@ class PluginGlpinewentityWizard {
         $parentEntity  = (int)($input['parent_entity'] ?? 0);
         $subEntities   = trim($input['sub_entities'] ?? '');
         $adminEmail    = trim($input['admin_email'] ?? '');
-        $groupNames    = trim($input['group_names'] ?? '');
-        $techEmails    = trim($input['tech_emails'] ?? '');
+        $subgroupsData = is_array($input['subgroups'] ?? null) ? $input['subgroups'] : [];
         $categoryNames = trim($input['category_names'] ?? '');
 
         // ── Validação básica ──
@@ -45,6 +44,33 @@ class PluginGlpinewentityWizard {
         if (empty($adminEmail) || !filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
             $result['errors'][] = 'E-mail do Administrador é obrigatório e deve ser válido.';
             return $result;
+        }
+
+        // ── Validação de Subgrupos e Técnicos ──
+        $hasAnySubgroup = false;
+        foreach ($subgroupsData as $sg) {
+            if (!empty(trim($sg['name'] ?? ''))) {
+                $hasAnySubgroup = true;
+                break;
+            }
+        }
+        
+        foreach ($subgroupsData as $index => $sg) {
+            $name = trim($sg['name'] ?? '');
+            $techs = trim($sg['techs'] ?? '');
+            $hasName = !empty($name);
+            $hasTechs = !empty($techs);
+            
+            if ($hasName && !$hasTechs) {
+                $result['errors'][] = "O subgrupo '{$name}' foi informado, mas nenhum e-mail de técnico atendente foi preenchido.";
+                return $result;
+            }
+            if (!$hasName && $hasTechs) {
+                if ($hasAnySubgroup) {
+                    $result['errors'][] = "Não é permitido adicionar técnicos avulsos ao Grupo Pai quando há subgrupos informados. Preencha o nome do subgrupo no Bloco " . ($index + 1) . ".";
+                    return $result;
+                }
+            }
         }
 
         if (empty($categoryNames)) {
@@ -117,34 +143,10 @@ class PluginGlpinewentityWizard {
         }
 
         // =================================================================
-        // PASSO 3 — Criar Grupos e Associar Técnicos Atendentes
+        // PASSO 3 — Criar Grupo Pai, Subgrupos e Associar Técnicos
         // =================================================================
-        $groupList = array_filter(array_map('trim', explode(',', $groupNames)));
-        $techList  = [];
-        if (!empty($techEmails)) {
-            $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $techEmails)));
-        }
 
-        // Cria os usuários técnicos atendentes primeiro (reutiliza se já existir)
-        $techUserIds = [];
-        foreach ($techList as $techEmail) {
-            if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
-                $result['errors'][] = "E-mail de técnico atendente inválido: '{$techEmail}'. Ignorado.";
-                continue;
-            }
-            $techUserId = self::findUserByEmail($techEmail);
-            if ($techUserId) {
-                $techUserIds[] = $techUserId;
-                $result['technicians'][] = [
-                    'id'    => $techUserId,
-                    'email' => $techEmail,
-                ];
-            } else {
-                $result['errors'][] = "Técnico atendente '{$techEmail}' não encontrado no GLPI. Ignorado.";
-            }
-        }
-
-        // Cria o grupo pai (Obrigatório) usando a sigla
+        // 1. Cria o grupo pai (Obrigatório) usando a sigla
         $parentGroupName = "({$sectorAbbr})";
         $group = new Group();
         $parentGroupId = $group->add([
@@ -152,51 +154,76 @@ class PluginGlpinewentityWizard {
             'entities_id' => $entityId,
         ]);
 
-        if ($parentGroupId) {
+        if (!$parentGroupId) {
+            $result['errors'][] = "Falha ao criar grupo pai '{$parentGroupName}'.";
+        } else {
             $result['groups'][] = [
                 'id'   => $parentGroupId,
                 'name' => $parentGroupName,
             ];
-            // Associa técnicos atendentes ao grupo pai
-            foreach ($techUserIds as $tuid) {
-                $groupUser = new Group_User();
-                $groupUser->add([
-                    'users_id'  => $tuid,
-                    'groups_id' => $parentGroupId,
-                ]);
-            }
-        } else {
-            $result['errors'][] = "Falha ao criar grupo pai '{$parentGroupName}'.";
-        }
-
-        // Cria os subgrupos informados e associa TODOS os técnicos atendentes a eles também
-        foreach ($groupList as $gName) {
-            if (empty($gName)) continue;
-
-            $group = new Group();
-            $groupId = $group->add([
-                'name'        => $gName,
-                'entities_id' => $entityId,
-                'groups_id'   => $parentGroupId ?: 0,
-            ]);
-
-            if (!$groupId) {
-                $result['errors'][] = "Falha ao criar grupo '{$gName}'.";
-                continue;
-            }
-
-            $result['groups'][] = [
-                'id'   => $groupId,
-                'name' => $gName,
-            ];
-
-            // Associa técnicos atendentes ao subgrupo
-            foreach ($techUserIds as $tuid) {
-                $groupUser = new Group_User();
-                $groupUser->add([
-                    'users_id'  => $tuid,
-                    'groups_id' => $groupId,
-                ]);
+            
+            // 2. Itera sobre os blocos dinâmicos
+            foreach ($subgroupsData as $sg) {
+                $sgName  = trim($sg['name'] ?? '');
+                $sgTechs = trim($sg['techs'] ?? '');
+                
+                if (empty($sgName) && empty($sgTechs)) {
+                    continue; // Bloco vazio, ignora
+                }
+                
+                // Processa técnicos deste bloco
+                $techUserIds = [];
+                if (!empty($sgTechs)) {
+                    $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $sgTechs)));
+                    foreach ($techList as $techEmail) {
+                        if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
+                            $result['errors'][] = "E-mail de técnico atendente inválido: '{$techEmail}'. Ignorado.";
+                            continue;
+                        }
+                        $techUserId = self::findUserByEmail($techEmail);
+                        if ($techUserId) {
+                            $techUserIds[] = $techUserId;
+                            $result['technicians'][] = [
+                                'id'    => $techUserId,
+                                'email' => $techEmail . ($sgName ? " -> {$sgName}" : " -> Pai"),
+                            ];
+                        } else {
+                            $result['errors'][] = "Técnico atendente '{$techEmail}' não encontrado no GLPI. Ignorado.";
+                        }
+                    }
+                }
+                
+                // Onde alocar os técnicos?
+                $targetGroupId = $parentGroupId; // Padrão: Grupo Pai
+                
+                if (!empty($sgName)) {
+                    // Cria o subgrupo e muda o targetGroupId
+                    $subg = new Group();
+                    $targetGroupId = $subg->add([
+                        'name'        => $sgName,
+                        'entities_id' => $entityId,
+                        'groups_id'   => $parentGroupId,
+                    ]);
+                    
+                    if (!$targetGroupId) {
+                        $result['errors'][] = "Falha ao criar subgrupo '{$sgName}'.";
+                        continue;
+                    }
+                    
+                    $result['groups'][] = [
+                        'id'   => $targetGroupId,
+                        'name' => $sgName,
+                    ];
+                }
+                
+                // Associa técnicos ao grupo alvo (seja o pai ou o subgrupo)
+                foreach ($techUserIds as $tuid) {
+                    $groupUser = new Group_User();
+                    $groupUser->add([
+                        'users_id'  => $tuid,
+                        'groups_id' => $targetGroupId,
+                    ]);
+                }
             }
         }
 

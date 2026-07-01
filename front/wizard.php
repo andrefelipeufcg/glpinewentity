@@ -134,21 +134,35 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
     echo "<tr><th colspan='2'><i class='fas fa-users-cog'></i> Grupos e Técnicos Atendentes</th></tr>";
 
-    // Grupos
     echo "<tr class='tab_bg_1'>";
-    echo "<td style='width: 35%;'>Subgrupos Opcionais</td>";
-    echo "<td>";
-    echo "<input type='text' name='group_names' class='form-control' style='width: 100%;' placeholder='Ex: Suporte Infra, Suporte Software'>";
-    echo "<br><small class='text-muted'>Separados por vírgula. O grupo pai <strong>({SIGLA})</strong> será criado automaticamente.</small>";
-    echo "</td>";
-    echo "</tr>";
-
-    // Técnicos Atendentes
-    echo "<tr class='tab_bg_1'>";
-    echo "<td>E-mails dos Técnicos Atendentes</td>";
-    echo "<td>";
-    echo "<textarea name='tech_emails' class='form-control' style='width: 100%; height: 100px;' placeholder='Um e-mail por linha.&#10;Ex:&#10;maria@instituicao.edu.br&#10;pedro@instituicao.edu.br'></textarea>";
-    echo "<br><small class='text-muted'>Opcional. Os técnicos atendentes <strong>já devem estar cadastrados</strong> no GLPI e serão adicionados a <strong>todos</strong> os grupos criados (pai e subgrupos).</small>";
+    echo "<td colspan='2' style='padding: 0;'>";
+    echo "<div id='subgroups-container'>";
+    
+    // Bloco inicial (index 0)
+    echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
+    echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
+    echo "      <strong>Subgrupo <span class='sg-index'>1</span></strong>";
+    echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='display:none;'><i class='fas fa-trash'></i> Remover</button>";
+    echo "  </div>";
+    
+    echo "  <div style='margin-bottom: 10px;'>";
+    echo "      <label>Nome do Subgrupo</label>";
+    echo "      <input type='text' name='subgroups[0][name]' class='form-control' style='width: 100%;' placeholder='Ex: Suporte Infra (Deixe em branco para alocar no Grupo Pai)'>";
+    echo "  </div>";
+    
+    echo "  <div>";
+    echo "      <label>E-mails dos Técnicos Atendentes</label>";
+    echo "      <textarea name='subgroups[0][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='maria@instituicao.edu.br&#10;pedro@instituicao.edu.br'></textarea>";
+    echo "      <small class='text-muted'>Devem estar cadastrados no GLPI. Se informar um subgrupo, os técnicos irão EXCLUSIVAMENTE para ele. Senão, irão para o Grupo Pai <strong>({SIGLA})</strong>.</small>";
+    echo "  </div>";
+    echo "</div>";
+    
+    echo "</div>"; // Fim subgroups-container
+    
+    echo "<div style='margin: 10px;'>";
+    echo "  <button type='button' id='btn-add-subgroup' class='btn btn-sm btn-primary'><i class='fas fa-plus'></i> Adicionar outro Subgrupo</button>";
+    echo "</div>";
+    
     echo "</td>";
     echo "</tr>";
 
@@ -200,6 +214,51 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "</table>";
 
     Html::closeForm();
+
+    echo "<script>
+    $(function() {
+        let index = 1;
+
+        $('#btn-add-subgroup').on('click', function() {
+            const container = $('#subgroups-container');
+            
+            // Validação: verifica se os blocos atuais estão preenchidos
+            let allFilled = true;
+            container.find('.subgroup-block').each(function() {
+                const nameVal = $(this).find('input').val().trim();
+                const techsVal = $(this).find('textarea').val().trim();
+                
+                if (nameVal === '' || techsVal === '') {
+                    allFilled = false;
+                }
+            });
+            
+            if (!allFilled) {
+                alert('Por favor, preencha o Nome do Subgrupo e os E-mails dos técnicos em todos os blocos atuais antes de adicionar um novo.');
+                return;
+            }
+
+            const firstBlock = container.find('.subgroup-block').first();
+            const newBlock = firstBlock.clone();
+            
+            newBlock.find('input').val('');
+            newBlock.find('textarea').val('');
+            
+            newBlock.find('input').attr('name', 'subgroups[' + index + '][name]');
+            newBlock.find('textarea').attr('name', 'subgroups[' + index + '][techs]');
+            newBlock.find('.sg-index').text(index + 1);
+            
+            const btnRemove = newBlock.find('.btn-remove-subgroup');
+            btnRemove.show();
+            btnRemove.on('click', function() {
+                newBlock.remove();
+            });
+            
+            container.append(newBlock);
+            index++;
+        });
+    });
+    </script>";
 
 // =====================================================================
 // RESULTADO — Exibe o resumo da criação
