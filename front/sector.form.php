@@ -112,7 +112,6 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     // ── Título Principal ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
     echo "<tr><th colspan='2' style='font-size: 1.2em;'>";
-    echo "<i class='fas fa-magic' style='margin-right: 8px;'></i>";
     echo "Nova Entidade para Central de Serviços";
     echo "</th></tr>";
     echo "</table>";
@@ -287,10 +286,9 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<tr class='tab_bg_2'>";
     echo "<td class='center' style='padding: 15px;'>";
     $btnTitle = $isEdit ? 'Salvar Modificações' : 'Criar Infraestrutura da Entidade';
-    $btnIcon  = $isEdit ? 'fa-save' : 'fa-magic';
     
     echo "<button type='submit' class='btn btn-primary' style='font-size: 1.05em; padding: 8px 30px;'>";
-    echo "<i class='fas {$btnIcon}' style='margin-right: 6px;'></i> {$btnTitle}";
+    echo $btnTitle;
     echo "</button>";
     echo "</td>";
     echo "</tr>";
