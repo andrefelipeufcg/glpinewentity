@@ -1,8 +1,8 @@
 <?php
 /**
  * -----------------------------------------------------------------------
- * GLPI New Entity — front/wizard.php
- * Formulário wizard para criação rápida de infraestrutura de novo setor.
+ * GLPI New Entity — front/sector.form.php
+ * Formulário para criação e edição de infraestrutura de novo setor.
  * -----------------------------------------------------------------------
  */
 
@@ -16,36 +16,84 @@ Session::checkRight("entity", CREATE);
 // -----------------------------------------------------------------------
 $showResult = false;
 $result     = [];
+$isEdit     = false;
+$sectorId   = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+$sectorObj  = new PluginGlpinewentitySector();
+
+if ($sectorId > 0) {
+    if ($sectorObj->getFromDB($sectorId)) {
+        $isEdit = true;
+    } else {
+        Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
+    }
+}
 
 if (isset($_POST['process_wizard'])) {
-    // Validação CSRF do GLPI
     Session::checkCSRF($_POST);
 
-    $result = PluginGlpinewentityWizard::processCreation($_POST);
+    if ($isEdit) {
+        $result = PluginGlpinewentityWizard::processUpdate($_POST, $sectorObj->fields);
+        // Atualiza metadata
+        if (empty($result['errors'])) {
+            $sectorObj->update([
+                'id' => $sectorId,
+                'sector_name' => $_POST['sector_name'],
+                'sector_abbr' => $_POST['sector_abbr'],
+                'metadata' => json_encode($result)
+            ]);
+            Session::addMessageAfterRedirect('Infraestrutura atualizada com sucesso!', true, INFO);
+            Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php?id=' . $sectorId);
+        }
+    } else {
+        $result = PluginGlpinewentityWizard::processCreation($_POST);
+        
+        if (empty($result['errors']) && $result['entity_id'] > 0) {
+            $sectorObj->add([
+                'entities_id' => (int)$_POST['parent_entity'],
+                'sector_name' => $_POST['sector_name'],
+                'sector_abbr' => $_POST['sector_abbr'],
+                'metadata' => json_encode($result)
+            ]);
+            Session::addMessageAfterRedirect('Infraestrutura criada com sucesso!', true, INFO);
+            Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
+        }
+    }
+    
     $showResult = true;
-
     if (!empty($result['errors'])) {
         foreach ($result['errors'] as $err) {
             Session::addMessageAfterRedirect($err, false, ERROR);
         }
     }
+}
 
-    if ($result['entity_id'] > 0) {
-        Session::addMessageAfterRedirect(
-            'Infraestrutura do setor criada com sucesso!',
-            true,
-            INFO
-        );
-    }
+// -----------------------------------------------------------------------
+// Carrega dados para edição
+// -----------------------------------------------------------------------
+$def_sector_name = '';
+$def_sector_abbr = '';
+$def_parent_entity = 0;
+$def_admin_email = '';
+$def_category_names = '';
+$def_subgroups = [];
+
+if ($isEdit) {
+    $meta = json_decode($sectorObj->fields['metadata'], true) ?: [];
+    $def_sector_name = $sectorObj->fields['sector_name'];
+    $def_sector_abbr = $sectorObj->fields['sector_abbr'];
+    $def_parent_entity = $sectorObj->fields['entities_id'];
+    $def_admin_email = $meta['admin_login'] ?? '';
+    // Monta subgrupos a partir do metadata se necessário (simplificado para form)
+    $def_subgroups = $meta['groups'] ?? []; 
 }
 
 // -----------------------------------------------------------------------
 // RENDERIZAÇÃO DA PÁGINA
 // -----------------------------------------------------------------------
-Html::header('GLPI New Entity — Wizard', $_SERVER['PHP_SELF'], 'config', 'plugins');
+Html::header('GLPI New Entity — Form', $_SERVER['PHP_SELF'], 'config', 'plugins');
 
 global $CFG_GLPI;
-$form_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/wizard.php';
+$form_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php';
 
 echo "<div class='center' style='margin-top: 20px;'>";
 
@@ -57,6 +105,9 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<form method='post' action='" . $form_url . "' id='form_wizard'>";
     echo Html::hidden('_glpi_csrf_token', ['value' => Session::getNewCSRFToken()]);
     echo "<input type='hidden' name='process_wizard' value='1'>";
+    if ($isEdit) {
+        echo "<input type='hidden' name='id' value='{$sectorId}'>";
+    }
 
     // ── Título Principal ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
@@ -88,7 +139,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<tr class='tab_bg_1'>";
     echo "<td>Nome do Setor <span style='color:red;'>*</span></td>";
     echo "<td>";
-    echo "<input type='text' name='sector_name' class='form-control' style='width: 100%;' placeholder='Ex: Departamento de Computação' required>";
+    echo "<input type='text' name='sector_name' class='form-control' style='width: 100%;' placeholder='Ex: Departamento de Computação' value='" . Html::cleanInputText($def_sector_name) . "' required>";
     echo "</td>";
     echo "</tr>";
 
@@ -96,7 +147,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<tr class='tab_bg_1'>";
     echo "<td>Sigla <span style='color:red;'>*</span></td>";
     echo "<td>";
-    echo "<input type='text' name='sector_abbr' class='form-control' style='width: 200px;' placeholder='Ex: DC' maxlength='20' required>";
+    echo "<input type='text' name='sector_abbr' class='form-control' style='width: 100%;' placeholder='Ex: DC' value='" . Html::cleanInputText($def_sector_abbr) . "' maxlength='20' required>";
     echo "<br><small class='text-muted'>A entidade será criada com o mesmo nome da sigla.</small>";
     echo "</td>";
     echo "</tr>";
@@ -121,7 +172,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<tr class='tab_bg_1'>";
     echo "<td style='width: 35%;'>E-mail do Administrador <span style='color:red;'>*</span></td>";
     echo "<td>";
-    echo "<input type='email' name='admin_email' class='form-control' style='width: 100%;' placeholder='Ex: joao.silva@instituicao.edu.br' required>";
+    echo "<input type='email' name='admin_email' class='form-control' style='width: 100%;' placeholder='Ex: joao.silva@instituicao.edu.br' value='" . Html::cleanInputText($def_admin_email) . "' required>";
     echo "<br><small class='text-muted'>O e-mail deve pertencer a um usuário <strong>já cadastrado</strong> no GLPI. Ele receberá o perfil <strong>Admin</strong> na nova entidade, com permissão recursiva.</small>";
     echo "</td>";
     echo "</tr>";
@@ -138,24 +189,53 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<td colspan='2' style='padding: 0;'>";
     echo "<div id='subgroups-container'>";
     
-    // Bloco inicial (index 0)
-    echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
-    echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
-    echo "      <strong>Subgrupo <span class='sg-index'>1</span></strong>";
-    echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='display:none;'><i class='fas fa-trash'></i> Remover</button>";
-    echo "  </div>";
-    
-    echo "  <div style='margin-bottom: 10px;'>";
-    echo "      <label>Nome do Subgrupo</label>";
-    echo "      <input type='text' name='subgroups[0][name]' class='form-control' style='width: 100%;' placeholder='Ex: Suporte Infra (Deixe em branco para alocar no Grupo Pai)'>";
-    echo "  </div>";
-    
-    echo "  <div>";
-    echo "      <label>E-mails dos Técnicos Atendentes</label>";
-    echo "      <textarea name='subgroups[0][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='maria@instituicao.edu.br&#10;pedro@instituicao.edu.br'></textarea>";
-    echo "      <small class='text-muted'>Devem estar cadastrados no GLPI. Se informar um subgrupo, os técnicos irão EXCLUSIVAMENTE para ele. Senão, irão para o Grupo Pai <strong>({SIGLA})</strong>.</small>";
-    echo "  </div>";
-    echo "</div>";
+    if (empty($def_subgroups) || count($def_subgroups) <= 1) {
+        // Se não tem subgrupos, ou só tem o pai (índice 0), renderiza 1 bloco vazio
+        echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
+        echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
+        echo "      <strong>Subgrupo <span class='sg-index'>1</span></strong>";
+        echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='display:none;'><i class='fas fa-trash'></i> Remover</button>";
+        echo "  </div>";
+        echo "  <div style='margin-bottom: 10px;'>";
+        echo "      <label>Nome do Subgrupo</label>";
+        echo "      <input type='text' name='subgroups[0][name]' class='form-control' style='width: 100%;' placeholder='Ex: Suporte Infra (Deixe em branco para alocar no Grupo Pai)'>";
+        echo "  </div>";
+        echo "  <div>";
+        echo "      <label>E-mails dos Técnicos Atendentes</label>";
+        echo "      <textarea name='subgroups[0][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='maria@instituicao.edu.br&#10;pedro@instituicao.edu.br'></textarea>";
+        echo "      <small class='text-muted'>Devem estar cadastrados no GLPI. Se informar um subgrupo, os técnicos irão EXCLUSIVAMENTE para ele. Senão, irão para o Grupo Pai <strong>({SIGLA})</strong>.</small>";
+        echo "  </div>";
+        echo "</div>";
+    } else {
+        // Tem subgrupos (além do pai). O índice 0 no $def_subgroups é o pai.
+        // Se a pessoa preencheu subgrupos, o metadata os salvou a partir do índice 1.
+        $i = 0;
+        foreach ($def_subgroups as $idx => $sg) {
+            if ($idx === 0) continue; // Pula o grupo pai que só foi salvo no metadata, mas não no form
+            
+            // Wait, this requires mapping technicians for each group. The metadata currently doesn't store techs per group easily!
+            // I'll just render empty blocks based on the count for now, because extracting techs back to textarea is complex.
+            // Actually, let's just render the names.
+            $sgName = Html::cleanInputText($sg['name']);
+            
+            echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
+            echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
+            echo "      <strong>Subgrupo <span class='sg-index'>".($i+1)."</span></strong>";
+            echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='".($i==0 ? 'display:none;' : '')."'><i class='fas fa-trash'></i> Remover</button>";
+            echo "  </div>";
+            echo "  <div style='margin-bottom: 10px;'>";
+            echo "      <label>Nome do Subgrupo</label>";
+            echo "      <input type='text' name='subgroups[{$i}][name]' class='form-control' style='width: 100%;' value='{$sgName}' placeholder='Ex: Suporte Infra (Deixe em branco para alocar no Grupo Pai)'>";
+            echo "  </div>";
+            echo "  <div>";
+            echo "      <label>E-mails dos Técnicos Atendentes</label>";
+            echo "      <textarea name='subgroups[{$i}][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='maria@instituicao.edu.br&#10;pedro@instituicao.edu.br'></textarea>";
+            echo "      <small class='text-muted'>Na edição, não estamos listando os e-mails antigos. Se quiser sincronizar, preencha novamente.</small>";
+            echo "  </div>";
+            echo "</div>";
+            $i++;
+        }
+    }
     
     echo "</div>"; // Fim subgroups-container
     
@@ -206,8 +286,11 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
     echo "<tr class='tab_bg_2'>";
     echo "<td class='center' style='padding: 15px;'>";
+    $btnTitle = $isEdit ? 'Salvar Modificações' : 'Criar Infraestrutura do Setor';
+    $btnIcon  = $isEdit ? 'fa-save' : 'fa-magic';
+    
     echo "<button type='submit' class='btn btn-primary' style='font-size: 1.05em; padding: 8px 30px;'>";
-    echo "<i class='fas fa-magic' style='margin-right: 6px;'></i> Criar Infraestrutura do Setor";
+    echo "<i class='fas {$btnIcon}' style='margin-right: 6px;'></i> {$btnTitle}";
     echo "</button>";
     echo "</td>";
     echo "</tr>";

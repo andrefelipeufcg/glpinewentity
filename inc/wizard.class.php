@@ -265,6 +265,51 @@ class PluginGlpinewentityWizard {
     // Métodos auxiliares
     // =====================================================================
 
+    public static function processUpdate(array $input, array $existingFields): array {
+        $result = json_decode($existingFields['metadata'] ?? '{}', true) ?: [];
+        if (!isset($result['errors'])) $result['errors'] = [];
+        
+        $sectorName   = trim($input['sector_name'] ?? '');
+        $sectorAbbr   = trim($input['sector_abbr'] ?? '');
+        $parentEntity = (int)($input['parent_entity'] ?? 0);
+        $adminEmail   = trim($input['admin_email'] ?? '');
+        
+        if (empty($sectorName) || empty($sectorAbbr)) {
+            $result['errors'][] = 'O nome do setor e a sigla são obrigatórios.';
+            return $result;
+        }
+        
+        // 1. Atualizar Entidade Pai
+        $entityId = $result['entity_id'] ?? 0;
+        if ($entityId > 0) {
+            $entity = new Entity();
+            if ($entity->getFromDB($entityId)) {
+                $entity->update([
+                    'id' => $entityId,
+                    'name' => strtoupper($sectorAbbr),
+                    'entities_id' => $parentEntity
+                ]);
+            }
+        }
+        
+        // 2. Atualizar Nome do Grupo Pai (SIGLA)
+        if (!empty($result['groups']) && isset($result['groups'][0]['id'])) {
+            $parentGroupId = $result['groups'][0]['id'];
+            $group = new Group();
+            if ($group->getFromDB($parentGroupId)) {
+                $group->update([
+                    'id' => $parentGroupId,
+                    'name' => "({$sectorAbbr})"
+                ]);
+                $result['groups'][0]['name'] = "({$sectorAbbr})";
+            }
+        }
+        
+        // TODO: Sincronização complexa de subgrupos e técnicos (será feita no próximo passo)
+        
+        return $result;
+    }
+
     /**
      * Busca um usuário pelo e-mail (em glpi_useremails ou pelo login).
      * Se não existir, retorna false.

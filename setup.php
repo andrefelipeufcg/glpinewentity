@@ -21,9 +21,15 @@ function plugin_init_glpinewentity(): void {
     global $PLUGIN_HOOKS;
 
     $PLUGIN_HOOKS[Hooks::CSRF_COMPLIANT]['glpinewentity'] = true;
-    $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['glpinewentity'] = 'front/wizard.php';
+    $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['glpinewentity'] = 'front/sector.form.php';
 
     Plugin::registerClass('PluginGlpinewentityWizard');
+    Plugin::registerClass('PluginGlpinewentitySector');
+
+    $plugin = new Plugin();
+    if ($plugin->isActivated('glpinewentity')) {
+        $PLUGIN_HOOKS['menu_toadd']['glpinewentity'] = ['config' => 'PluginGlpinewentityMenu'];
+    }
 }
 
 function plugin_version_glpinewentity(): array {
