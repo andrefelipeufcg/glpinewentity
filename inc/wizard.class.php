@@ -46,10 +46,7 @@ class PluginGlpinewentityWizard {
             $result['errors'][] = 'E-mail do Administrador é obrigatório e deve ser válido.';
             return $result;
         }
-        if (empty($groupNames)) {
-            $result['errors'][] = 'Informe pelo menos um nome de Grupo.';
-            return $result;
-        }
+
         if (empty($categoryNames)) {
             $result['errors'][] = 'Informe pelo menos uma Categoria de Serviço.';
             return $result;
@@ -58,7 +55,7 @@ class PluginGlpinewentityWizard {
         // =================================================================
         // PASSO 1 — Criar Entidade Principal
         // =================================================================
-        $entityName = strtoupper($sectorAbbr) . ' - ' . $sectorName;
+        $entityName = strtoupper($sectorAbbr);
 
         $entity = new Entity();
         $entityId = $entity->add([
@@ -147,12 +144,40 @@ class PluginGlpinewentityWizard {
             }
         }
 
-        // Cria cada grupo e associa TODOS os técnicos
+        // Cria o grupo pai (Obrigatório) usando a sigla
+        $parentGroupName = "({$sectorAbbr})";
+        $group = new Group();
+        $parentGroupId = $group->add([
+            'name'        => $parentGroupName,
+            'entities_id' => $entityId,
+        ]);
+
+        if ($parentGroupId) {
+            $result['groups'][] = [
+                'id'   => $parentGroupId,
+                'name' => $parentGroupName,
+            ];
+            // Associa técnicos ao grupo pai
+            foreach ($techUserIds as $tuid) {
+                $groupUser = new Group_User();
+                $groupUser->add([
+                    'users_id'  => $tuid,
+                    'groups_id' => $parentGroupId,
+                ]);
+            }
+        } else {
+            $result['errors'][] = "Falha ao criar grupo pai '{$parentGroupName}'.";
+        }
+
+        // Cria os subgrupos informados e associa TODOS os técnicos a eles também
         foreach ($groupList as $gName) {
+            if (empty($gName)) continue;
+
             $group = new Group();
             $groupId = $group->add([
                 'name'        => $gName,
                 'entities_id' => $entityId,
+                'groups_id'   => $parentGroupId ?: 0,
             ]);
 
             if (!$groupId) {
@@ -165,7 +190,7 @@ class PluginGlpinewentityWizard {
                 'name' => $gName,
             ];
 
-            // Associa técnicos ao grupo
+            // Associa técnicos ao subgrupo
             foreach ($techUserIds as $tuid) {
                 $groupUser = new Group_User();
                 $groupUser->add([

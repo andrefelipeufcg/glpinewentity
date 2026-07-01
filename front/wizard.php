@@ -97,7 +97,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<td>Sigla <span style='color:red;'>*</span></td>";
     echo "<td>";
     echo "<input type='text' name='sector_abbr' class='form-control' style='width: 200px;' placeholder='Ex: DC' maxlength='20' required>";
-    echo "<br><small class='text-muted'>A entidade será criada como \"SIGLA - Nome do Setor\".</small>";
+    echo "<br><small class='text-muted'>A entidade será criada com o mesmo nome da sigla.</small>";
     echo "</td>";
     echo "</tr>";
 
@@ -136,10 +136,10 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     // Grupos
     echo "<tr class='tab_bg_1'>";
-    echo "<td style='width: 35%;'>Nomes dos Grupos <span style='color:red;'>*</span></td>";
+    echo "<td style='width: 35%;'>Subgrupos Opcionais</td>";
     echo "<td>";
-    echo "<input type='text' name='group_names' class='form-control' style='width: 100%;' placeholder='Ex: Suporte Infra, Suporte Software' required>";
-    echo "<br><small class='text-muted'>Separados por vírgula. Cada grupo será vinculado à nova entidade.</small>";
+    echo "<input type='text' name='group_names' class='form-control' style='width: 100%;' placeholder='Ex: Suporte Infra, Suporte Software'>";
+    echo "<br><small class='text-muted'>Separados por vírgula. O grupo pai <strong>({SIGLA})</strong> será criado automaticamente.</small>";
     echo "</td>";
     echo "</tr>";
 
@@ -148,7 +148,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<td>E-mails dos Técnicos</td>";
     echo "<td>";
     echo "<textarea name='tech_emails' class='form-control' style='width: 100%; height: 100px;' placeholder='Um e-mail por linha.&#10;Ex:&#10;maria@instituicao.edu.br&#10;pedro@instituicao.edu.br'></textarea>";
-    echo "<br><small class='text-muted'>Opcional. Os técnicos serão criados (se não existirem) e adicionados a <strong>todos</strong> os grupos acima.</small>";
+    echo "<br><small class='text-muted'>Opcional. Os técnicos serão criados (se não existirem) e adicionados a <strong>todos</strong> os grupos criados (pai e subgrupos).</small>";
     echo "</td>";
     echo "</tr>";
 
