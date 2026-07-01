@@ -92,10 +92,10 @@ class PluginGlpinewentityWizard {
         // =================================================================
         // PASSO 2 — Criar/Encontrar Administrador e Atribuir Perfil
         // =================================================================
-        $adminUserId = self::findOrCreateUser($adminEmail);
+        $adminUserId = self::findUserByEmail($adminEmail);
 
         if (!$adminUserId) {
-            $result['errors'][] = "Falha ao criar/encontrar o usuário admin '{$adminEmail}'.";
+            $result['errors'][] = "O usuário admin '{$adminEmail}' não foi encontrado no GLPI. Cadastre-o antes de prosseguir.";
         } else {
             $result['admin_user_id'] = $adminUserId;
             $result['admin_login']   = $adminEmail;
@@ -132,7 +132,7 @@ class PluginGlpinewentityWizard {
                 $result['errors'][] = "E-mail de técnico inválido: '{$techEmail}'. Ignorado.";
                 continue;
             }
-            $techUserId = self::findOrCreateUser($techEmail);
+            $techUserId = self::findUserByEmail($techEmail);
             if ($techUserId) {
                 $techUserIds[] = $techUserId;
                 $result['technicians'][] = [
@@ -140,7 +140,7 @@ class PluginGlpinewentityWizard {
                     'email' => $techEmail,
                 ];
             } else {
-                $result['errors'][] = "Falha ao criar/encontrar técnico '{$techEmail}'.";
+                $result['errors'][] = "Técnico '{$techEmail}' não encontrado no GLPI. Ignorado.";
             }
         }
 
@@ -239,12 +239,13 @@ class PluginGlpinewentityWizard {
     // =====================================================================
 
     /**
-     * Busca um usuário pelo e-mail. Se não existir, cria com login = e-mail.
+     * Busca um usuário pelo e-mail (em glpi_useremails ou pelo login).
+     * Se não existir, retorna false.
      *
      * @param string $email E-mail institucional
-     * @return int|false ID do usuário ou false em caso de falha
+     * @return int|false ID do usuário ou false em caso de falha/não encontrado
      */
-    private static function findOrCreateUser(string $email) {
+    private static function findUserByEmail(string $email) {
         global $DB;
 
         // Primeiro tenta encontrar pelo e-mail na tabela glpi_useremails
@@ -266,20 +267,8 @@ class PluginGlpinewentityWizard {
             return (int)$user->fields['id'];
         }
 
-        // Não encontrou: cria o usuário
-        // O login será o e-mail completo
-        // O nome real será a parte antes do @
-        $nameParts = explode('@', $email);
-        $realname  = ucfirst(str_replace('.', ' ', $nameParts[0]));
-
-        $userId = $user->add([
-            'name'        => $email,
-            'realname'    => $realname,
-            '_useremails' => [$email],
-            'authtype'    => Auth::DB_GLPI,
-        ]);
-
-        return $userId ?: false;
+        // Não encontrou
+        return false;
     }
 
     /**

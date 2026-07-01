@@ -122,7 +122,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<td style='width: 35%;'>E-mail do Administrador <span style='color:red;'>*</span></td>";
     echo "<td>";
     echo "<input type='email' name='admin_email' class='form-control' style='width: 100%;' placeholder='Ex: joao.silva@instituicao.edu.br' required>";
-    echo "<br><small class='text-muted'>O usuário será criado (se não existir) e receberá o perfil <strong>Admin</strong> na nova entidade, com permissão recursiva.</small>";
+    echo "<br><small class='text-muted'>O e-mail deve pertencer a um usuário <strong>já cadastrado</strong> no GLPI. Ele receberá o perfil <strong>Admin</strong> na nova entidade, com permissão recursiva.</small>";
     echo "</td>";
     echo "</tr>";
 
@@ -148,7 +148,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<td>E-mails dos Técnicos</td>";
     echo "<td>";
     echo "<textarea name='tech_emails' class='form-control' style='width: 100%; height: 100px;' placeholder='Um e-mail por linha.&#10;Ex:&#10;maria@instituicao.edu.br&#10;pedro@instituicao.edu.br'></textarea>";
-    echo "<br><small class='text-muted'>Opcional. Os técnicos serão criados (se não existirem) e adicionados a <strong>todos</strong> os grupos criados (pai e subgrupos).</small>";
+    echo "<br><small class='text-muted'>Opcional. Os técnicos <strong>já devem estar cadastrados</strong> no GLPI e serão adicionados a <strong>todos</strong> os grupos criados (pai e subgrupos).</small>";
     echo "</td>";
     echo "</tr>";
 
