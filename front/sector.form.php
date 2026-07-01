@@ -157,7 +157,83 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
 
-    // ── Bloco 2: Administrador ──
+    // ── Bloco 2: Perfis ──
+    echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
+    echo "<tr><th colspan='2'><i class='fas fa-id-card'></i> Perfis</th></tr>";
+
+    echo "<tr class='tab_bg_1'>";
+    echo "<td colspan='2' style='padding: 15px;'>";
+    
+    echo "<div id='perfis-padrao-section'>";
+
+    // Tableless approach para garantir 100%
+    echo "<div style='display: flex; gap: 10px; margin-bottom: 5px;'>";
+    echo "  <div style='flex: 1; color: #444;'>Perfis Padrão</div>";
+    echo "  <div style='flex: 1; color: #444;'>Copiar de...</div>";
+    echo "</div>";
+
+    echo "<div style='display: flex; gap: 10px; margin-bottom: 10px;'>";
+    echo "  <div style='flex: 1;'><input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly></div>";
+    echo "  <div style='flex: 1;'>";
+    Profile::dropdown(['name' => 'copy_profile_admin', 'display_emptychoice' => true, 'emptylabel' => '-----', 'width' => '100%', 'comments' => false, 'addicon' => false]);
+    echo "  </div>";
+    echo "</div>";
+
+    echo "<div style='display: flex; gap: 10px; margin-bottom: 10px;'>";
+    echo "  <div style='flex: 1;'><input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly></div>";
+    echo "  <div style='flex: 1;'>";
+    Profile::dropdown(['name' => 'copy_profile_support', 'display_emptychoice' => true, 'emptylabel' => '-----', 'width' => '100%', 'comments' => false, 'addicon' => false]);
+    echo "  </div>";
+    echo "</div>";
+
+    echo "<div style='display: flex; gap: 10px; margin-bottom: 10px;'>";
+    echo "  <div style='flex: 1;'><input type='text' id='profile_transfer' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly></div>";
+    echo "  <div style='flex: 1;'>";
+    Profile::dropdown(['name' => 'copy_profile_transfer', 'display_emptychoice' => true, 'emptylabel' => '-----', 'width' => '100%', 'comments' => false, 'addicon' => false]);
+    echo "  </div>";
+    echo "</div>";
+    echo "</div>"; // fecha #perfis-padrao-section
+    
+    echo "<br><small class='text-muted'>Os 'Perfis Padrão' são criados automaticamente com base na SIGLA e não podem ser apagados, mas você pode adicionar um novo em 'Adicionar Perfil'.</small>";
+    echo "</td>";
+    echo "</tr>";
+
+    echo "<tr class='tab_bg_1'>";
+    echo "<td colspan='2' style='padding: 0;'>";
+    echo "<div id='profiles-container'>";
+    
+    // Template oculto para adicionar perfis customizados
+    echo "<div class='profile-block template' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa; display: none;'>";
+    echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
+    echo "      <strong>Perfil Adicional</strong>";
+    echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-profile'><i class='fas fa-trash'></i> Remover</button>";
+    echo "  </div>";
+    echo "  <div style='display: flex; gap: 10px; align-items: flex-start;'>";
+    echo "      <div style='flex: 1;'>";
+    echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Nome do Perfil</label>";
+    echo "          <input type='text' class='form-control profile-input' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador'>";
+    echo "      </div>";
+    echo "      <div style='flex: 1;'>";
+    echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
+    echo "          <div style='display: flex; align-items: center;'>";
+    Profile::dropdown(['name' => 'copy_profile_custom[]', 'display_emptychoice' => true, 'emptylabel' => '-----', 'width' => '100%', 'comments' => false, 'addicon' => false]);
+    echo "          </div>";
+    echo "      </div>";
+    echo "  </div>";
+    echo "</div>";
+
+    echo "</div>";
+    echo "<div style='padding: 0 10px 10px 10px;'>";
+    echo "<button type='button' class='btn btn-success btn-sm' id='btn-add-profile'><i class='fas fa-plus'></i> Adicionar Perfil</button>";
+    echo "</div>";
+    echo "</td>";
+    echo "</tr>";
+
+    echo "</table>";
+
+    echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
+
+    // ── Bloco 3: Administrador ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
     echo "<tr><th colspan='2'><i class='fas fa-user-shield'></i> Administrador Local</th></tr>";
 
@@ -317,6 +393,95 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
             container.append(newBlock);
             index++;
         });
+
+        // ── Lógica para Perfis Padrão ──
+        $('input[name=\'sector_abbr\']').on('input', function() {
+            let abbr = $(this).val().trim();
+            if (abbr === '') {
+                $('#profile_admin').val('');
+                $('#profile_support').val('');
+                $('#profile_transfer').val('');
+            } else {
+                $('#profile_admin').val(abbr + ' - Admin');
+                $('#profile_support').val(abbr + ' - Atendimento');
+                $('#profile_transfer').val(abbr + ' - Transferência de Chamados');
+            }
+        });
+        // Inicializa ao carregar (se houver valor padrão)
+        $('input[name=\'sector_abbr\']').trigger('input');
+
+        // ── Forçar largura 100% nos dropdowns após select2 inicializar ──
+        function fixProfileDropdowns() {
+            $('#perfis-padrao-section .select2-container').each(function() {
+                $(this).css('width', '100%');
+            });
+            // Também esconder ícones de comentário/link que sobraram
+            $('#perfis-padrao-section .dropdown-wrapper > a').hide();
+            $('#perfis-padrao-section .dropdown-wrapper + a').hide();
+            // Forçar dropdown-wrapper a block/100%
+            $('#perfis-padrao-section .dropdown-wrapper').css({
+                'display': 'block',
+                'width': '100%'
+            });
+        }
+        // Executar com delays progressivos para pegar qualquer inicialização tardia do select2
+        fixProfileDropdowns();
+        setTimeout(fixProfileDropdowns, 100);
+        setTimeout(fixProfileDropdowns, 500);
+        setTimeout(fixProfileDropdowns, 1000);
+        setTimeout(fixProfileDropdowns, 2000);
+
+        // ── Lógica para Adicionar Perfis Customizados ──
+        $('#btn-add-profile').on('click', function() {
+            const container = $('#profiles-container');
+            const template = container.find('.profile-block.template');
+            
+            // Valida os visíveis atuais
+            let allFilled = true;
+            container.find('.profile-block:visible').each(function() {
+                const nameVal = $(this).find('.profile-input').val().trim();
+                const copyVal = $(this).find('select').val();
+                if (nameVal === '' || copyVal === '' || copyVal === null || copyVal === '0') {
+                    allFilled = false;
+                }
+            });
+            
+            if (!allFilled) {
+                alert('Por favor, preencha os nomes dos perfis e selecione de qual perfil copiar antes de adicionar um novo.');
+                return;
+            }
+            
+            const newBlock = template.clone();
+            newBlock.removeClass('template');
+            newBlock.css('display', 'block');
+            newBlock.find('.profile-input').attr('name', 'profiles_custom[]');
+            
+            // Remove o lixo do select2 clonado
+            newBlock.find('.select2-container').remove();
+            
+            // Restaura o select original para inicializar o select2 novamente
+            let selectEl = newBlock.find('select');
+            selectEl.removeClass('select2-hidden-accessible')
+                    .removeAttr('data-select2-id')
+                    .removeAttr('tabindex')
+                    .removeAttr('aria-hidden')
+                    .show();
+            
+            // Gera um ID novo
+            let newId = 'dropdown_copy_profile_' + Date.now();
+            selectEl.attr('id', newId);
+            selectEl.find('option').removeAttr('data-select2-id');
+
+            newBlock.find('.btn-remove-profile').on('click', function() {
+                newBlock.remove();
+            });
+            
+            container.append(newBlock);
+
+            // Inicializa select2 no novo dropdown com largura total
+            $('#' + newId).select2({ width: '100%' });
+        });
+
     });
     </script>";
 
