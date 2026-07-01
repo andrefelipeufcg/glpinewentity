@@ -151,14 +151,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "</td>";
     echo "</tr>";
 
-    // Sub-entidades
-    echo "<tr class='tab_bg_1'>";
-    echo "<td>Sub-entidades</td>";
-    echo "<td>";
-    echo "<input type='text' name='sub_entities' class='form-control' style='width: 100%;' placeholder='Ex: Laboratório IA, Laboratório Redes, Núcleo de Pesquisa'>";
-    echo "<br><small class='text-muted'>Opcional. Nomes separados por vírgula. Serão criadas como filhas da entidade principal.</small>";
-    echo "</td>";
-    echo "</tr>";
+
 
     echo "</table>";
 
@@ -363,16 +356,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<td><strong>ID " . $result['entity_id'] . "</strong> — Criada com sucesso</td>";
     echo "</tr>";
 
-    if (!empty($result['sub_entities'])) {
-        echo "<tr class='tab_bg_1'>";
-        echo "<td>Sub-entidades</td>";
-        echo "<td>";
-        foreach ($result['sub_entities'] as $sub) {
-            echo "<span class='badge bg-secondary' style='margin-right: 5px;'>{$sub['name']} (ID {$sub['id']})</span> ";
-        }
-        echo "</td>";
-        echo "</tr>";
-    }
+
     echo "</table>";
 
     // ── Resumo: Admin ──

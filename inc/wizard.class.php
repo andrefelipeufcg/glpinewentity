@@ -18,7 +18,7 @@ class PluginGlpinewentityWizard {
 
         $result = [
             'entity_id'      => 0,
-            'sub_entities'   => [],
+
             'admin_user_id'  => 0,
             'admin_login'    => '',
             'groups'         => [],
@@ -31,7 +31,7 @@ class PluginGlpinewentityWizard {
         $sectorName   = trim($input['sector_name'] ?? '');
         $sectorAbbr   = trim($input['sector_abbr'] ?? '');
         $parentEntity  = (int)($input['parent_entity'] ?? 0);
-        $subEntities   = trim($input['sub_entities'] ?? '');
+
         $adminEmail    = trim($input['admin_email'] ?? '');
         $subgroupsData = is_array($input['subgroups'] ?? null) ? $input['subgroups'] : [];
         $categoryNames = trim($input['category_names'] ?? '');
@@ -95,25 +95,7 @@ class PluginGlpinewentityWizard {
         }
         $result['entity_id'] = $entityId;
 
-        // Sub-entidades (se houver)
-        if (!empty($subEntities)) {
-            $subList = array_filter(array_map('trim', explode(',', $subEntities)));
-            foreach ($subList as $subName) {
-                $subEntity = new Entity();
-                $subId = $subEntity->add([
-                    'name'        => $subName,
-                    'entities_id' => $entityId,
-                ]);
-                if ($subId) {
-                    $result['sub_entities'][] = [
-                        'id'   => $subId,
-                        'name' => $subName,
-                    ];
-                } else {
-                    $result['errors'][] = "Falha ao criar sub-entidade '{$subName}'.";
-                }
-            }
-        }
+
 
         // =================================================================
         // PASSO 2 — Criar/Encontrar Administrador e Atribuir Perfil
