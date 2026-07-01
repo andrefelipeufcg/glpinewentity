@@ -256,21 +256,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     echo "</table>";
 
-    echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
 
-    // ── Bloco 5: Roteamento e E-mail (V2) ──
-    echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-envelope'></i> Roteamento de E-mail</th></tr>";
-
-    echo "<tr class='tab_bg_1'>";
-    echo "<td style='width: 35%;'>E-mail de Suporte</td>";
-    echo "<td>";
-    echo "<input type='email' name='support_email' class='form-control' style='width: 100%;' placeholder='Ex: suporte.dc@instituicao.edu.br' disabled>";
-    echo "<br><small class='text-muted'><i class='fas fa-clock'></i> <strong>Em breve (V2):</strong> Cadastro automático de Coletor de E-mail e Regras de Roteamento (RuleTicket).</small>";
-    echo "</td>";
-    echo "</tr>";
-
-    echo "</table>";
 
     echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
 
