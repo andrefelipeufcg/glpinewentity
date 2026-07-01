@@ -2,7 +2,7 @@
 /**
  * -----------------------------------------------------------------------
  * GLPI New Entity — inc/wizard.class.php
- * Lógica de negócio: cria Entidade, Admin, Grupos, Técnicos e Categorias.
+ * Lógica de negócio: cria Entidade, Admin, Grupos, Técnicos Atendentes e Categorias.
  * -----------------------------------------------------------------------
  */
 
@@ -117,7 +117,7 @@ class PluginGlpinewentityWizard {
         }
 
         // =================================================================
-        // PASSO 3 — Criar Grupos e Associar Técnicos
+        // PASSO 3 — Criar Grupos e Associar Técnicos Atendentes
         // =================================================================
         $groupList = array_filter(array_map('trim', explode(',', $groupNames)));
         $techList  = [];
@@ -125,11 +125,11 @@ class PluginGlpinewentityWizard {
             $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $techEmails)));
         }
 
-        // Cria os usuários técnicos primeiro (reutiliza se já existir)
+        // Cria os usuários técnicos atendentes primeiro (reutiliza se já existir)
         $techUserIds = [];
         foreach ($techList as $techEmail) {
             if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
-                $result['errors'][] = "E-mail de técnico inválido: '{$techEmail}'. Ignorado.";
+                $result['errors'][] = "E-mail de técnico atendente inválido: '{$techEmail}'. Ignorado.";
                 continue;
             }
             $techUserId = self::findUserByEmail($techEmail);
@@ -140,7 +140,7 @@ class PluginGlpinewentityWizard {
                     'email' => $techEmail,
                 ];
             } else {
-                $result['errors'][] = "Técnico '{$techEmail}' não encontrado no GLPI. Ignorado.";
+                $result['errors'][] = "Técnico atendente '{$techEmail}' não encontrado no GLPI. Ignorado.";
             }
         }
 
@@ -157,7 +157,7 @@ class PluginGlpinewentityWizard {
                 'id'   => $parentGroupId,
                 'name' => $parentGroupName,
             ];
-            // Associa técnicos ao grupo pai
+            // Associa técnicos atendentes ao grupo pai
             foreach ($techUserIds as $tuid) {
                 $groupUser = new Group_User();
                 $groupUser->add([
@@ -169,7 +169,7 @@ class PluginGlpinewentityWizard {
             $result['errors'][] = "Falha ao criar grupo pai '{$parentGroupName}'.";
         }
 
-        // Cria os subgrupos informados e associa TODOS os técnicos a eles também
+        // Cria os subgrupos informados e associa TODOS os técnicos atendentes a eles também
         foreach ($groupList as $gName) {
             if (empty($gName)) continue;
 
@@ -190,7 +190,7 @@ class PluginGlpinewentityWizard {
                 'name' => $gName,
             ];
 
-            // Associa técnicos ao subgrupo
+            // Associa técnicos atendentes ao subgrupo
             foreach ($techUserIds as $tuid) {
                 $groupUser = new Group_User();
                 $groupUser->add([

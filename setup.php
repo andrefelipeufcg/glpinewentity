@@ -2,7 +2,7 @@
 /**
  * -----------------------------------------------------------------------
  * GLPI New Entity — Plugin GLPI 11
- * Wizard de onboarding: cria Entidade, Admin local, Grupos, Técnicos
+ * Wizard de onboarding: cria Entidade, Admin local, Grupos, Técnicos Atendentes
  * e Catálogo de Serviços (ITILCategory) em poucos cliques.
  * -----------------------------------------------------------------------
  * @package   glpinewentity

@@ -130,9 +130,9 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
 
-    // ── Bloco 3: Grupos e Técnicos ──
+    // ── Bloco 3: Grupos e Técnicos Atendentes ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-users-cog'></i> Grupos e Técnicos</th></tr>";
+    echo "<tr><th colspan='2'><i class='fas fa-users-cog'></i> Grupos e Técnicos Atendentes</th></tr>";
 
     // Grupos
     echo "<tr class='tab_bg_1'>";
@@ -143,12 +143,12 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "</td>";
     echo "</tr>";
 
-    // Técnicos
+    // Técnicos Atendentes
     echo "<tr class='tab_bg_1'>";
-    echo "<td>E-mails dos Técnicos</td>";
+    echo "<td>E-mails dos Técnicos Atendentes</td>";
     echo "<td>";
     echo "<textarea name='tech_emails' class='form-control' style='width: 100%; height: 100px;' placeholder='Um e-mail por linha.&#10;Ex:&#10;maria@instituicao.edu.br&#10;pedro@instituicao.edu.br'></textarea>";
-    echo "<br><small class='text-muted'>Opcional. Os técnicos <strong>já devem estar cadastrados</strong> no GLPI e serão adicionados a <strong>todos</strong> os grupos criados (pai e subgrupos).</small>";
+    echo "<br><small class='text-muted'>Opcional. Os técnicos atendentes <strong>já devem estar cadastrados</strong> no GLPI e serão adicionados a <strong>todos</strong> os grupos criados (pai e subgrupos).</small>";
     echo "</td>";
     echo "</tr>";
 
@@ -265,10 +265,10 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     }
     echo "</table>";
 
-    // ── Resumo: Técnicos ──
+    // ── Resumo: Técnicos Atendentes ──
     if (!empty($result['technicians'])) {
-        echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-        echo "<tr><th colspan='2'><i class='fas fa-user-cog'></i> Técnicos</th></tr>";
+        echo "<table class='tab_cadre_fixe' style='width: 750px; margin-top: 20px;'>";
+        echo "<tr><th colspan='2'><i class='fas fa-user-cog'></i> Técnicos Atendentes</th></tr>";
         foreach ($result['technicians'] as $t) {
             echo "<tr class='tab_bg_1'>";
             echo "<td style='width: 35%;'>" . htmlspecialchars($t['email']) . "</td>";
