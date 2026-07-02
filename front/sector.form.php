@@ -120,7 +120,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     // ── Bloco 1: Dados da Entidade ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-building'></i> Dados da Entidade</th></tr>";
+    echo "<tr><th colspan='2'><i class='fas fa-building' style='margin-right: 5px;'></i> Dados da Entidade</th></tr>";
 
     // Entidade-Pai (dropdown nativo do GLPI)
     echo "<tr class='tab_bg_1'>";
@@ -159,7 +159,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     // ── Bloco 2: Perfis ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-id-card'></i> Perfis</th></tr>";
+    echo "<tr><th colspan='2'><i class='fas fa-id-card' style='margin-right: 5px;'></i> Perfis</th></tr>";
 
     echo "<tr class='tab_bg_1'>";
     echo "<td colspan='2' style='padding: 15px;'>";
@@ -234,7 +234,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<div class='profile-block template' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa; display: none;'>";
     echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
     echo "      <strong>Perfil Adicional</strong>";
-    echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-profile'><i class='fas fa-trash'></i> Remover</button>";
+    echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-profile'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
     echo "  </div>";
     echo "  <div style='display: flex; gap: 10px; align-items: flex-start;'>";
     echo "      <div style='flex: 1;'>";
@@ -255,7 +255,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     echo "</div>";
     echo "<div style='padding: 0 10px 10px 10px;'>";
-    echo "<button type='button' class='btn btn-success btn-sm' id='btn-add-profile'><i class='fas fa-plus'></i> Adicionar Perfil</button>";
+    echo "<button type='button' class='btn btn-success btn-sm' id='btn-add-profile'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar Perfil</button>";
     echo "</div>";
     echo "</td>";
     echo "</tr>";
@@ -266,7 +266,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     // ── Bloco 3: Administrador ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-user-shield'></i> Administrador Local</th></tr>";
+    echo "<tr><th colspan='2'><i class='fas fa-user-shield' style='margin-right: 5px;'></i> Administrador Local</th></tr>";
 
     echo "<tr class='tab_bg_1'>";
     echo "<td style='width: 35%;'>E-mail do Administrador <span style='color:red;'>*</span></td>";
@@ -282,7 +282,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     // ── Bloco 3: Grupos e Técnicos Atendentes ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-users-cog'></i> Grupos e Técnicos Atendentes</th></tr>";
+    echo "<tr><th colspan='2'><i class='fas fa-users-cog' style='margin-right: 5px;'></i> Grupos e Técnicos Atendentes</th></tr>";
 
     echo "<tr class='tab_bg_1'>";
     echo "<td colspan='2' style='padding: 0;'>";
@@ -293,7 +293,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
         echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
         echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
         echo "      <strong>Subgrupo <span class='sg-index'>1</span></strong>";
-        echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='display:none;'><i class='fas fa-trash'></i> Remover</button>";
+        echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='display:none;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
         echo "  </div>";
         echo "  <div style='margin-bottom: 10px;'>";
         echo "      <label>Nome do Subgrupo</label>";
@@ -320,7 +320,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
             echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
             echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
             echo "      <strong>Subgrupo <span class='sg-index'>".($i+1)."</span></strong>";
-            echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='".($i==0 ? 'display:none;' : '')."'><i class='fas fa-trash'></i> Remover</button>";
+            echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='".($i==0 ? 'display:none;' : '')."'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
             echo "  </div>";
             echo "  <div style='margin-bottom: 10px;'>";
             echo "      <label>Nome do Subgrupo</label>";
@@ -339,7 +339,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "</div>"; // Fim subgroups-container
     
     echo "<div style='margin: 10px;'>";
-    echo "  <button type='button' id='btn-add-subgroup' class='btn btn-sm btn-primary'><i class='fas fa-plus'></i> Adicionar outro Subgrupo</button>";
+    echo "  <button type='button' id='btn-add-subgroup' class='btn btn-sm btn-primary'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar outro Subgrupo</button>";
     echo "</div>";
     
     echo "</td>";
@@ -351,7 +351,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     // ── Bloco 4: Catálogo de Serviços ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-clipboard-list'></i> Catálogo de Serviços (Categorias ITIL)</th></tr>";
+    echo "<tr><th colspan='2'><i class='fas fa-clipboard-list' style='margin-right: 5px;'></i> Catálogo de Serviços (Categorias ITIL)</th></tr>";
 
     echo "<tr class='tab_bg_1'>";
     echo "<td style='width: 35%;'>Categorias de Serviço <span style='color:red;'>*</span></td>";
