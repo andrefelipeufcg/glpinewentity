@@ -73,7 +73,6 @@ if (isset($_POST['process_wizard'])) {
 $def_sector_name = '';
 $def_sector_abbr = '';
 $def_parent_entity = 0;
-$def_admin_email = '';
 $def_category_names = '';
 $def_subgroups = [];
 
@@ -82,7 +81,6 @@ if ($isEdit) {
     $def_sector_name = $sectorObj->fields['sector_name'];
     $def_sector_abbr = $sectorObj->fields['sector_abbr'];
     $def_parent_entity = $sectorObj->fields['entities_id'];
-    $def_admin_email = $meta['admin_login'] ?? '';
     // Monta subgrupos a partir do metadata se necessário (simplificado para form)
     $def_subgroups = $meta['groups'] ?? []; 
 }
@@ -173,50 +171,77 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     echo "<div id='perfis-padrao-section'>";
 
-    echo "<div style='display: flex; gap: 10px; margin-bottom: 5px;'>";
-    echo "  <div style='flex: 1; color: #444;'>Perfis Padrão</div>";
-    echo "  <div style='flex: 1; color: #444;'>Copiar de...</div>";
-    echo "</div>";
+
 
     // Admin
-    echo "<div style='display: flex; gap: 10px; margin-bottom: 10px;'>";
-    echo "  <div style='flex: 1;'><input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly></div>";
-    echo "  <div style='flex: 1;'>";
-    echo "    <select name='copy_profile_admin' class='form-select profile-select2' style='width: 100%;'>";
-    echo "      <option value='0'>-----</option>";
+    echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
+    echo "  <div style='display: flex; gap: 10px;'>";
+    echo "    <div style='flex: 1;'>";
+    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Perfil Padrão</label>";
+    echo "      <input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly>";
+    echo "    </div>";
+    echo "    <div style='flex: 1;'>";
+    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
+    echo "      <select name='copy_profile_admin' class='form-select profile-select2' style='width: 100%;'>";
+    echo "        <option value='0'>-----</option>";
     foreach ($profiles as $pid => $pname) {
         $selected = (strpos($pname, '[Padrão] Admin') !== false) ? 'selected' : '';
-        echo "      <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
+        echo "        <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
     }
-    echo "    </select>";
+    echo "      </select>";
+    echo "    </div>";
+    echo "  </div>";
+    echo "  <div>";
+    echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
+    echo "    <textarea name='users_profile_admin' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
     echo "  </div>";
     echo "</div>";
 
     // Atendimento
-    echo "<div style='display: flex; gap: 10px; margin-bottom: 10px;'>";
-    echo "  <div style='flex: 1;'><input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly></div>";
-    echo "  <div style='flex: 1;'>";
-    echo "    <select name='copy_profile_support' class='form-select profile-select2' style='width: 100%;'>";
-    echo "      <option value='0'>-----</option>";
+    echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
+    echo "  <div style='display: flex; gap: 10px;'>";
+    echo "    <div style='flex: 1;'>";
+    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Perfil Padrão</label>";
+    echo "      <input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly>";
+    echo "    </div>";
+    echo "    <div style='flex: 1;'>";
+    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
+    echo "      <select name='copy_profile_support' class='form-select profile-select2' style='width: 100%;'>";
+    echo "        <option value='0'>-----</option>";
     foreach ($profiles as $pid => $pname) {
         $selected = (strpos($pname, '[Padrão] Atendimento') !== false) ? 'selected' : '';
-        echo "      <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
+        echo "        <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
     }
-    echo "    </select>";
+    echo "      </select>";
+    echo "    </div>";
+    echo "  </div>";
+    echo "  <div>";
+    echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
+    echo "    <textarea name='users_profile_admin' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
     echo "  </div>";
     echo "</div>";
 
     // Transferência de Chamados
-    echo "<div style='display: flex; gap: 10px; margin-bottom: 10px;'>";
-    echo "  <div style='flex: 1;'><input type='text' id='profile_transfer' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly></div>";
-    echo "  <div style='flex: 1;'>";
-    echo "    <select name='copy_profile_transfer' class='form-select profile-select2' style='width: 100%;'>";
-    echo "      <option value='0'>-----</option>";
+    echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;'>";
+    echo "  <div style='display: flex; gap: 10px;'>";
+    echo "    <div style='flex: 1;'>";
+    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Perfil Padrão</label>";
+    echo "      <input type='text' id='profile_transfer' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly>";
+    echo "    </div>";
+    echo "    <div style='flex: 1;'>";
+    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
+    echo "      <select name='copy_profile_transfer' class='form-select profile-select2' style='width: 100%;'>";
+    echo "        <option value='0'>-----</option>";
     foreach ($profiles as $pid => $pname) {
         $selected = (strpos($pname, '[Padrão] Transferência de Chamados') !== false) ? 'selected' : '';
-        echo "      <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
+        echo "        <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
     }
-    echo "    </select>";
+    echo "      </select>";
+    echo "    </div>";
+    echo "  </div>";
+    echo "  <div>";
+    echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
+    echo "    <textarea name='users_profile_admin' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
     echo "  </div>";
     echo "</div>";
 
@@ -251,6 +276,10 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "          </select>";
     echo "      </div>";
     echo "  </div>";
+    echo "  <div style='margin-top: 10px;'>";
+    echo "      <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
+    echo "    <textarea name='users_profile_admin' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+    echo "  </div>";
     echo "</div>";
 
     echo "</div>";
@@ -264,21 +293,6 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
 
-    // ── Bloco 3: Administrador ──
-    echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-user-shield' style='margin-right: 5px;'></i> Administrador Local</th></tr>";
-
-    echo "<tr class='tab_bg_1'>";
-    echo "<td style='width: 35%;'>E-mail do Administrador <span style='color:red;'>*</span></td>";
-    echo "<td>";
-    echo "<input type='email' name='admin_email' class='form-control' style='width: 100%;' placeholder='Ex: joao.silva@instituicao.edu.br' value='" . Html::cleanInputText($def_admin_email) . "' required>";
-    echo "<br><small class='text-muted'>O e-mail deve pertencer a um usuário <strong>já cadastrado</strong> no GLPI. Ele receberá o perfil <strong>Admin</strong> na nova entidade, com permissão recursiva.</small>";
-    echo "</td>";
-    echo "</tr>";
-
-    echo "</table>";
-
-    echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
 
     // ── Bloco 3: Grupos e Técnicos Atendentes ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
@@ -384,6 +398,20 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     echo "<script>
     $(function() {
+        function validateEmailsStr(str) {
+            let cleanStr = str.trim();
+            if (cleanStr === '') return false;
+            let emails = cleanStr.split(/[\\n,]+/);
+            let emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+            for (let i = 0; i < emails.length; i++) {
+                let e = emails[i].trim();
+                if (e !== '' && !emailRegex.test(e)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         let index = 1;
 
         $('#btn-add-subgroup').on('click', function() {
@@ -451,16 +479,20 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
             
             // Valida os visíveis atuais
             let allFilled = true;
+            let emailsValid = true;
             container.find('.profile-block:visible').each(function() {
                 const nameVal = $(this).find('.profile-input').val().trim();
                 const copyVal = $(this).find('select').val();
-                if (nameVal === '' || copyVal === '' || copyVal === null || copyVal === '0') {
+                const usersVal = $(this).find('.profile-users-input').val().trim();
+                if (nameVal === '' || copyVal === '' || copyVal === null || copyVal === '0' || usersVal === '') {
                     allFilled = false;
+                } else if (!validateEmailsStr(usersVal)) {
+                    emailsValid = false;
                 }
             });
             
-            if (!allFilled) {
-                alert('Por favor, preencha os nomes dos perfis e selecione de qual perfil copiar antes de adicionar um novo.');
+            if (!allFilled || !emailsValid) {
+                alert('Por favor, preencha o nome do perfil, selecione de qual perfil copiar e certifique-se de que todos os e-mails informados são válidos (ex: nome@dominio.com) antes de adicionar um novo.');
                 return;
             }
             
@@ -468,6 +500,9 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
             newBlock.removeClass('template');
             newBlock.css('display', 'block');
             newBlock.find('.profile-input').attr('name', 'profiles_custom[]');
+            
+            // Limpa o textarea de usuários
+            newBlock.find('.profile-users-input').val('');
             
             // Remove o lixo do select2 clonado
             newBlock.find('.select2-container').remove();
@@ -493,6 +528,51 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
             // Inicializa select2 no novo dropdown com largura total
             $('#' + newId).select2({ width: '100%' });
+        });
+
+        // Validação no Submit do Formulário
+        $('#form_wizard').on('submit', function(e) {
+            let standardFilled = true;
+            let standardEmailsValid = true;
+            $('#perfis-padrao-section select').each(function() {
+                if ($(this).val() === '0' || $(this).val() === null) {
+                    standardFilled = false;
+                }
+            });
+            $('#perfis-padrao-section textarea').each(function() {
+                let usersVal = $(this).val().trim();
+                if (usersVal === '') {
+                    standardFilled = false;
+                } else if (!validateEmailsStr(usersVal)) {
+                    standardEmailsValid = false;
+                }
+            });
+            
+            if (!standardFilled || !standardEmailsValid) {
+                e.preventDefault();
+                alert('Por favor, selecione de qual perfil copiar e certifique-se de que todos os e-mails informados são válidos (ex: nome@dominio.com) para todos os Perfis Padrão.');
+                return false;
+            }
+
+            let customFilled = true;
+            let customEmailsValid = true;
+            $('#profiles-container .profile-block:visible').each(function() {
+                const nameVal = $(this).find('.profile-input').val().trim();
+                const copyVal = $(this).find('select').val();
+                const usersVal = $(this).find('.profile-users-input').val().trim();
+                
+                if (nameVal === '' || copyVal === '' || copyVal === null || copyVal === '0' || usersVal === '') {
+                    customFilled = false;
+                } else if (!validateEmailsStr(usersVal)) {
+                    customEmailsValid = false;
+                }
+            });
+            
+            if (!customFilled || !customEmailsValid) {
+                e.preventDefault();
+                alert('Por favor, preencha o nome do perfil, selecione de qual perfil copiar e certifique-se de que todos os e-mails informados são válidos (ex: nome@dominio.com) para todos os Perfis Adicionais.');
+                return false;
+            }
         });
 
     });

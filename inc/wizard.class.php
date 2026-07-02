@@ -32,17 +32,12 @@ class PluginGlpinewentityWizard {
         $sectorAbbr   = trim($input['sector_abbr'] ?? '');
         $parentEntity  = (int)($input['parent_entity'] ?? 0);
 
-        $adminEmail    = trim($input['admin_email'] ?? '');
         $subgroupsData = is_array($input['subgroups'] ?? null) ? $input['subgroups'] : [];
         $categoryNames = trim($input['category_names'] ?? '');
 
         // ── Validação básica ──
         if (empty($sectorName) || empty($sectorAbbr)) {
             $result['errors'][] = 'O nome do setor e a sigla são obrigatórios.';
-            return $result;
-        }
-        if (empty($adminEmail) || !filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
-            $result['errors'][] = 'E-mail do Administrador é obrigatório e deve ser válido.';
             return $result;
         }
 
@@ -98,29 +93,61 @@ class PluginGlpinewentityWizard {
 
 
         // =================================================================
-        // PASSO 2 — Criar/Encontrar Administrador e Atribuir Perfil
+        // PASSO 2 — Atribuir Usuários aos Perfis
         // =================================================================
-        $adminUserId = self::findUserByEmail($adminEmail);
+        // Vamos extrair todos os perfis preenchidos (Padrões + Customizados)
+        $profileAssignments = [];
+        
+        // Admin
+        if (!empty($input['copy_profile_admin']) && $input['copy_profile_admin'] > 0 && !empty(trim($input['users_profile_admin'] ?? ''))) {
+            $profileAssignments[] = ['profile_id' => (int)$input['copy_profile_admin'], 'users' => trim($input['users_profile_admin']), 'name' => 'Admin'];
+        }
+        // Atendimento
+        if (!empty($input['copy_profile_support']) && $input['copy_profile_support'] > 0 && !empty(trim($input['users_profile_support'] ?? ''))) {
+            $profileAssignments[] = ['profile_id' => (int)$input['copy_profile_support'], 'users' => trim($input['users_profile_support']), 'name' => 'Atendimento'];
+        }
+        // Transferência
+        if (!empty($input['copy_profile_transfer']) && $input['copy_profile_transfer'] > 0 && !empty(trim($input['users_profile_transfer'] ?? ''))) {
+            $profileAssignments[] = ['profile_id' => (int)$input['copy_profile_transfer'], 'users' => trim($input['users_profile_transfer']), 'name' => 'Transferência de Chamados'];
+        }
+        // Customizados
+        if (!empty($input['copy_profile_custom']) && is_array($input['copy_profile_custom'])) {
+            foreach ($input['copy_profile_custom'] as $idx => $pId) {
+                if ($pId > 0 && !empty(trim($input['users_profile_custom'][$idx] ?? ''))) {
+                    $profileAssignments[] = [
+                        'profile_id' => (int)$pId, 
+                        'users' => trim($input['users_profile_custom'][$idx]), 
+                        'name' => 'Customizado ' . ($idx + 1)
+                    ];
+                }
+            }
+        }
 
-        if (!$adminUserId) {
-            $result['errors'][] = "O usuário admin '{$adminEmail}' não foi encontrado no GLPI. Cadastre-o antes de prosseguir.";
-        } else {
-            $result['admin_user_id'] = $adminUserId;
-            $result['admin_login']   = $adminEmail;
+        foreach ($profileAssignments as $assignment) {
+            $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
+            foreach ($usersList as $userEmail) {
+                if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
+                    $result['errors'][] = "E-mail de usuário inválido para perfil '{$assignment['name']}': '{$userEmail}'. Ignorado.";
+                    continue;
+                }
+                
+                $userId = self::findUserByEmail($userEmail);
+                if (!$userId) {
+                    $result['errors'][] = "Usuário '{$userEmail}' não encontrado no GLPI. Ignorado.";
+                    continue;
+                }
+                
+                $profileUser = new Profile_User();
+                $puId = $profileUser->add([
+                    'users_id'     => $userId,
+                    'profiles_id'  => $assignment['profile_id'],
+                    'entities_id'  => $entityId,
+                    'is_recursive' => 1,
+                ]);
 
-            // Perfil "Admin" no GLPI padrão tem id = 4
-            $profileId = self::getProfileIdByName('Admin');
-
-            $profileUser = new Profile_User();
-            $puId = $profileUser->add([
-                'users_id'     => $adminUserId,
-                'profiles_id'  => $profileId,
-                'entities_id'  => $entityId,
-                'is_recursive' => 1,
-            ]);
-
-            if (!$puId) {
-                $result['errors'][] = "Falha ao atribuir perfil Admin ao usuário '{$adminEmail}' na entidade criada.";
+                if (!$puId) {
+                    $result['errors'][] = "Falha ao atribuir perfil ao usuário '{$userEmail}' na entidade criada.";
+                }
             }
         }
 
@@ -254,7 +281,6 @@ class PluginGlpinewentityWizard {
         $sectorName   = trim($input['sector_name'] ?? '');
         $sectorAbbr   = trim($input['sector_abbr'] ?? '');
         $parentEntity = (int)($input['parent_entity'] ?? 0);
-        $adminEmail   = trim($input['admin_email'] ?? '');
         
         if (empty($sectorName) || empty($sectorAbbr)) {
             $result['errors'][] = 'O nome do setor e a sigla são obrigatórios.';
