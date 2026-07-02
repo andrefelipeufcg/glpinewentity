@@ -164,34 +164,62 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<tr class='tab_bg_1'>";
     echo "<td colspan='2' style='padding: 15px;'>";
     
+    // Carregar lista de perfis do banco
+    $profiles = [];
+    $profile_obj = new Profile();
+    foreach ($profile_obj->find([], ['name']) as $p) {
+        $profiles[$p['id']] = $p['name'];
+    }
+
     echo "<div id='perfis-padrao-section'>";
 
-    // Tableless approach para garantir 100%
     echo "<div style='display: flex; gap: 10px; margin-bottom: 5px;'>";
     echo "  <div style='flex: 1; color: #444;'>Perfis Padrão</div>";
     echo "  <div style='flex: 1; color: #444;'>Copiar de...</div>";
     echo "</div>";
 
+    // Admin
     echo "<div style='display: flex; gap: 10px; margin-bottom: 10px;'>";
     echo "  <div style='flex: 1;'><input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly></div>";
     echo "  <div style='flex: 1;'>";
-    Profile::dropdown(['name' => 'copy_profile_admin', 'display_emptychoice' => true, 'emptylabel' => '-----', 'width' => '100%', 'comments' => false, 'addicon' => false]);
+    echo "    <select name='copy_profile_admin' class='form-select profile-select2' style='width: 100%;'>";
+    echo "      <option value='0'>-----</option>";
+    foreach ($profiles as $pid => $pname) {
+        $selected = (strpos($pname, '[Padrão] Admin') !== false) ? 'selected' : '';
+        echo "      <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
+    }
+    echo "    </select>";
     echo "  </div>";
     echo "</div>";
 
+    // Atendimento
     echo "<div style='display: flex; gap: 10px; margin-bottom: 10px;'>";
     echo "  <div style='flex: 1;'><input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly></div>";
     echo "  <div style='flex: 1;'>";
-    Profile::dropdown(['name' => 'copy_profile_support', 'display_emptychoice' => true, 'emptylabel' => '-----', 'width' => '100%', 'comments' => false, 'addicon' => false]);
+    echo "    <select name='copy_profile_support' class='form-select profile-select2' style='width: 100%;'>";
+    echo "      <option value='0'>-----</option>";
+    foreach ($profiles as $pid => $pname) {
+        $selected = (strpos($pname, '[Padrão] Atendimento') !== false) ? 'selected' : '';
+        echo "      <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
+    }
+    echo "    </select>";
     echo "  </div>";
     echo "</div>";
 
+    // Transferência de Chamados
     echo "<div style='display: flex; gap: 10px; margin-bottom: 10px;'>";
     echo "  <div style='flex: 1;'><input type='text' id='profile_transfer' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly></div>";
     echo "  <div style='flex: 1;'>";
-    Profile::dropdown(['name' => 'copy_profile_transfer', 'display_emptychoice' => true, 'emptylabel' => '-----', 'width' => '100%', 'comments' => false, 'addicon' => false]);
+    echo "    <select name='copy_profile_transfer' class='form-select profile-select2' style='width: 100%;'>";
+    echo "      <option value='0'>-----</option>";
+    foreach ($profiles as $pid => $pname) {
+        $selected = (strpos($pname, '[Padrão] Transferência de Chamados') !== false) ? 'selected' : '';
+        echo "      <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
+    }
+    echo "    </select>";
     echo "  </div>";
     echo "</div>";
+
     echo "</div>"; // fecha #perfis-padrao-section
     
     echo "<br><small class='text-muted'>Os 'Perfis Padrão' são criados automaticamente com base na SIGLA e não podem ser apagados, mas você pode adicionar um novo em 'Adicionar Perfil'.</small>";
@@ -215,9 +243,12 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "      </div>";
     echo "      <div style='flex: 1;'>";
     echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
-    echo "          <div style='display: flex; align-items: center;'>";
-    Profile::dropdown(['name' => 'copy_profile_custom[]', 'display_emptychoice' => true, 'emptylabel' => '-----', 'width' => '100%', 'comments' => false, 'addicon' => false]);
-    echo "          </div>";
+    echo "          <select name='copy_profile_custom[]' class='form-select profile-select2' style='width: 100%;'>";
+    echo "            <option value='0'>-----</option>";
+    foreach ($profiles as $pid => $pname) {
+        echo "            <option value='{$pid}'>" . Html::cleanInputText($pname) . "</option>";
+    }
+    echo "          </select>";
     echo "      </div>";
     echo "  </div>";
     echo "</div>";
@@ -410,26 +441,8 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
         // Inicializa ao carregar (se houver valor padrão)
         $('input[name=\'sector_abbr\']').trigger('input');
 
-        // ── Forçar largura 100% nos dropdowns após select2 inicializar ──
-        function fixProfileDropdowns() {
-            $('#perfis-padrao-section .select2-container').each(function() {
-                $(this).css('width', '100%');
-            });
-            // Também esconder ícones de comentário/link que sobraram
-            $('#perfis-padrao-section .dropdown-wrapper > a').hide();
-            $('#perfis-padrao-section .dropdown-wrapper + a').hide();
-            // Forçar dropdown-wrapper a block/100%
-            $('#perfis-padrao-section .dropdown-wrapper').css({
-                'display': 'block',
-                'width': '100%'
-            });
-        }
-        // Executar com delays progressivos para pegar qualquer inicialização tardia do select2
-        fixProfileDropdowns();
-        setTimeout(fixProfileDropdowns, 100);
-        setTimeout(fixProfileDropdowns, 500);
-        setTimeout(fixProfileDropdowns, 1000);
-        setTimeout(fixProfileDropdowns, 2000);
+        // Inicializa o select2 explicitamente com 100% de largura
+        $('.profile-select2').select2({ width: '100%' });
 
         // ── Lógica para Adicionar Perfis Customizados ──
         $('#btn-add-profile').on('click', function() {
@@ -467,9 +480,9 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
                     .removeAttr('aria-hidden')
                     .show();
             
-            // Gera um ID novo
+            // Gera um ID novo e limpa o valor selecionado
             let newId = 'dropdown_copy_profile_' + Date.now();
-            selectEl.attr('id', newId);
+            selectEl.attr('id', newId).val('0');
             selectEl.find('option').removeAttr('data-select2-id');
 
             newBlock.find('.btn-remove-profile').on('click', function() {
