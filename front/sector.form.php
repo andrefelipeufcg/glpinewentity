@@ -401,7 +401,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
         function validateEmailsStr(str) {
             let cleanStr = str.trim();
             if (cleanStr === '') return false;
-            let emails = cleanStr.split(/[\n,]+/);
+            let emails = cleanStr.split(/[\\n,]+/);
             let emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
             for (let i = 0; i < emails.length; i++) {
                 let e = emails[i].trim();
