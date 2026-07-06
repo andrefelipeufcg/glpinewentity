@@ -311,11 +311,11 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
         echo "  </div>";
         echo "  <div style='margin-bottom: 10px;'>";
         echo "      <label>Nome do Subgrupo</label>";
-        echo "      <input type='text' name='subgroups[0][name]' class='form-control' style='width: 100%;' placeholder='Ex: Suporte Infra (Deixe em branco para alocar no Grupo Pai)'>";
+        echo "      <input type='text' name='subgroups[0][name]' class='form-control' style='width: 100%;' placeholder='Ex: Suporte Nível 1 (Deixe em branco para alocar no Grupo Pai)'>";
         echo "  </div>";
         echo "  <div>";
         echo "      <label>E-mails dos Técnicos Atendentes</label>";
-        echo "      <textarea name='subgroups[0][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira os e-mails separados por vírgula ou quebra de linha. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+        echo "      <textarea name='subgroups[0][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
         echo "      <small class='text-muted'>Devem estar cadastrados no GLPI. Se informar um subgrupo, os técnicos irão EXCLUSIVAMENTE para ele. Senão, irão para o Grupo Pai <strong>({SIGLA})</strong>.</small>";
         echo "  </div>";
         echo "</div>";
@@ -338,11 +338,11 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
             echo "  </div>";
             echo "  <div style='margin-bottom: 10px;'>";
             echo "      <label>Nome do Subgrupo</label>";
-            echo "      <input type='text' name='subgroups[{$i}][name]' class='form-control' style='width: 100%;' value='{$sgName}' placeholder='Ex: Suporte Infra (Deixe em branco para alocar no Grupo Pai)'>";
+            echo "      <input type='text' name='subgroups[{$i}][name]' class='form-control' style='width: 100%;' value='{$sgName}' placeholder='Ex: Suporte Nível 1 (Deixe em branco para alocar no Grupo Pai)'>";
             echo "  </div>";
             echo "  <div>";
             echo "      <label>E-mails dos Técnicos Atendentes</label>";
-            echo "      <textarea name='subgroups[{$i}][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira os e-mails separados por vírgula ou quebra de linha. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+            echo "      <textarea name='subgroups[{$i}][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
             echo "      <small class='text-muted'>Na edição, não estamos listando os e-mails antigos. Se quiser sincronizar, preencha novamente.</small>";
             echo "  </div>";
             echo "</div>";
@@ -401,7 +401,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
         function validateEmailsStr(str) {
             let cleanStr = str.trim();
             if (cleanStr === '') return false;
-            let emails = cleanStr.split(/[\\n,]+/);
+            let emails = cleanStr.split(/[,]+/);
             let emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
             for (let i = 0; i < emails.length; i++) {
                 let e = emails[i].trim();
