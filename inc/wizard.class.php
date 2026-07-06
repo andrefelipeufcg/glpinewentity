@@ -124,7 +124,7 @@ class PluginGlpinewentityWizard {
         }
 
         foreach ($profileAssignments as $assignment) {
-            $usersList = array_filter(array_map('trim', explode(',', $assignment['users'])));
+            $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
             foreach ($usersList as $userEmail) {
                 if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
                     $result['errors'][] = "E-mail de usuário inválido para perfil '{$assignment['name']}': '{$userEmail}'. Ignorado.";
@@ -183,7 +183,7 @@ class PluginGlpinewentityWizard {
                 // Processa técnicos deste bloco
                 $techUserIds = [];
                 if (!empty($sgTechs)) {
-                    $techList = array_filter(array_map('trim', explode(',', $sgTechs)));
+                    $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $sgTechs)));
                     foreach ($techList as $techEmail) {
                         if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
                             $result['errors'][] = "E-mail de técnico atendente inválido: '{$techEmail}'. Ignorado.";

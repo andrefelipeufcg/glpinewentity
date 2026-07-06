@@ -193,7 +193,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  </div>";
     echo "  <div>";
     echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-    echo "    <textarea name='users_profile_admin' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+    echo "    <textarea name='users_profile_admin' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
     echo "  </div>";
     echo "</div>";
 
@@ -217,7 +217,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  </div>";
     echo "  <div>";
     echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-    echo "    <textarea name='users_profile_support' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+    echo "    <textarea name='users_profile_support' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
     echo "  </div>";
     echo "</div>";
 
@@ -241,7 +241,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  </div>";
     echo "  <div>";
     echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-    echo "    <textarea name='users_profile_transfer' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+    echo "    <textarea name='users_profile_transfer' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
     echo "  </div>";
     echo "</div>";
 
@@ -278,7 +278,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  </div>";
     echo "  <div style='margin-top: 10px;'>";
     echo "      <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-    echo "      <textarea name='users_profile_custom[]' class='form-control profile-users-input' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+    echo "      <textarea name='users_profile_custom[]' class='form-control profile-users-input' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
     echo "  </div>";
     echo "</div>";
 
@@ -315,7 +315,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
         echo "  </div>";
         echo "  <div>";
         echo "      <label>E-mails dos Técnicos Atendentes</label>";
-        echo "      <textarea name='subgroups[0][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+        echo "      <textarea name='subgroups[0][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
         echo "      <small class='text-muted'>Devem estar cadastrados no GLPI. Se informar um subgrupo, os técnicos irão EXCLUSIVAMENTE para ele. Senão, irão para o Grupo Pai <strong>({SIGLA})</strong>.</small>";
         echo "  </div>";
         echo "</div>";
@@ -342,7 +342,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
             echo "  </div>";
             echo "  <div>";
             echo "      <label>E-mails dos Técnicos Atendentes</label>";
-            echo "      <textarea name='subgroups[{$i}][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula. (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+            echo "      <textarea name='subgroups[{$i}][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
             echo "      <small class='text-muted'>Na edição, não estamos listando os e-mails antigos. Se quiser sincronizar, preencha novamente.</small>";
             echo "  </div>";
             echo "</div>";
@@ -401,7 +401,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
         function validateEmailsStr(str) {
             let cleanStr = str.trim();
             if (cleanStr === '') return false;
-            let emails = cleanStr.split(/[,]+/);
+            let emails = cleanStr.split(/[\n,]+/);
             let emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
             for (let i = 0; i < emails.length; i++) {
                 let e = emails[i].trim();
