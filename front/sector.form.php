@@ -370,8 +370,8 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<tr class='tab_bg_1'>";
     echo "<td style='width: 35%;'>Categorias de Serviço <span style='color:red;'>*</span></td>";
     echo "<td>";
-    echo "<textarea name='category_names' class='form-control' style='width: 100%; height: 120px;' placeholder='Uma categoria por linha.&#10;Ex:&#10;Manutenção de Hardware&#10;Instalação de Software&#10;Acesso à Rede' required></textarea>";
-    echo "<br><small class='text-muted'>Cada categoria será vinculada exclusivamente à nova entidade, habilitada para Incidentes e Requisições.</small>";
+    echo "<textarea name='category_names' class='form-control' style='width: 100%; height: 160px; overflow-y: scroll;' placeholder='Uma categoria por linha. Use hífen (-) para subcategorias.&#10;Ex:&#10;Hardware&#10;- Manutenção de Hardware&#10;-- Troca de Peças&#10;Software&#10;- Instalação de Software' required></textarea>";
+    echo "<br><small class='text-muted'>Cada categoria será vinculada exclusivamente à nova entidade, habilitada para Incidentes e Requisições.<br><strong>Importante:</strong> O sistema só identificará a hierarquia (Categorias Pai e Filha) se você usar o hífen (-) no início da linha correspondente.</small>";
     echo "</td>";
     echo "</tr>";
 

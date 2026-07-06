@@ -240,24 +240,56 @@ class PluginGlpinewentityWizard {
         // PASSO 4 — Criar Categorias ITIL
         // =================================================================
         $catList = array_filter(array_map('trim', preg_split('/[\n]+/', $categoryNames)));
+        $lastIdAtDepth = [];
 
-        foreach ($catList as $catName) {
+        foreach ($catList as $line) {
+            // Conta hífens no início da linha
+            preg_match('/^-+/', $line, $matches);
+            $hyphensCount = !empty($matches[0]) ? strlen($matches[0]) : 0;
+            
+            // Remove hífens e espaços do início
+            $cleanName = trim(substr($line, $hyphensCount));
+            
+            if (empty($cleanName)) {
+                continue;
+            }
+
+            // Descobre o parentId verificando os níveis acima
+            $parentId = 0;
+            for ($d = $hyphensCount - 1; $d >= 0; $d--) {
+                if (isset($lastIdAtDepth[$d])) {
+                    $parentId = $lastIdAtDepth[$d];
+                    break;
+                }
+            }
+
             $category = new ITILCategory();
             $catId = $category->add([
-                'name'         => $catName,
-                'entities_id'  => $entityId,
-                'is_recursive' => 1,
-                'is_incident'  => 1,
-                'is_request'   => 1,
+                'name'              => $cleanName,
+                'entities_id'       => $entityId,
+                'itilcategories_id' => $parentId,
+                'is_recursive'      => 1,
+                'is_incident'       => 1,
+                'is_request'        => 1,
             ]);
 
             if ($catId) {
+                // Atualiza o ID mais recente para a profundidade atual
+                $lastIdAtDepth[$hyphensCount] = $catId;
+                
+                // Limpa os IDs das profundidades maiores, pois agora estamos em um novo galho
+                foreach (array_keys($lastIdAtDepth) as $d) {
+                    if ($d > $hyphensCount) {
+                        unset($lastIdAtDepth[$d]);
+                    }
+                }
+                
                 $result['categories'][] = [
                     'id'   => $catId,
-                    'name' => $catName,
+                    'name' => $cleanName,
                 ];
             } else {
-                $result['errors'][] = "Falha ao criar categoria '{$catName}'.";
+                $result['errors'][] = "Falha ao criar categoria '{$cleanName}'.";
             }
         }
 
