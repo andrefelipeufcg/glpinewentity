@@ -94,6 +94,15 @@ global $CFG_GLPI;
 $form_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php';
 
 echo "<div class='center' style='margin-top: 20px;'>";
+echo "<style>
+        .tab_cadre_fixe td {
+            vertical-align: top !important;
+        }
+        .tab_cadre_fixe td:not([style*=\"padding: 0\"]) {
+            padding-top: 15px !important;
+            padding-bottom: 15px !important;
+        }
+    </style>";
 
 // =====================================================================
 // FORMULÁRIO WIZARD
