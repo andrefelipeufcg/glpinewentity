@@ -86,8 +86,219 @@ if ($isEdit) {
     $def_sector_name = $sectorObj->fields['sector_name'];
     $def_sector_abbr = $sectorObj->fields['sector_abbr'];
     $def_parent_entity = $sectorObj->fields['entities_id'];
-    // Monta subgrupos a partir do metadata se necessário (simplificado para form)
-    $def_subgroups = $meta['groups'] ?? []; 
+    
+    // Reconstruir subgrupos e técnicos a partir do banco (live)
+    $def_subgroups = [];
+    $live_success = false;
+    if (!empty($meta['entity_id'])) {
+        global $DB;
+        $parentGroupIter = $DB->request([
+            'SELECT' => ['id', 'groups_id'],
+            'FROM'   => 'glpi_groups',
+            'WHERE'  => [
+                'entities_id' => $meta['entity_id']
+            ]
+        ]);
+        
+        $parentGroupId = 0;
+        foreach ($parentGroupIter as $row) {
+            if (empty($row['groups_id'])) {
+                $parentGroupId = $row['id'];
+                break;
+            }
+        }
+        
+        if ($parentGroupId > 0) {
+            $def_subgroups[] = ['name' => '', 'techs' => []]; // Bloco Pai
+            
+            $subgroupsIter = $DB->request([
+                'SELECT' => ['id', 'name'],
+                'FROM'   => 'glpi_groups',
+                'WHERE'  => ['groups_id' => $parentGroupId]
+            ]);
+            
+            $sgMap = [$parentGroupId => 0]; // group_id => index in $def_subgroups
+            $idx = 1;
+            foreach ($subgroupsIter as $row) {
+                // Se a view nativa mostra nomes certos mas tem um prefixo ou algo assim, pegamos o nome real
+                $def_subgroups[] = ['name' => $row['name'], 'techs' => []];
+                $sgMap[$row['id']] = $idx++;
+            }
+            
+            // Buscar emails dos técnicos
+            $allGroupIds = array_keys($sgMap);
+            $techsIter = $DB->request([
+                'SELECT' => ['glpi_groups_users.groups_id', 'glpi_useremails.email'],
+                'FROM'   => 'glpi_groups_users',
+                'INNER JOIN' => [
+                    'glpi_useremails' => [
+                        'ON' => [
+                            'glpi_groups_users' => 'users_id',
+                            'glpi_useremails'   => 'users_id'
+                        ]
+                    ]
+                ],
+                'WHERE'  => [
+                    'glpi_groups_users.groups_id' => $allGroupIds,
+                    'glpi_useremails.is_default'  => 1
+                ]
+            ]);
+            
+            foreach ($techsIter as $row) {
+                $gId = $row['groups_id'];
+                if (isset($sgMap[$gId])) {
+                    $def_subgroups[$sgMap[$gId]]['techs'][] = $row['email'];
+                }
+            }
+            $live_success = true;
+        }
+    }
+    
+    // Fallback para metadata antiga se a query live falhar ou não houver entidade criada
+    if (!$live_success && !empty($meta['groups'])) {
+        foreach ($meta['groups'] as $g) {
+            $gName = $g['name'];
+            $isParent = (strpos($gName, '(' . $def_sector_abbr . ')') !== false);
+            $sgName = $isParent ? '' : $gName;
+            $def_subgroups[] = [
+                'name' => $sgName,
+                'techs' => []
+            ];
+        }
+        
+        if (!empty($meta['technicians'])) {
+            foreach ($meta['technicians'] as $tech) {
+                $parts = explode(' -> ', $tech['email']);
+                $email = trim($parts[0]);
+                $groupTarget = trim($parts[1] ?? '');
+                
+                foreach ($def_subgroups as &$sg) {
+                    if (($groupTarget === 'Pai' && $sg['name'] === '') || ($groupTarget !== 'Pai' && $sg['name'] === $groupTarget)) {
+                        $sg['techs'][] = $email;
+                        break;
+                    }
+                }
+                unset($sg);
+            }
+        }
+    }
+
+    foreach ($def_subgroups as &$sg) {
+        $sg['techs'] = implode("\n", $sg['techs']);
+    }
+    unset($sg); // IMPORTANTE: quebra a referência para evitar corrupção no próximo foreach
+    
+    // Se por acaso vier vazio, garante pelo menos um bloco
+    if (empty($def_subgroups)) {
+        $def_subgroups[0] = ['name' => '', 'techs' => ''];
+    }
+
+
+    // Reconstruir categorias a partir do banco para manter a hierarquia com hífens
+    $catList = [];
+    if (!empty($meta['entity_id'])) {
+        global $DB;
+        $cat_iterator = $DB->request([
+            'SELECT' => ['id', 'name', 'itilcategories_id'],
+            'FROM'   => 'glpi_itilcategories',
+            'WHERE'  => ['entities_id' => $meta['entity_id']]
+        ]);
+        
+        $cats = [];
+        $children = [];
+        foreach ($cat_iterator as $row) {
+            $cats[$row['id']] = $row;
+            $children[$row['itilcategories_id']][] = $row['id'];
+        }
+        
+        $buildTree = function($parentId, $depth) use (&$buildTree, &$catList, &$cats, &$children) {
+            if (isset($children[$parentId])) {
+                foreach ($children[$parentId] as $childId) {
+                    $prefix = str_repeat('-', $depth);
+                    $catList[] = $prefix . $cats[$childId]['name'];
+                    $buildTree($childId, $depth + 1);
+                }
+            }
+        };
+        
+        $buildTree(0, 0);
+    }
+    
+    // Fallback caso a entidade não tenha sido criada ou não tenha categorias no DB
+    if (empty($catList) && !empty($meta['categories'])) {
+        foreach ($meta['categories'] as $c) {
+            $catList[] = $c['name'];
+        }
+    }
+    $def_category_names = implode("\n", $catList);
+
+    // Reconstruir Perfis (Buscando diretamente do banco para a entidade criada)
+    $def_profiles = [
+        'admin' => ['id' => 0, 'emails' => []],
+        'support' => ['id' => 0, 'emails' => []],
+        'transfer' => ['id' => 0, 'emails' => []],
+        'custom' => []
+    ];
+    if (!empty($meta['entity_id'])) {
+        global $DB;
+        $pu_iterator = $DB->request([
+            'SELECT' => [
+                'glpi_profiles_users.profiles_id',
+                'glpi_useremails.email',
+                'glpi_profiles.name AS profile_name'
+            ],
+            'FROM'   => 'glpi_profiles_users',
+            'INNER JOIN' => [
+                'glpi_useremails' => [
+                    'ON' => [
+                        'glpi_profiles_users' => 'users_id',
+                        'glpi_useremails' => 'users_id'
+                    ]
+                ],
+                'glpi_profiles' => [
+                    'ON' => [
+                        'glpi_profiles_users' => 'profiles_id',
+                        'glpi_profiles' => 'id'
+                    ]
+                ]
+            ],
+            'WHERE'  => [
+                'glpi_profiles_users.entities_id' => $meta['entity_id']
+            ]
+        ]);
+        
+        $profile_map = [];
+        foreach ($pu_iterator as $row) {
+            $pid = $row['profiles_id'];
+            $pname = $row['profile_name'];
+            $email = $row['email'];
+            
+            if (!isset($profile_map[$pid])) {
+                if (strpos($pname, '[Padrão] Admin') !== false) {
+                    $profile_map[$pid] = 'admin';
+                } elseif (strpos($pname, '[Padrão] Atendimento') !== false) {
+                    $profile_map[$pid] = 'support';
+                } elseif (strpos($pname, '[Padrão] Transferência de Chamados') !== false) {
+                    $profile_map[$pid] = 'transfer';
+                } else {
+                    $def_profiles['custom'][] = [
+                        'id' => $pid,
+                        'emails' => []
+                    ];
+                    $profile_map[$pid] = 'custom_' . (count($def_profiles['custom']) - 1);
+                }
+            }
+            
+            $map_key = $profile_map[$pid];
+            if (str_starts_with($map_key, 'custom_')) {
+                $idx = (int)str_replace('custom_', '', $map_key);
+                $def_profiles['custom'][$idx]['emails'][] = $email;
+            } else {
+                $def_profiles[$map_key]['emails'][] = $email;
+                $def_profiles[$map_key]['id'] = $pid;
+            }
+        }
+    }
 }
 
 // -----------------------------------------------------------------------
@@ -135,14 +346,14 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     // Entidade-Pai (dropdown nativo do GLPI)
     echo "<tr class='tab_bg_1'>";
-    echo "<td style='width: 35%;'>Entidade-Pai <span style='color:red;'>*</span></td>";
-    echo "<td>";
+    echo "      <td style='width: 35%;'>Entidade-Pai <span style='color:red;'>*</span></td>";
+    echo "      <td>";
     Entity::dropdown([
         'name'  => 'parent_entity',
-        'value' => 0,
+        'value' => $def_parent_entity,
     ]);
-    echo "<br><small class='text-muted'>Selecione sob qual entidade o novo setor será criado.</small>";
-    echo "</td>";
+    echo "          <br><small class='text-muted'>Selecione sob qual entidade o novo setor será criado.</small>";
+    echo "      </td>";
     echo "</tr>";
 
     // Nome do Setor
@@ -197,8 +408,13 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
     echo "      <select name='copy_profile_admin' class='form-select profile-select2' style='width: 100%;'>";
     echo "        <option value='0'>-----</option>";
+    $adminId = $def_profiles['admin']['id'] ?? 0;
     foreach ($profiles as $pid => $pname) {
-        $selected = (strpos($pname, '[Padrão] Admin') !== false) ? 'selected' : '';
+        if ($adminId > 0) {
+            $selected = ($pid == $adminId) ? 'selected' : '';
+        } else {
+            $selected = (strpos($pname, '[Padrão] Admin') !== false) ? 'selected' : '';
+        }
         echo "        <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
     }
     echo "      </select>";
@@ -206,7 +422,8 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  </div>";
     echo "  <div>";
     echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-    echo "    <textarea name='users_profile_admin' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+    $adminEmails = Html::cleanInputText(implode("\n", $def_profiles['admin']['emails'] ?? []));
+    echo "    <textarea name='users_profile_admin' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$adminEmails}</textarea>";
     echo "  </div>";
     echo "</div>";
 
@@ -221,8 +438,13 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
     echo "      <select name='copy_profile_support' class='form-select profile-select2' style='width: 100%;'>";
     echo "        <option value='0'>-----</option>";
+    $supportId = $def_profiles['support']['id'] ?? 0;
     foreach ($profiles as $pid => $pname) {
-        $selected = (strpos($pname, '[Padrão] Atendimento') !== false) ? 'selected' : '';
+        if ($supportId > 0) {
+            $selected = ($pid == $supportId) ? 'selected' : '';
+        } else {
+            $selected = (strpos($pname, '[Padrão] Atendimento') !== false) ? 'selected' : '';
+        }
         echo "        <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
     }
     echo "      </select>";
@@ -230,7 +452,8 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  </div>";
     echo "  <div>";
     echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-    echo "    <textarea name='users_profile_support' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+    $supportEmails = Html::cleanInputText(implode("\n", $def_profiles['support']['emails'] ?? []));
+    echo "    <textarea name='users_profile_support' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$supportEmails}</textarea>";
     echo "  </div>";
     echo "</div>";
 
@@ -245,8 +468,13 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
     echo "      <select name='copy_profile_transfer' class='form-select profile-select2' style='width: 100%;'>";
     echo "        <option value='0'>-----</option>";
+    $transferId = $def_profiles['transfer']['id'] ?? 0;
     foreach ($profiles as $pid => $pname) {
-        $selected = (strpos($pname, '[Padrão] Transferência de Chamados') !== false) ? 'selected' : '';
+        if ($transferId > 0) {
+            $selected = ($pid == $transferId) ? 'selected' : '';
+        } else {
+            $selected = (strpos($pname, '[Padrão] Transferência de Chamados') !== false) ? 'selected' : '';
+        }
         echo "        <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
     }
     echo "      </select>";
@@ -254,7 +482,8 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  </div>";
     echo "  <div>";
     echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-    echo "    <textarea name='users_profile_transfer' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+    $transferEmails = Html::cleanInputText(implode("\n", $def_profiles['transfer']['emails'] ?? []));
+    echo "    <textarea name='users_profile_transfer' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$transferEmails}</textarea>";
     echo "  </div>";
     echo "</div>";
 
@@ -295,6 +524,42 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  </div>";
     echo "</div>";
 
+    // Renderiza perfis customizados existentes na edição
+    if (!empty($def_profiles['custom'])) {
+        foreach ($def_profiles['custom'] as $cProf) {
+            $cEmails = Html::cleanInputText(implode("\n", $cProf['emails'] ?? []));
+            $cId = $cProf['id'];
+            
+            echo "<div class='profile-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
+            echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
+            echo "      <strong>Perfil Adicional</strong>";
+            echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-profile'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
+            echo "  </div>";
+            echo "  <div style='display: flex; gap: 10px; align-items: flex-start;'>";
+            echo "      <div style='flex: 1;'>";
+            echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Nome do Perfil</label>";
+            echo "          <input type='text' class='form-control profile-input' name='profiles_custom[]' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' value=''>";
+            echo "          <small class='text-muted'>O nome original não é carregado na edição, preencha novamente se desejar salvar outro.</small>";
+            echo "      </div>";
+            echo "      <div style='flex: 1;'>";
+            echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
+            echo "          <select name='copy_profile_custom[]' class='form-select profile-select2' style='width: 100%;'>";
+            echo "            <option value='0'>-----</option>";
+            foreach ($profiles as $pid => $pname) {
+                $selected = ($pid == $cId) ? 'selected' : '';
+                echo "            <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
+            }
+            echo "          </select>";
+            echo "      </div>";
+            echo "  </div>";
+            echo "  <div style='margin-top: 10px;'>";
+            echo "      <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
+            echo "      <textarea name='users_profile_custom[]' class='form-control profile-users-input' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$cEmails}</textarea>";
+            echo "  </div>";
+            echo "</div>";
+        }
+    }
+
     echo "</div>";
     echo "<div style='padding: 0 10px 10px 10px;'>";
     echo "<button type='button' class='btn btn-success btn-sm' id='btn-add-profile'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar Perfil</button>";
@@ -317,6 +582,9 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     
     if (empty($def_subgroups) || count($def_subgroups) <= 1) {
         // Se não tem subgrupos, ou só tem o pai (índice 0), renderiza 1 bloco vazio
+        $sg0Name = Html::cleanInputText($def_subgroups[0]['name'] ?? '');
+        $sg0Techs = Html::cleanInputText($def_subgroups[0]['techs'] ?? '');
+        
         echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
         echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
         echo "      <strong>Subgrupo <span class='sg-index'>1</span></strong>";
@@ -324,11 +592,11 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
         echo "  </div>";
         echo "  <div style='margin-bottom: 10px;'>";
         echo "      <label>Nome do Subgrupo</label>";
-        echo "      <input type='text' name='subgroups[0][name]' class='form-control' style='width: 100%;' placeholder='Ex: Suporte Nível 1 (Deixe em branco para alocar no Grupo Pai)'>";
+        echo "      <input type='text' name='subgroups[0][name]' class='form-control' style='width: 100%;' value='" . $sg0Name . "' placeholder='Ex: Suporte Nível 1 (Deixe em branco para alocar no Grupo Pai)'>";
         echo "  </div>";
         echo "  <div>";
         echo "      <label>E-mails dos Técnicos Atendentes</label>";
-        echo "      <textarea name='subgroups[0][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+        echo "      <textarea name='subgroups[0][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>" . $sg0Techs . "</textarea>";
         echo "      <small class='text-muted'>Devem estar cadastrados no GLPI. Se informar um subgrupo, os técnicos irão EXCLUSIVAMENTE para ele. Senão, irão para o Grupo Pai <strong>({SIGLA})</strong>.</small>";
         echo "  </div>";
         echo "</div>";
@@ -339,10 +607,8 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
         foreach ($def_subgroups as $idx => $sg) {
             if ($idx === 0) continue; // Pula o grupo pai que só foi salvo no metadata, mas não no form
             
-            // Wait, this requires mapping technicians for each group. The metadata currently doesn't store techs per group easily!
-            // I'll just render empty blocks based on the count for now, because extracting techs back to textarea is complex.
-            // Actually, let's just render the names.
             $sgName = Html::cleanInputText($sg['name']);
+            $sgTechs = Html::cleanInputText($sg['techs'] ?? '');
             
             echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
             echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
@@ -355,8 +621,8 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
             echo "  </div>";
             echo "  <div>";
             echo "      <label>E-mails dos Técnicos Atendentes</label>";
-            echo "      <textarea name='subgroups[{$i}][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
-            echo "      <small class='text-muted'>Na edição, não estamos listando os e-mails antigos. Se quiser sincronizar, preencha novamente.</small>";
+            echo "      <textarea name='subgroups[{$i}][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$sgTechs}</textarea>";
+            echo "      <small class='text-muted'>Na edição, carregamos os e-mails salvos na base da entidade. Se quiser sincronizar, modifique e salve.</small>";
             echo "  </div>";
             echo "</div>";
             $i++;
@@ -383,7 +649,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "<tr class='tab_bg_1'>";
     echo "<td style='width: 35%;'>Categorias de Serviço <span style='color:red;'>*</span></td>";
     echo "<td>";
-    echo "<textarea name='category_names' class='form-control' style='width: 100%; height: 160px; overflow-y: scroll;' placeholder='Uma categoria por linha. Use hífen (-) para subcategorias.&#10;Ex:&#10;Hardware&#10;- Manutenção de Hardware&#10;-- Troca de Peças&#10;Software&#10;- Instalação de Software' required></textarea>";
+    echo "<textarea name='category_names' class='form-control' style='width: 100%; height: 160px; overflow-y: scroll;' placeholder='Uma categoria por linha. Use hífen (-) para subcategorias.&#10;Ex:&#10;Hardware&#10;- Manutenção de Hardware&#10;-- Troca de Peças&#10;Software&#10;- Instalação de Software' required>" . Html::cleanInputText($def_category_names) . "</textarea>";
     echo "<br><small class='text-muted'>Cada categoria será vinculada exclusivamente à nova entidade, habilitada para Incidentes e Requisições.<br><strong>Importante:</strong> O sistema só identificará a hierarquia (Categorias Pai e Filha) se você usar o hífen (-) no início da linha correspondente.</small>";
     echo "</td>";
     echo "</tr>";
@@ -425,7 +691,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
             return true;
         }
 
-        let index = 1;
+        let index = $('.subgroup-block').length;
 
         $('#btn-add-subgroup').on('click', function() {
             const container = $('#subgroups-container');

@@ -40,6 +40,13 @@ class PluginGlpinewentitySector extends CommonDBTM {
     }
 
     /**
+     * Define o campo usado como 'nome' para que o GLPI crie os links corretamente.
+     */
+    public static function getNameField() {
+        return 'sector_abbr';
+    }
+
+    /**
      * Define as colunas que aparecem na tela de busca (Grid)
      */
     public function rawSearchOptions() {
@@ -56,7 +63,7 @@ class PluginGlpinewentitySector extends CommonDBTM {
             'table'              => $this->getTable(),
             'field'              => 'sector_abbr',
             'name'               => 'Sigla',
-            'datatype'           => 'string',
+            'datatype'           => 'itemlink',
         ];
 
         // 2. Nome do Setor
