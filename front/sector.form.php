@@ -29,7 +29,12 @@ if ($sectorId > 0) {
 }
 
 if (isset($_POST['process_wizard'])) {
-    Session::checkCSRF($_POST);
+    // No GLPI 11+, o CheckCsrfListener já valida e consome o token globalmente.
+    // Chamar checkCSRF novamente falha porque o token já foi consumido.
+    // Em versões antigas (ex: 9.5), precisamos checar manualmente.
+    if (!class_exists('Glpi\Kernel\Listener\ControllerListener\CheckCsrfListener')) {
+        Session::checkCSRF($_POST);
+    }
 
     if ($isEdit) {
         $result = PluginGlpinewentityWizard::processUpdate($_POST, $sectorObj->fields);
@@ -110,7 +115,6 @@ echo "<style>
 if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     echo "<form method='post' action='" . $form_url . "' id='form_wizard'>";
-    echo Html::hidden('_glpi_csrf_token', ['value' => Session::getNewCSRFToken()]);
     echo "<input type='hidden' name='process_wizard' value='1'>";
     if ($isEdit) {
         echo "<input type='hidden' name='id' value='{$sectorId}'>";
