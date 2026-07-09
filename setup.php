@@ -28,7 +28,9 @@ function plugin_init_glpinewentity(): void {
 
     $plugin = new Plugin();
     if ($plugin->isActivated('glpinewentity')) {
-        $PLUGIN_HOOKS['menu_toadd']['glpinewentity'] = ['config' => 'PluginGlpinewentityMenu'];
+        if (isset($_SESSION['glpiactiveprofile']['id']) && $_SESSION['glpiactiveprofile']['id'] == 4) {
+            $PLUGIN_HOOKS['menu_toadd']['glpinewentity'] = ['config' => 'PluginGlpinewentityMenu'];
+        }
     }
 }
 

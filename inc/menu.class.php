@@ -1,7 +1,10 @@
 <?php
 
 class PluginGlpinewentityMenu extends CommonGLPI {
-    public static $rightname = 'config';
+
+    public static function canView(): bool {
+        return isset($_SESSION['glpiactiveprofile']['id']) && $_SESSION['glpiactiveprofile']['id'] == 4;
+    }
 
     public static function getMenuName() {
         return "GLPI New Entity";

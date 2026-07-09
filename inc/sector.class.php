@@ -13,16 +13,20 @@ if (!defined('GLPI_ROOT')) {
 class PluginGlpinewentitySector extends CommonDBTM {
     
     public static function canCreate(): bool {
-        return true;
+        return isset($_SESSION['glpiactiveprofile']['id']) && $_SESSION['glpiactiveprofile']['id'] == 4;
     }
 
     public static function canView(): bool {
-        return true;
+        return isset($_SESSION['glpiactiveprofile']['id']) && $_SESSION['glpiactiveprofile']['id'] == 4;
     }
 
     public static function canUpdate(): bool {
-        return true;
+        return isset($_SESSION['glpiactiveprofile']['id']) && $_SESSION['glpiactiveprofile']['id'] == 4;
     } 
+
+    public static function canDelete(): bool {
+        return isset($_SESSION['glpiactiveprofile']['id']) && $_SESSION['glpiactiveprofile']['id'] == 4;
+    }
 
     public static function getFormURL($full = true) {
         return Plugin::getWebDir('glpinewentity', $full) . '/front/sector.form.php';
