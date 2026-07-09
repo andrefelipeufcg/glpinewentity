@@ -344,7 +344,8 @@ class PluginGlpinewentityWizard {
 
     public static function processUpdate(array $input, array $existingFields): array {
         $result = json_decode($existingFields['metadata'] ?? '{}', true) ?: [];
-        if (!isset($result['errors'])) $result['errors'] = [];
+        // Limpa erros antigos carregados do metadata
+        $result['errors'] = [];
         
         $sectorName   = trim($input['sector_name'] ?? '');
         $sectorAbbr   = trim($input['sector_abbr'] ?? '');

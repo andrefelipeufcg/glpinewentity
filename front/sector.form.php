@@ -38,22 +38,27 @@ if (isset($_POST['process_wizard'])) {
 
     if ($isEdit) {
         $result = PluginGlpinewentityWizard::processUpdate($_POST, $sectorObj->fields);
-        // Atualiza metadata
+        // Atualiza metadata independentemente de ter erro, pois os dados no banco já foram alterados
+        $sectorObj->update([
+            'id' => $sectorId,
+            'sector_name' => $_POST['sector_name'],
+            'sector_abbr' => $_POST['sector_abbr'],
+            'metadata' => json_encode($result)
+        ]);
+        
         if (empty($result['errors'])) {
-            $sectorObj->update([
-                'id' => $sectorId,
-                'sector_name' => $_POST['sector_name'],
-                'sector_abbr' => $_POST['sector_abbr'],
-                'metadata' => json_encode($result)
-            ]);
             Session::addMessageAfterRedirect('Infraestrutura atualizada com sucesso!', true, INFO);
-            global $CFG_GLPI;
-            Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php?id=' . $sectorId);
+        } else {
+            foreach ($result['errors'] as $err) {
+                Session::addMessageAfterRedirect($err, false, ERROR);
+            }
         }
+        global $CFG_GLPI;
+        Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php?id=' . $sectorId);
     } else {
         $result = PluginGlpinewentityWizard::processCreation($_POST);
         
-        if (empty($result['errors']) && $result['entity_id'] > 0) {
+        if (empty($result['errors']) && !empty($result['entity_id'])) {
             $sectorObj->add([
                 'entities_id' => (int)$_POST['parent_entity'],
                 'sector_name' => $_POST['sector_name'],
@@ -63,13 +68,29 @@ if (isset($_POST['process_wizard'])) {
             Session::addMessageAfterRedirect('Infraestrutura criada com sucesso!', true, INFO);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
-        }
-    }
-    
-    $showResult = true;
-    if (!empty($result['errors'])) {
-        foreach ($result['errors'] as $err) {
-            Session::addMessageAfterRedirect($err, false, ERROR);
+        } else {
+            // Se houve erro durante a criação, mas a entidade foi criada, salvamos o que deu e redirecionamos para EDIÇÃO
+            if (!empty($result['entity_id'])) {
+                $newSectorId = $sectorObj->add([
+                    'entities_id' => (int)$_POST['parent_entity'],
+                    'sector_name' => $_POST['sector_name'],
+                    'sector_abbr' => $_POST['sector_abbr'],
+                    'metadata' => json_encode($result)
+                ]);
+                foreach ($result['errors'] as $err) {
+                    Session::addMessageAfterRedirect($err, false, ERROR);
+                }
+                Session::addMessageAfterRedirect('Infraestrutura criada parcialmente. Verifique os erros.', false, WARNING);
+                global $CFG_GLPI;
+                Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php?id=' . $newSectorId);
+            } else {
+                // Erro fatal logo no inicio. Volta para adicionar
+                foreach ($result['errors'] as $err) {
+                    Session::addMessageAfterRedirect($err, false, ERROR);
+                }
+                global $CFG_GLPI;
+                Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php');
+            }
         }
     }
 }
@@ -324,7 +345,6 @@ echo "<style>
 // =====================================================================
 // FORMULÁRIO WIZARD
 // =====================================================================
-if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     echo "<form method='post' action='" . $form_url . "' id='form_wizard'>";
     echo "<input type='hidden' name='process_wizard' value='1'>";
@@ -860,103 +880,6 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
 
     });
     </script>";
-
-// =====================================================================
-// RESULTADO — Exibe o resumo da criação
-// =====================================================================
-} else {
-
-    echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2' style='font-size: 1.2em; color: #2e7d32;'>";
-    echo "<i class='fas fa-check-circle' style='margin-right: 8px;'></i>";
-    echo "Infraestrutura Criada com Sucesso!";
-    echo "</th></tr>";
-    echo "</table>";
-
-    echo "<hr style='width: 750px; border-top: 3px solid #2e7d32; margin: 20px auto 10px auto;'>";
-
-    // ── Resumo: Entidade ──
-    echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-building'></i> Entidade</th></tr>";
-    echo "<tr class='tab_bg_1'>";
-    echo "<td style='width: 35%;'>Entidade Principal</td>";
-    echo "<td><strong>ID " . $result['entity_id'] . "</strong> — Criada com sucesso</td>";
-    echo "</tr>";
-
-
-    echo "</table>";
-
-    // ── Resumo: Admin ──
-    echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-user-shield'></i> Administrador</th></tr>";
-    echo "<tr class='tab_bg_1'>";
-    echo "<td style='width: 35%;'>Usuário Admin</td>";
-    echo "<td>";
-    if ($result['admin_user_id'] > 0) {
-        echo "<strong>" . htmlspecialchars($result['admin_login']) . "</strong> (ID {$result['admin_user_id']}) — Perfil Admin atribuído";
-    } else {
-        echo "<span style='color: red;'>Falha na criação</span>";
-    }
-    echo "</td>";
-    echo "</tr>";
-    echo "</table>";
-
-    // ── Resumo: Grupos ──
-    echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-users-cog'></i> Grupos</th></tr>";
-    if (!empty($result['groups'])) {
-        foreach ($result['groups'] as $g) {
-            echo "<tr class='tab_bg_1'>";
-            echo "<td style='width: 35%;'><strong>{$g['name']}</strong></td>";
-            echo "<td>ID {$g['id']} — Criado com sucesso</td>";
-            echo "</tr>";
-        }
-    } else {
-        echo "<tr class='tab_bg_1'><td colspan='2'>Nenhum grupo criado.</td></tr>";
-    }
-    echo "</table>";
-
-    // ── Resumo: Técnicos Atendentes ──
-    if (!empty($result['technicians'])) {
-        echo "<table class='tab_cadre_fixe' style='width: 750px; margin-top: 20px;'>";
-        echo "<tr><th colspan='2'><i class='fas fa-user-cog'></i> Técnicos Atendentes</th></tr>";
-        foreach ($result['technicians'] as $t) {
-            echo "<tr class='tab_bg_1'>";
-            echo "<td style='width: 35%;'>" . htmlspecialchars($t['email']) . "</td>";
-            echo "<td>ID {$t['id']} — Adicionado aos grupos</td>";
-            echo "</tr>";
-        }
-        echo "</table>";
-    }
-
-    // ── Resumo: Categorias ──
-    echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr><th colspan='2'><i class='fas fa-clipboard-list'></i> Categorias ITIL</th></tr>";
-    if (!empty($result['categories'])) {
-        foreach ($result['categories'] as $c) {
-            echo "<tr class='tab_bg_1'>";
-            echo "<td style='width: 35%;'><strong>{$c['name']}</strong></td>";
-            echo "<td>ID {$c['id']} — Criada com sucesso</td>";
-            echo "</tr>";
-        }
-    } else {
-        echo "<tr class='tab_bg_1'><td colspan='2'>Nenhuma categoria criada.</td></tr>";
-    }
-    echo "</table>";
-
-    echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
-
-    // ── Botão para criar outra ──
-    echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-    echo "<tr class='tab_bg_2'>";
-    echo "<td class='center' style='padding: 15px;'>";
-    echo "<a href='" . $form_url . "' class='btn btn-outline-primary' style='font-size: 1.05em; padding: 8px 30px;'>";
-    echo "<i class='fas fa-plus' style='margin-right: 6px;'></i> Criar Outro Setor";
-    echo "</a>";
-    echo "</td>";
-    echo "</tr>";
-    echo "</table>";
-}
 
 echo "</div>";
 
