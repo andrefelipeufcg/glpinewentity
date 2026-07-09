@@ -93,41 +93,77 @@ class PluginGlpinewentityWizard {
 
 
         // =================================================================
-        // PASSO 2 — Atribuir Usuários aos Perfis
+        // PASSO 2 — Criar Perfis (clone) e Atribuir Usuários
         // =================================================================
-        // Vamos extrair todos os perfis preenchidos (Padrões + Customizados)
         $profileAssignments = [];
+        $profileNames = $input['profiles_default'] ?? [];
         
         // Admin
         if (!empty($input['copy_profile_admin']) && $input['copy_profile_admin'] > 0 && !empty(trim($input['users_profile_admin'] ?? ''))) {
-            $profileAssignments[] = ['profile_id' => (int)$input['copy_profile_admin'], 'users' => trim($input['users_profile_admin']), 'name' => 'Admin'];
+            $profileAssignments[] = [
+                'source_profile_id' => (int)$input['copy_profile_admin'],
+                'new_name'          => trim($profileNames[0] ?? ($sectorAbbr . ' - Admin')),
+                'users'             => trim($input['users_profile_admin']),
+                'label'             => 'Admin'
+            ];
         }
         // Atendimento
         if (!empty($input['copy_profile_support']) && $input['copy_profile_support'] > 0 && !empty(trim($input['users_profile_support'] ?? ''))) {
-            $profileAssignments[] = ['profile_id' => (int)$input['copy_profile_support'], 'users' => trim($input['users_profile_support']), 'name' => 'Atendimento'];
+            $profileAssignments[] = [
+                'source_profile_id' => (int)$input['copy_profile_support'],
+                'new_name'          => trim($profileNames[1] ?? ($sectorAbbr . ' - Atendimento')),
+                'users'             => trim($input['users_profile_support']),
+                'label'             => 'Atendimento'
+            ];
         }
         // Transferência
         if (!empty($input['copy_profile_transfer']) && $input['copy_profile_transfer'] > 0 && !empty(trim($input['users_profile_transfer'] ?? ''))) {
-            $profileAssignments[] = ['profile_id' => (int)$input['copy_profile_transfer'], 'users' => trim($input['users_profile_transfer']), 'name' => 'Transferência de Chamados'];
+            $profileAssignments[] = [
+                'source_profile_id' => (int)$input['copy_profile_transfer'],
+                'new_name'          => trim($profileNames[2] ?? ($sectorAbbr . ' - Transferência de Chamados')),
+                'users'             => trim($input['users_profile_transfer']),
+                'label'             => 'Transferência de Chamados'
+            ];
         }
         // Customizados
         if (!empty($input['copy_profile_custom']) && is_array($input['copy_profile_custom'])) {
             foreach ($input['copy_profile_custom'] as $idx => $pId) {
                 if ($pId > 0 && !empty(trim($input['users_profile_custom'][$idx] ?? ''))) {
+                    $customName = trim($input['name_profile_custom'][$idx] ?? ('Customizado ' . ($idx + 1)));
                     $profileAssignments[] = [
-                        'profile_id' => (int)$pId, 
-                        'users' => trim($input['users_profile_custom'][$idx]), 
-                        'name' => 'Customizado ' . ($idx + 1)
+                        'source_profile_id' => (int)$pId,
+                        'new_name'          => $customName,
+                        'users'             => trim($input['users_profile_custom'][$idx]),
+                        'label'             => 'Customizado ' . ($idx + 1)
                     ];
                 }
             }
         }
 
+        $result['profiles'] = [];
+
         foreach ($profileAssignments as $assignment) {
+            // 1. Clonar o perfil (criar novo Profile com os mesmos direitos)
+            $newProfileId = self::cloneProfile(
+                $assignment['source_profile_id'],
+                $assignment['new_name']
+            );
+
+            if (!$newProfileId) {
+                $result['errors'][] = "Falha ao criar o perfil '{$assignment['new_name']}' (clone de #{$assignment['source_profile_id']}).";
+                continue;
+            }
+
+            $result['profiles'][] = [
+                'id'   => $newProfileId,
+                'name' => $assignment['new_name'],
+            ];
+
+            // 2. Associar usuários ao NOVO perfil na entidade criada
             $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
             foreach ($usersList as $userEmail) {
                 if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
-                    $result['errors'][] = "E-mail de usuário inválido para perfil '{$assignment['name']}': '{$userEmail}'. Ignorado.";
+                    $result['errors'][] = "E-mail de usuário inválido para perfil '{$assignment['label']}': '{$userEmail}'. Ignorado.";
                     continue;
                 }
                 
@@ -140,13 +176,13 @@ class PluginGlpinewentityWizard {
                 $profileUser = new Profile_User();
                 $puId = $profileUser->add([
                     'users_id'     => $userId,
-                    'profiles_id'  => $assignment['profile_id'],
+                    'profiles_id'  => $newProfileId,
                     'entities_id'  => $entityId,
                     'is_recursive' => 1,
                 ]);
 
                 if (!$puId) {
-                    $result['errors'][] = "Falha ao atribuir perfil ao usuário '{$userEmail}' na entidade criada.";
+                    $result['errors'][] = "Falha ao atribuir perfil '{$assignment['new_name']}' ao usuário '{$userEmail}'.";
                 }
             }
         }
@@ -319,8 +355,11 @@ class PluginGlpinewentityWizard {
             return $result;
         }
         
-        // 1. Atualizar Entidade Pai
         $entityId = $result['entity_id'] ?? 0;
+
+        // =================================================================
+        // 1. Atualizar Entidade
+        // =================================================================
         if ($entityId > 0) {
             $entity = new Entity();
             if ($entity->getFromDB($entityId)) {
@@ -332,21 +371,233 @@ class PluginGlpinewentityWizard {
             }
         }
         
-        // 2. Atualizar Nome do Grupo Pai (SIGLA)
-        if (!empty($result['groups']) && isset($result['groups'][0]['id'])) {
-            $parentGroupId = $result['groups'][0]['id'];
+        // =================================================================
+        // 2. Atualizar Grupo Pai
+        // =================================================================
+        global $DB;
+        $parentGroupId = 0;
+        
+        // Buscar grupo pai na entidade
+        $pgIter = $DB->request([
+            'SELECT' => ['id', 'groups_id'],
+            'FROM'   => 'glpi_groups',
+            'WHERE'  => ['entities_id' => $entityId]
+        ]);
+        foreach ($pgIter as $row) {
+            if (empty($row['groups_id'])) {
+                $parentGroupId = $row['id'];
+                break;
+            }
+        }
+        
+        if ($parentGroupId > 0) {
             $group = new Group();
             if ($group->getFromDB($parentGroupId)) {
                 $group->update([
                     'id' => $parentGroupId,
                     'name' => "({$sectorAbbr})"
                 ]);
-                $result['groups'][0]['name'] = "({$sectorAbbr})";
             }
         }
+
+        // =================================================================
+        // 3. Sincronizar Perfis
+        // =================================================================
+        $profileNames = $input['profiles_default'] ?? [];
+        $profileAssignments = [];
+
+        // Admin
+        if (!empty($input['copy_profile_admin']) && $input['copy_profile_admin'] > 0) {
+            $profileAssignments[] = [
+                'source_profile_id' => (int)$input['copy_profile_admin'],
+                'new_name'          => trim($profileNames[0] ?? ($sectorAbbr . ' - Admin')),
+                'users'             => trim($input['users_profile_admin'] ?? ''),
+                'label'             => 'Admin'
+            ];
+        }
+        // Atendimento
+        if (!empty($input['copy_profile_support']) && $input['copy_profile_support'] > 0) {
+            $profileAssignments[] = [
+                'source_profile_id' => (int)$input['copy_profile_support'],
+                'new_name'          => trim($profileNames[1] ?? ($sectorAbbr . ' - Atendimento')),
+                'users'             => trim($input['users_profile_support'] ?? ''),
+                'label'             => 'Atendimento'
+            ];
+        }
+        // Transferência
+        if (!empty($input['copy_profile_transfer']) && $input['copy_profile_transfer'] > 0) {
+            $profileAssignments[] = [
+                'source_profile_id' => (int)$input['copy_profile_transfer'],
+                'new_name'          => trim($profileNames[2] ?? ($sectorAbbr . ' - Transferência de Chamados')),
+                'users'             => trim($input['users_profile_transfer'] ?? ''),
+                'label'             => 'Transferência de Chamados'
+            ];
+        }
+        // Customizados
+        if (!empty($input['copy_profile_custom']) && is_array($input['copy_profile_custom'])) {
+            foreach ($input['copy_profile_custom'] as $idx => $pId) {
+                if ($pId > 0) {
+                    $customName = trim($input['name_profile_custom'][$idx] ?? ('Customizado ' . ($idx + 1)));
+                    $profileAssignments[] = [
+                        'source_profile_id' => (int)$pId,
+                        'new_name'          => $customName,
+                        'users'             => trim($input['users_profile_custom'][$idx] ?? ''),
+                        'label'             => 'Customizado ' . ($idx + 1)
+                    ];
+                }
+            }
+        }
+
+        // Processar cada perfil
+        $result['profiles'] = [];
+        foreach ($profileAssignments as $assignment) {
+            $newName = $assignment['new_name'];
+            
+            // Verificar se o perfil já existe por nome
+            $existingProfile = $DB->request([
+                'SELECT' => 'id',
+                'FROM'   => 'glpi_profiles',
+                'WHERE'  => ['name' => $newName],
+                'LIMIT'  => 1
+            ]);
+            
+            $profileId = 0;
+            if (count($existingProfile) > 0) {
+                $row = $existingProfile->current();
+                $profileId = (int)$row['id'];
+            } else {
+                // Criar perfil novo (clonar do fonte)
+                $profileId = self::cloneProfile(
+                    $assignment['source_profile_id'],
+                    $newName
+                );
+                if (!$profileId) {
+                    $result['errors'][] = "Falha ao criar o perfil '{$newName}'.";
+                    continue;
+                }
+            }
+
+            $result['profiles'][] = [
+                'id'   => $profileId,
+                'name' => $newName,
+            ];
+
+            // Sincronizar usuários: remover os antigos da entidade e adicionar os novos
+            // Remover vinculações existentes deste perfil nesta entidade
+            $DB->delete('glpi_profiles_users', [
+                'profiles_id' => $profileId,
+                'entities_id' => $entityId
+            ]);
+
+            // Adicionar os novos
+            if (!empty($assignment['users'])) {
+                $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
+                foreach ($usersList as $userEmail) {
+                    if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) continue;
+                    $userId = self::findUserByEmail($userEmail);
+                    if (!$userId) {
+                        $result['errors'][] = "Usuário '{$userEmail}' não encontrado no GLPI. Ignorado.";
+                        continue;
+                    }
+                    $profileUser = new Profile_User();
+                    $puId = $profileUser->add([
+                        'users_id'     => $userId,
+                        'profiles_id'  => $profileId,
+                        'entities_id'  => $entityId,
+                        'is_recursive' => 1,
+                    ]);
+                    if (!$puId) {
+                        $result['errors'][] = "Falha ao atribuir perfil '{$assignment['new_name']}' ao usuário '{$userEmail}'.";
+                    }
+                }
+            }
+        }
+
+        // =================================================================
+        // 4. Sincronizar Subgrupos e Técnicos
+        // =================================================================
+        $subgroupsData = is_array($input['subgroups'] ?? null) ? $input['subgroups'] : [];
         
-        // TODO: Sincronização complexa de subgrupos e técnicos (será feita no próximo passo)
-        
+        if ($parentGroupId > 0) {
+            // Buscar subgrupos atuais
+            $currentSubgroups = [];
+            $sgIter = $DB->request([
+                'SELECT' => ['id', 'name'],
+                'FROM'   => 'glpi_groups',
+                'WHERE'  => ['groups_id' => $parentGroupId]
+            ]);
+            foreach ($sgIter as $row) {
+                $currentSubgroups[$row['name']] = $row['id'];
+            }
+
+            $result['groups'] = [['id' => $parentGroupId, 'name' => "({$sectorAbbr})"]];
+            $result['technicians'] = [];
+
+            foreach ($subgroupsData as $sg) {
+                $sgName  = trim($sg['name'] ?? '');
+                $sgTechs = trim($sg['techs'] ?? '');
+
+                if (empty($sgName) && empty($sgTechs)) continue;
+
+                // Definir o grupo-alvo
+                $targetGroupId = $parentGroupId; // Padrão: Grupo Pai
+
+                if (!empty($sgName)) {
+                    if (isset($currentSubgroups[$sgName])) {
+                        $targetGroupId = $currentSubgroups[$sgName];
+                        unset($currentSubgroups[$sgName]); // Marca como processado
+                    } else {
+                        // Criar subgrupo novo
+                        $subg = new Group();
+                        $targetGroupId = $subg->add([
+                            'name'        => $sgName,
+                            'entities_id' => $entityId,
+                            'groups_id'   => $parentGroupId,
+                        ]);
+                        if (!$targetGroupId) {
+                            $result['errors'][] = "Falha ao criar subgrupo '{$sgName}'.";
+                            continue;
+                        }
+                    }
+                    $result['groups'][] = ['id' => $targetGroupId, 'name' => $sgName];
+                }
+
+                // Sincronizar técnicos: remover os atuais do grupo e adicionar os novos
+                $DB->delete('glpi_groups_users', ['groups_id' => $targetGroupId]);
+
+                if (!empty($sgTechs)) {
+                    $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $sgTechs)));
+                    foreach ($techList as $techEmail) {
+                        if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
+                            $result['errors'][] = "E-mail de técnico inválido: '{$techEmail}'. Ignorado.";
+                            continue;
+                        }
+                        $techUserId = self::findUserByEmail($techEmail);
+                        if ($techUserId) {
+                            $groupUser = new Group_User();
+                            $guId = $groupUser->add([
+                                'users_id'  => $techUserId,
+                                'groups_id' => $targetGroupId,
+                            ]);
+                            if (!$guId) {
+                                $result['errors'][] = "Falha ao associar técnico '{$techEmail}' ao subgrupo.";
+                            } else {
+                                $result['technicians'][] = [
+                                    'id'    => $techUserId,
+                                    'email' => $techEmail . ($sgName ? " -> {$sgName}" : " -> Pai"),
+                                ];
+                            }
+                        } else {
+                            $result['errors'][] = "Técnico '{$techEmail}' não encontrado no GLPI. Ignorado.";
+                        }
+                    }
+                }
+            }
+
+            // Subgrupos que sobraram (não estão mais no form) — deixar intactos
+            // (não apagamos para não perder dados acidentalmente)
+        }
+
         return $result;
     }
 
@@ -407,5 +658,64 @@ class PluginGlpinewentityWizard {
 
         // Fallback: Admin padrão no GLPI = id 4
         return 4;
+    }
+
+    /**
+     * Clona um perfil existente: cria um novo Profile com o nome informado
+     * e copia todos os direitos (ProfileRight) do perfil-fonte.
+     *
+     * @param int    $sourceProfileId ID do perfil a ser clonado
+     * @param string $newName         Nome do novo perfil
+     * @return int|false ID do novo perfil criado, ou false em caso de falha
+     */
+    private static function cloneProfile(int $sourceProfileId, string $newName) {
+        global $DB;
+
+        // Carrega o perfil-fonte
+        $sourceProfile = new Profile();
+        if (!$sourceProfile->getFromDB($sourceProfileId)) {
+            return false;
+        }
+
+        // Cria o novo perfil copiando os campos do fonte
+        $newProfileData = $sourceProfile->fields;
+        unset($newProfileData['id']);
+        unset($newProfileData['date_mod']);
+        unset($newProfileData['date_creation']);
+        $newProfileData['name'] = $newName;
+        
+        // Decodifica campos serializados para array (GLPI 11 prepareInputForAdd exige array nestes campos)
+        $arrayFields = ['helpdesk_item_type', 'managed_domainrecordtypes', 'ticket_status', 'problem_status', 'change_status'];
+        foreach ($arrayFields as $f) {
+            if (isset($newProfileData[$f]) && is_string($newProfileData[$f])) {
+                $newProfileData[$f] = importArrayFromDB($newProfileData[$f]);
+            }
+        }
+
+        $newProfile = new Profile();
+        $newProfileId = $newProfile->add($newProfileData);
+
+        if (!$newProfileId) {
+            return false;
+        }
+
+        // Copia todos os direitos (ProfileRight) do perfil-fonte para o novo
+        $rightsIterator = $DB->request([
+            'FROM'  => 'glpi_profilerights',
+            'WHERE' => ['profiles_id' => $sourceProfileId]
+        ]);
+
+        foreach ($rightsIterator as $right) {
+            $DB->updateOrInsert('glpi_profilerights', [
+                'profiles_id' => $newProfileId,
+                'name'        => $right['name'],
+                'rights'      => $right['rights'],
+            ], [
+                'profiles_id' => $newProfileId,
+                'name'        => $right['name'],
+            ]);
+        }
+
+        return $newProfileId;
     }
 }

@@ -47,6 +47,7 @@ if (isset($_POST['process_wizard'])) {
                 'metadata' => json_encode($result)
             ]);
             Session::addMessageAfterRedirect('Infraestrutura atualizada com sucesso!', true, INFO);
+            global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php?id=' . $sectorId);
         }
     } else {
@@ -139,8 +140,7 @@ if ($isEdit) {
                     ]
                 ],
                 'WHERE'  => [
-                    'glpi_groups_users.groups_id' => $allGroupIds,
-                    'glpi_useremails.is_default'  => 1
+                    'glpi_groups_users.groups_id' => $allGroupIds
                 ]
             ]);
             
@@ -158,7 +158,7 @@ if ($isEdit) {
     if (!$live_success && !empty($meta['groups'])) {
         foreach ($meta['groups'] as $g) {
             $gName = $g['name'];
-            $isParent = (strpos($gName, '(' . $def_sector_abbr . ')') !== false);
+            $isParent = (strpos($gName, '(' . $sectorObj->fields['sector_abbr'] . ')') !== false);
             $sgName = $isParent ? '' : $gName;
             $def_subgroups[] = [
                 'name' => $sgName,
@@ -184,7 +184,7 @@ if ($isEdit) {
     }
 
     foreach ($def_subgroups as &$sg) {
-        $sg['techs'] = implode("\n", $sg['techs']);
+        $sg['techs'] = implode("\n", array_unique($sg['techs']));
     }
     unset($sg); // IMPORTANTE: quebra a referência para evitar corrupção no próximo foreach
     
@@ -274,11 +274,11 @@ if ($isEdit) {
             $email = $row['email'];
             
             if (!isset($profile_map[$pid])) {
-                if (strpos($pname, '[Padrão] Admin') !== false) {
+                if (str_ends_with($pname, ' - Admin')) {
                     $profile_map[$pid] = 'admin';
-                } elseif (strpos($pname, '[Padrão] Atendimento') !== false) {
+                } elseif (str_ends_with($pname, ' - Atendimento')) {
                     $profile_map[$pid] = 'support';
-                } elseif (strpos($pname, '[Padrão] Transferência de Chamados') !== false) {
+                } elseif (str_ends_with($pname, ' - Transferência de Chamados')) {
                     $profile_map[$pid] = 'transfer';
                 } else {
                     $def_profiles['custom'][] = [
@@ -506,7 +506,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  <div style='display: flex; gap: 10px; align-items: flex-start;'>";
     echo "      <div style='flex: 1;'>";
     echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Nome do Perfil</label>";
-    echo "          <input type='text' class='form-control profile-input' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador'>";
+    echo "          <input type='text' class='form-control profile-input' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' name='name_profile_custom[]'>";
     echo "      </div>";
     echo "      <div style='flex: 1;'>";
     echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
@@ -538,7 +538,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
             echo "  <div style='display: flex; gap: 10px; align-items: flex-start;'>";
             echo "      <div style='flex: 1;'>";
             echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Nome do Perfil</label>";
-            echo "          <input type='text' class='form-control profile-input' name='profiles_custom[]' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' value=''>";
+            echo "          <input type='text' class='form-control profile-input' name='name_profile_custom[]' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' value='" . Html::cleanInputText($cProf['name']) . "'>";
             echo "          <small class='text-muted'>O nome original não é carregado na edição, preencha novamente se desejar salvar outro.</small>";
             echo "      </div>";
             echo "      <div style='flex: 1;'>";
@@ -778,7 +778,7 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
             const newBlock = template.clone();
             newBlock.removeClass('template');
             newBlock.css('display', 'block');
-            newBlock.find('.profile-input').attr('name', 'profiles_custom[]');
+            newBlock.find('.profile-input').attr('name', 'name_profile_custom[]');
             
             // Limpa o textarea de usuários
             newBlock.find('.profile-users-input').val('');
