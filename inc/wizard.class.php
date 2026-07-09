@@ -695,6 +695,18 @@ class PluginGlpinewentityWizard {
         $newProfile = new Profile();
         $newProfileId = $newProfile->add($newProfileData);
 
+        // Remove false-positive validation errors from GLPI 11 when cloning profiles
+        if (defined('ERROR') && isset($_SESSION['MESSAGE_AFTER_REDIRECT'][ERROR])) {
+            foreach ($_SESSION['MESSAGE_AFTER_REDIRECT'][ERROR] as $k => $msg) {
+                if (stripos($msg, 'Perfis') !== false || stripos($msg, 'Profile') !== false || stripos($msg, 'valor incorreto') !== false) {
+                    unset($_SESSION['MESSAGE_AFTER_REDIRECT'][ERROR][$k]);
+                }
+            }
+            if (empty($_SESSION['MESSAGE_AFTER_REDIRECT'][ERROR])) {
+                unset($_SESSION['MESSAGE_AFTER_REDIRECT'][ERROR]);
+            }
+        }
+
         if (!$newProfileId) {
             return false;
         }

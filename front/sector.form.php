@@ -61,6 +61,7 @@ if (isset($_POST['process_wizard'])) {
                 'metadata' => json_encode($result)
             ]);
             Session::addMessageAfterRedirect('Infraestrutura criada com sucesso!', true, INFO);
+            global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
         }
     }
@@ -402,7 +403,8 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  <div style='display: flex; gap: 10px;'>";
     echo "    <div style='flex: 1;'>";
     echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Perfil Padrão</label>";
-    echo "      <input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly>";
+    $adminVal = $def_sector_abbr ? Html::cleanInputText($def_sector_abbr) . ' - Admin' : '';
+    echo "      <input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly value='{$adminVal}'>";
     echo "    </div>";
     echo "    <div style='flex: 1;'>";
     echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
@@ -432,7 +434,8 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  <div style='display: flex; gap: 10px;'>";
     echo "    <div style='flex: 1;'>";
     echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Perfil Padrão</label>";
-    echo "      <input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly>";
+    $supportVal = $def_sector_abbr ? Html::cleanInputText($def_sector_abbr) . ' - Atendimento' : '';
+    echo "      <input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly value='{$supportVal}'>";
     echo "    </div>";
     echo "    <div style='flex: 1;'>";
     echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
@@ -462,7 +465,8 @@ if (!$showResult || ($showResult && $result['entity_id'] === 0)) {
     echo "  <div style='display: flex; gap: 10px;'>";
     echo "    <div style='flex: 1;'>";
     echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Perfil Padrão</label>";
-    echo "      <input type='text' id='profile_transfer' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly>";
+    $transferVal = $def_sector_abbr ? Html::cleanInputText($def_sector_abbr) . ' - Transferência de Chamados' : '';
+    echo "      <input type='text' id='profile_transfer' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly value='{$transferVal}'>";
     echo "    </div>";
     echo "    <div style='flex: 1;'>";
     echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
