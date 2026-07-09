@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity="0.3" />
+    </filter>
+  </defs>
+  
+  <rect width="256" height="256" rx="56" fill="url(#bg)" />
+  
+  <g filter="url(#shadow)">
+    <!-- Entidade Raiz -->
+    <rect x="96" y="60" width="64" height="44" rx="12" fill="none" stroke="#F8FAFC" stroke-width="16" />
+    
+    <!-- Linhas da Hierarquia -->
+    <path d="M 128 104 L 128 132" fill="none" stroke="#F8FAFC" stroke-width="12" stroke-linecap="round" />
+    <path d="M 64 132 L 192 132" fill="none" stroke="#F8FAFC" stroke-width="12" stroke-linecap="round" />
+    
+    <path d="M 64 132 L 64 156" fill="none" stroke="#F8FAFC" stroke-width="12" stroke-linecap="round" />
+    <path d="M 192 132 L 192 156" fill="none" stroke="#F8FAFC" stroke-width="12" stroke-linecap="round" />
+    
+    <!-- Sub-Entidade 1 -->
+    <rect x="32" y="156" width="64" height="44" rx="12" fill="none" stroke="#F8FAFC" stroke-width="16" />
+    
+    <!-- Sub-Entidade 2 (Nova Entidade Criada) -->
+    <rect x="160" y="156" width="64" height="44" rx="12" fill="none" stroke="url(#accent)" stroke-width="16" />
+    
+    <!-- Símbolo de Adicionar (+) na Nova Entidade -->
+    <line x1="192" y1="168" x2="192" y2="188" stroke="url(#accent)" stroke-width="12" stroke-linecap="round" />
+    <line x1="182" y1="178" x2="202" y2="178" stroke="url(#accent)" stroke-width="12" stroke-linecap="round" />
+  </g>
+</svg>
