@@ -207,10 +207,15 @@ class PluginGlpinewentityWizard {
                 'name' => $parentGroupName,
             ];
             
+            // Mapeia o índice do subgrupo para o ID do grupo criado no GLPI
+            // -1 representa o Grupo Pai (SIGLA)
+            $createdGroupsByIndex = ['-1' => $parentGroupId];
+            
             // 2. Itera sobre os blocos dinâmicos
-            foreach ($subgroupsData as $sg) {
+            foreach ($subgroupsData as $index => $sg) {
                 $sgName  = trim($sg['name'] ?? '');
                 $sgTechs = trim($sg['techs'] ?? '');
+                $sgParentIndex = isset($sg['parent']) ? trim($sg['parent']) : '-1';
                 
                 if (empty($sgName) && empty($sgTechs)) {
                     continue; // Bloco vazio, ignora
@@ -239,7 +244,13 @@ class PluginGlpinewentityWizard {
                 }
                 
                 // Onde alocar os técnicos?
-                $targetGroupId = $parentGroupId; // Padrão: Grupo Pai
+                // Define o parentGroupId para este subgrupo baseado na escolha do usuário
+                $currentParentGroupId = $parentGroupId;
+                if (isset($createdGroupsByIndex[$sgParentIndex])) {
+                    $currentParentGroupId = $createdGroupsByIndex[$sgParentIndex];
+                }
+                
+                $targetGroupId = $currentParentGroupId; // Padrão se não houver nome de subgrupo
                 
                 if (!empty($sgName)) {
                     // Cria o subgrupo e muda o targetGroupId
@@ -247,7 +258,7 @@ class PluginGlpinewentityWizard {
                     $targetGroupId = $subg->add([
                         'name'        => $sgName,
                         'entities_id' => $entityId,
-                        'groups_id'   => $parentGroupId,
+                        'groups_id'   => $currentParentGroupId,
                     ]);
                     
                     if (!$targetGroupId) {
@@ -259,6 +270,12 @@ class PluginGlpinewentityWizard {
                         'id'   => $targetGroupId,
                         'name' => $sgName,
                     ];
+                    
+                    // Armazena o ID deste subgrupo criado
+                    $createdGroupsByIndex[(string)$index] = $targetGroupId;
+                } else {
+                    // Se não tiver nome, significa que é o bloco 0 que envia técnicos pro pai
+                    $createdGroupsByIndex[(string)$index] = $currentParentGroupId;
                 }
                 
                 // Associa técnicos ao grupo alvo (seja o pai ou o subgrupo)

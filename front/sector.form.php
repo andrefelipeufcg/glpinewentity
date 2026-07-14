@@ -135,17 +135,39 @@ if ($isEdit) {
             $def_subgroups[] = ['name' => '', 'techs' => []]; // Bloco Pai
             
             $subgroupsIter = $DB->request([
-                'SELECT' => ['id', 'name'],
+                'SELECT' => ['id', 'name', 'groups_id'],
                 'FROM'   => 'glpi_groups',
-                'WHERE'  => ['groups_id' => $parentGroupId]
+                'WHERE'  => [
+                    'entities_id' => $meta['entity_id'],
+                    'id' => ['<>', $parentGroupId]
+                ],
+                'ORDER'  => 'id ASC'
             ]);
             
             $sgMap = [$parentGroupId => 0]; // group_id => index in $def_subgroups
             $idx = 1;
+            
+            $rows = [];
             foreach ($subgroupsIter as $row) {
+                $rows[] = $row;
+            }
+            
+            foreach ($rows as $row) {
                 // Se a view nativa mostra nomes certos mas tem um prefixo ou algo assim, pegamos o nome real
-                $def_subgroups[] = ['name' => $row['name'], 'techs' => []];
+                $def_subgroups[] = ['name' => $row['name'], 'techs' => [], 'parent' => '-1'];
                 $sgMap[$row['id']] = $idx++;
+            }
+            
+            foreach ($rows as $row) {
+                $myIdx = $sgMap[$row['id']];
+                $parentGlpiId = $row['groups_id'];
+                if (isset($sgMap[$parentGlpiId])) {
+                    if ($parentGlpiId == $parentGroupId) {
+                        $def_subgroups[$myIdx]['parent'] = '-1';
+                    } else {
+                        $def_subgroups[$myIdx]['parent'] = (string)$sgMap[$parentGlpiId];
+                    }
+                }
             }
             
             // Buscar emails dos técnicos
@@ -184,7 +206,8 @@ if ($isEdit) {
             $sgName = $isParent ? '' : $gName;
             $def_subgroups[] = [
                 'name' => $sgName,
-                'techs' => []
+                'techs' => [],
+                'parent' => '-1'
             ];
         }
         
@@ -616,7 +639,14 @@ echo "<style>
         echo "  </div>";
         echo "  <div style='margin-bottom: 10px;'>";
         echo "      <label>Nome do Subgrupo</label>";
-        echo "      <input type='text' name='subgroups[0][name]' class='form-control' style='width: 100%;' value='" . $sg0Name . "' placeholder='Ex: Suporte Nível 1 (Deixe em branco para alocar no Grupo Pai)'>";
+        echo "      <input type='text' name='subgroups[0][name]' class='form-control sg-name-input' style='width: 100%;' value='" . $sg0Name . "' placeholder='Ex: Suporte Nível 1 (Deixe em branco para alocar no Grupo Pai)'>";
+        echo "  </div>";
+        echo "  <div style='margin-bottom: 10px;'>";
+        echo "      <label>Grupo Pai</label>";
+        echo "      <div class='parent-wrapper'>";
+        echo "          <input type='text' class='form-control' value='(SIGLA)' readonly>";
+        echo "          <input type='hidden' name='subgroups[0][parent]' value='-1'>";
+        echo "      </div>";
         echo "  </div>";
         echo "  <div>";
         echo "      <label>E-mails dos Técnicos Atendentes</label>";
@@ -641,7 +671,22 @@ echo "<style>
             echo "  </div>";
             echo "  <div style='margin-bottom: 10px;'>";
             echo "      <label>Nome do Subgrupo</label>";
-            echo "      <input type='text' name='subgroups[{$i}][name]' class='form-control' style='width: 100%;' value='{$sgName}' placeholder='Ex: Suporte Nível 1 (Deixe em branco para alocar no Grupo Pai)'>";
+            echo "      <input type='text' name='subgroups[{$i}][name]' class='form-control sg-name-input' style='width: 100%;' value='{$sgName}' placeholder='Ex: Suporte Nível 1 (Deixe em branco para alocar no Grupo Pai)'>";
+            echo "  </div>";
+            echo "  <div style='margin-bottom: 10px;'>";
+            echo "      <label>Grupo Pai</label>";
+            echo "      <div class='parent-wrapper'>";
+            echo "          <select name='subgroups[{$i}][parent]' class='form-select sg-parent-select' style='width: 100%;'>";
+            echo "              <option value='-1' " . (($sg['parent'] ?? '-1') == '-1' ? 'selected' : '') . ">(SIGLA)</option>";
+            for ($prev = 0; $prev < $i; $prev++) {
+                $prevName = Html::cleanInputText($def_subgroups[$prev]['name'] ?? '');
+                if (!empty($prevName)) {
+                    $selected = (($sg['parent'] ?? '') == (string)$prev) ? 'selected' : '';
+                    echo "              <option value='{$prev}' {$selected}>{$prevName}</option>";
+                }
+            }
+            echo "          </select>";
+            echo "      </div>";
             echo "  </div>";
             echo "  <div>";
             echo "      <label>E-mails dos Técnicos Atendentes</label>";
@@ -717,43 +762,130 @@ echo "<style>
 
         let index = $('.subgroup-block').length;
 
+        function getSigla() {
+            let val = $('input[name=\"sector_abbr\"]').val().trim();
+            return val !== '' ? '(' + val + ')' : '';
+        }
+
+        function updateAllParentCombos(removedIndex = null) {
+            const container = $('#subgroups-container');
+            let siglaText = getSigla();
+            
+            let firstInput = container.find('.subgroup-block').first().find('.parent-wrapper input[type=\"text\"]');
+            if (firstInput.length) {
+                firstInput.val(siglaText);
+            }
+            
+            let availableParents = [];
+            container.find('.subgroup-block').each(function() {
+                let nameInput = $(this).find('input.sg-name-input');
+                if (!nameInput.length) return;
+                
+                let prevName = nameInput.val().trim();
+                let match = nameInput.attr('name').match(/\d+/);
+                if (match && prevName !== '') {
+                    availableParents.push({ index: match[0], name: prevName });
+                }
+            });
+            
+            container.find('.subgroup-block').each(function() {
+                let select = $(this).find('select.sg-parent-select');
+                if (select.length === 0) return;
+                
+                let currentValue = select.val();
+                if (removedIndex !== null && currentValue === removedIndex) {
+                    currentValue = '-1';
+                }
+                
+                let match = $(this).find('input.sg-name-input').attr('name').match(/\d+/);
+                if (!match) return;
+                let currentBlockIndex = match[0];
+                
+                let selectHtml = '<option value=\"-1\">' + siglaText + '</option>';
+                let hasCurrentValue = false;
+                if (currentValue === '-1') hasCurrentValue = true;
+                
+                for (let i = 0; i < availableParents.length; i++) {
+                    let parentInfo = availableParents[i];
+                    if (parentInfo.index === currentBlockIndex) break;
+                    
+                    selectHtml += '<option value=\"' + parentInfo.index + '\">' + parentInfo.name + '</option>';
+                    if (currentValue === parentInfo.index) hasCurrentValue = true;
+                }
+                
+                select.html(selectHtml);
+                
+                if (hasCurrentValue) {
+                    select.val(currentValue);
+                } else {
+                    select.val('-1');
+                }
+            });
+        }
+
+        $('#subgroups-container').on('click', '.btn-remove-subgroup', function() {
+            let block = $(this).closest('.subgroup-block');
+            let match = block.find('input.sg-name-input').attr('name').match(/\d+/);
+            let removedIndex = match ? match[0] : null;
+            block.remove();
+            updateAllParentCombos(removedIndex);
+        });
+
+        $('#subgroups-container').on('input', 'input.sg-name-input', function() {
+            updateAllParentCombos();
+        });
+
         $('#btn-add-subgroup').on('click', function() {
             const container = $('#subgroups-container');
             
             // Validação: verifica se os blocos atuais estão preenchidos
             let allFilled = true;
+            let isSiglaEmpty = getSigla() === '';
+            
             container.find('.subgroup-block').each(function() {
-                const nameVal = $(this).find('input').val().trim();
+                const nameVal = $(this).find('input.sg-name-input').val().trim();
                 const techsVal = $(this).find('textarea').val().trim();
+                const isFirst = $(this).index() === 0;
                 
-                if (nameVal === '' || techsVal === '') {
-                    allFilled = false;
+                if (isFirst) {
+                    if (isSiglaEmpty || techsVal === '') {
+                        allFilled = false;
+                    }
+                } else {
+                    const parentVal = $(this).find('select.sg-parent-select, input[name$=\"[parent]\"]').val();
+                    if (nameVal === '' || parentVal === null || parentVal === '' || isSiglaEmpty || techsVal === '') {
+                        allFilled = false;
+                    }
                 }
             });
             
             if (!allFilled) {
-                alert('Por favor, preencha o Nome do Subgrupo e os E-mails dos técnicos em todos os blocos atuais antes de adicionar um novo.');
+                alert('Por favor, preencha o Nome do Subgrupo, Grupo Pai e os E-mails dos técnicos em todos os blocos atuais antes de adicionar um novo.');
                 return;
             }
 
             const firstBlock = container.find('.subgroup-block').first();
             const newBlock = firstBlock.clone();
             
-            newBlock.find('input').val('');
+            newBlock.find('input.sg-name-input').val('');
             newBlock.find('textarea').val('');
             
-            newBlock.find('input').attr('name', 'subgroups[' + index + '][name]');
+            newBlock.find('input.sg-name-input').attr('name', 'subgroups[' + index + '][name]');
             newBlock.find('textarea').attr('name', 'subgroups[' + index + '][techs]');
             newBlock.find('.sg-index').text(index + 1);
             
+            let parentWrapper = newBlock.find('.parent-wrapper');
+            parentWrapper.empty();
+            let selectHtml = '<select name=\"subgroups[' + index + '][parent]\" class=\"form-select sg-parent-select\" style=\"width: 100%;\"></select>';
+            parentWrapper.append(selectHtml);
+            
             const btnRemove = newBlock.find('.btn-remove-subgroup');
             btnRemove.show();
-            btnRemove.on('click', function() {
-                newBlock.remove();
-            });
+            // Evento de remoção agora é delegado globalmente
             
             container.append(newBlock);
             index++;
+            updateAllParentCombos();
         });
 
         // ── Lógica para Perfis Padrão ──
@@ -768,6 +900,7 @@ echo "<style>
                 $('#profile_support').val(abbr + ' - Atendimento');
                 $('#profile_transfer').val(abbr + ' - Transferência de Chamados');
             }
+            updateAllParentCombos();
         });
         // Inicializa ao carregar (se houver valor padrão)
         $('input[name=\'sector_abbr\']').trigger('input');
