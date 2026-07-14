@@ -17,8 +17,8 @@ function plugin_glpinewentity_install(): bool {
 
     if (!$DB->tableExists('glpi_plugin_glpinewentity_sectors')) {
         $query = "CREATE TABLE `glpi_plugin_glpinewentity_sectors` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `entities_id` int(11) NOT NULL DEFAULT '0' COMMENT 'Entidade Pai',
+            `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+            `entities_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Entidade Pai',
             `sector_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
             `sector_abbr` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
             `metadata` longtext COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'JSON com dados da infra (subgrupos, categorias, ids GLPI criados)',
