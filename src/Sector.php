@@ -1,31 +1,38 @@
 <?php
 /**
  * -----------------------------------------------------------------------
- * GLPI New Entity — inc/sector.class.php
+ * GLPI New Entity — src/Sector.php
  * Model principal para armazenamento dos setores criados.
  * -----------------------------------------------------------------------
  */
+
+namespace GlpiPlugin\Glpinewentity;
+
+use CommonDBTM;
+use Plugin;
+use Session;
+use Entity;
 
 if (!defined('GLPI_ROOT')) {
     die("Sorry. You can't access this file directly");
 }
 
-class PluginGlpinewentitySector extends CommonDBTM {
+class Sector extends CommonDBTM {
     
     public static function canCreate(): bool {
-        return isset($_SESSION['glpiactiveprofile']['id']) && $_SESSION['glpiactiveprofile']['id'] == 4;
+        return Session::haveRight('entity', CREATE);
     }
 
     public static function canView(): bool {
-        return isset($_SESSION['glpiactiveprofile']['id']) && $_SESSION['glpiactiveprofile']['id'] == 4;
+        return Session::haveRight('entity', READ);
     }
 
     public static function canUpdate(): bool {
-        return isset($_SESSION['glpiactiveprofile']['id']) && $_SESSION['glpiactiveprofile']['id'] == 4;
+        return Session::haveRight('entity', UPDATE);
     } 
 
     public static function canDelete(): bool {
-        return isset($_SESSION['glpiactiveprofile']['id']) && $_SESSION['glpiactiveprofile']['id'] == 4;
+        return Session::haveRight('entity', DELETE);
     }
 
     public static function getFormURL($full = true) {
@@ -66,7 +73,7 @@ class PluginGlpinewentitySector extends CommonDBTM {
             'id'                 => '1',
             'table'              => $this->getTable(),
             'field'              => 'sector_abbr',
-            'name'               => 'Sigla',
+            'name'               => __('Sigla', 'glpinewentity'),
             'datatype'           => 'itemlink',
         ];
 
@@ -75,7 +82,7 @@ class PluginGlpinewentitySector extends CommonDBTM {
             'id'                 => '2',
             'table'              => $this->getTable(),
             'field'              => 'sector_name',
-            'name'               => 'Nome do Setor',
+            'name'               => __('Nome do Setor', 'glpinewentity'),
             'datatype'           => 'string',
         ];
 
@@ -84,7 +91,7 @@ class PluginGlpinewentitySector extends CommonDBTM {
             'id'                 => '3',
             'table'              => 'glpi_entities',
             'field'              => 'completename',
-            'name'               => 'Entidade Pai',
+            'name'               => __('Entidade Pai', 'glpinewentity'),
             'datatype'           => 'itemlink',
         ];
 

@@ -6,9 +6,15 @@
  * -----------------------------------------------------------------------
  */
 
-include("../../../inc/includes.php");
+$inc = __DIR__ . '/../../../inc/includes.php';
+if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/inc/includes.php'; }
+if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/../inc/includes.php'; }
+include $inc;
 
-// Permissão: somente Super-Admin (ou quem possa gerenciar entidades)
+use GlpiPlugin\Glpinewentity\Sector;
+use GlpiPlugin\Glpinewentity\Wizard;
+
+// Permissão genérica de criação de entidade
 Session::checkRight("entity", CREATE);
 
 // -----------------------------------------------------------------------
@@ -18,26 +24,29 @@ $showResult = false;
 $result     = [];
 $isEdit     = false;
 $sectorId   = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
-$sectorObj  = new PluginGlpinewentitySector();
+$sectorObj  = new Sector();
 
 if ($sectorId > 0) {
     if ($sectorObj->getFromDB($sectorId)) {
+        // Prevenção de IDOR: Checar acesso à entidade pai
+        if (!Session::haveAccessToEntity($sectorObj->fields['entities_id'])) {
+            Session::addMessageAfterRedirect(__('Acesso negado à entidade.', 'glpinewentity'), false, ERROR);
+            global $CFG_GLPI;
+            Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
+        }
         $isEdit = true;
     } else {
+        global $CFG_GLPI;
         Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
     }
 }
 
 if (isset($_POST['process_wizard'])) {
-    // No GLPI 11+, o CheckCsrfListener já valida e consome o token globalmente.
-    // Chamar checkCSRF novamente falha porque o token já foi consumido.
-    // Em versões antigas (ex: 9.5), precisamos checar manualmente.
-    if (!class_exists('Glpi\Kernel\Listener\ControllerListener\CheckCsrfListener')) {
-        Session::checkCSRF($_POST);
-    }
+    // Prevenção CSRF incondicional (correção de segurança)
+    Session::checkCSRF($_POST);
 
     if ($isEdit) {
-        $result = PluginGlpinewentityWizard::processUpdate($_POST, $sectorObj->fields);
+        $result = Wizard::processUpdate($_POST, $sectorObj->fields);
         // Atualiza metadata independentemente de ter erro, pois os dados no banco já foram alterados
         $sectorObj->update([
             'id' => $sectorId,
@@ -47,7 +56,7 @@ if (isset($_POST['process_wizard'])) {
         ]);
         
         if (empty($result['errors'])) {
-            Session::addMessageAfterRedirect('Infraestrutura atualizada com sucesso!', true, INFO);
+            Session::addMessageAfterRedirect(__('Infraestrutura atualizada com sucesso!', 'glpinewentity'), true, INFO);
         } else {
             foreach ($result['errors'] as $err) {
                 Session::addMessageAfterRedirect($err, false, ERROR);
@@ -56,7 +65,7 @@ if (isset($_POST['process_wizard'])) {
         global $CFG_GLPI;
         Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php?id=' . $sectorId);
     } else {
-        $result = PluginGlpinewentityWizard::processCreation($_POST);
+        $result = Wizard::processCreation($_POST);
         
         if (empty($result['errors']) && !empty($result['entity_id'])) {
             $sectorObj->add([
@@ -65,7 +74,7 @@ if (isset($_POST['process_wizard'])) {
                 'sector_abbr' => $_POST['sector_abbr'],
                 'metadata' => json_encode($result)
             ]);
-            Session::addMessageAfterRedirect('Infraestrutura criada com sucesso!', true, INFO);
+            Session::addMessageAfterRedirect(__('Infraestrutura criada com sucesso!', 'glpinewentity'), true, INFO);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
         } else {
@@ -80,7 +89,7 @@ if (isset($_POST['process_wizard'])) {
                 foreach ($result['errors'] as $err) {
                     Session::addMessageAfterRedirect($err, false, ERROR);
                 }
-                Session::addMessageAfterRedirect('Infraestrutura criada parcialmente. Verifique os erros.', false, WARNING);
+                Session::addMessageAfterRedirect(__('Infraestrutura criada parcialmente. Verifique os erros.', 'glpinewentity'), false, WARNING);
                 global $CFG_GLPI;
                 Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php?id=' . $newSectorId);
             } else {

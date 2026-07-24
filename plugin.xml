@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin>
+   <name>GLPI New Entity</name>
+   <key>glpinewentity</key>
+   <state>stable</state>
+   <license>GPLv3+</license>
+   <homepage>https://github.com/andrefelipeufcg/glpinewentity</homepage>
+   <readme>https://github.com/andrefelipeufcg/glpinewentity/blob/main/README.md</readme>
+   <authors>
+      <author>andrefelipeufcg</author>
+   </authors>
+   <description>
+      <en>Wizard to create Entity, Admin, Groups, and ITIL Categories</en>
+      <pt_BR>Wizard para criação de Entidade, Admin, Grupos e Categorias ITIL</pt_BR>
+   </description>
+   <tags>
+      <en>entity,wizard,onboarding</en>
+      <pt_BR>entidade,wizard,onboarding</pt_BR>
+   </tags>
+   <versions>
+      <version>
+         <num>1.0.1</num>
+         <compatibility>&gt;=11.0.0</compatibility>
+         <download_url>https://github.com/andrefelipeufcg/glpinewentity/archive/refs/tags/v1.0.1.zip</download_url>
+      </version>
+      <version>
+         <num>1.0.0</num>
+         <compatibility>&gt;=11.0.0</compatibility>
+         <download_url>https://github.com/andrefelipeufcg/glpinewentity/archive/refs/tags/v1.0.0.zip</download_url>
+      </version>
+   </versions>
+</plugin>

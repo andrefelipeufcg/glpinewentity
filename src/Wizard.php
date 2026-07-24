@@ -1,12 +1,22 @@
 <?php
 /**
  * -----------------------------------------------------------------------
- * GLPI New Entity — inc/wizard.class.php
+ * GLPI New Entity — src/Wizard.php
  * Lógica de negócio: cria Entidade, Admin, Grupos, Técnicos Atendentes e Categorias.
  * -----------------------------------------------------------------------
  */
 
-class PluginGlpinewentityWizard {
+namespace GlpiPlugin\Glpinewentity;
+
+use Entity;
+use Profile;
+use Profile_User;
+use Group;
+use Group_User;
+use ITILCategory;
+use User;
+
+class Wizard {
 
     /**
      * Processa a criação de toda a infraestrutura do novo setor.
@@ -161,9 +171,10 @@ class PluginGlpinewentityWizard {
 
             // 2. Associar usuários ao NOVO perfil na entidade criada
             $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
+            $usersList = array_slice($usersList, 0, 100); // Previne exaustão
             foreach ($usersList as $userEmail) {
                 if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
-                    $result['errors'][] = "E-mail de usuário inválido para perfil '{$assignment['label']}': '{$userEmail}'. Ignorado.";
+                    $result['errors'][] = sprintf(__('E-mail de usuário inválido para perfil %s: %s. Ignorado.', 'glpinewentity'), $assignment['label'], $userEmail);
                     continue;
                 }
                 
@@ -225,9 +236,10 @@ class PluginGlpinewentityWizard {
                 $techUserIds = [];
                 if (!empty($sgTechs)) {
                     $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $sgTechs)));
+                    $techList = array_slice($techList, 0, 100); // Previne exaustão
                     foreach ($techList as $techEmail) {
                         if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
-                            $result['errors'][] = "E-mail de técnico atendente inválido: '{$techEmail}'. Ignorado.";
+                            $result['errors'][] = sprintf(__('E-mail de técnico atendente inválido: %s. Ignorado.', 'glpinewentity'), $techEmail);
                             continue;
                         }
                         $techUserId = self::findUserByEmail($techEmail);
@@ -501,15 +513,24 @@ class PluginGlpinewentityWizard {
             ];
 
             // Sincronizar usuários: remover os antigos da entidade e adicionar os novos
-            // Remover vinculações existentes deste perfil nesta entidade
-            $DB->delete('glpi_profiles_users', [
-                'profiles_id' => $profileId,
-                'entities_id' => $entityId
+            global $DB;
+            $iterator = $DB->request([
+                'SELECT' => 'id',
+                'FROM'   => 'glpi_profiles_users',
+                'WHERE'  => [
+                    'profiles_id' => $profileId,
+                    'entities_id' => $entityId
+                ]
             ]);
+            $profileUser = new Profile_User();
+            foreach ($iterator as $row) {
+                $profileUser->delete(['id' => $row['id']]);
+            }
 
             // Adicionar os novos
             if (!empty($assignment['users'])) {
                 $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
+                $usersList = array_slice($usersList, 0, 100); // Previne exaustão
                 foreach ($usersList as $userEmail) {
                     if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) continue;
                     $userId = self::findUserByEmail($userEmail);
@@ -581,13 +602,22 @@ class PluginGlpinewentityWizard {
                 }
 
                 // Sincronizar técnicos: remover os atuais do grupo e adicionar os novos
-                $DB->delete('glpi_groups_users', ['groups_id' => $targetGroupId]);
+                $guIter = $DB->request([
+                    'SELECT' => 'id',
+                    'FROM'   => 'glpi_groups_users',
+                    'WHERE'  => ['groups_id' => $targetGroupId]
+                ]);
+                $groupUser = new Group_User();
+                foreach ($guIter as $row) {
+                    $groupUser->delete(['id' => $row['id']]);
+                }
 
                 if (!empty($sgTechs)) {
                     $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $sgTechs)));
+                    $techList = array_slice($techList, 0, 100); // Previne exaustão
                     foreach ($techList as $techEmail) {
                         if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
-                            $result['errors'][] = "E-mail de técnico inválido: '{$techEmail}'. Ignorado.";
+                            $result['errors'][] = sprintf(__('E-mail de técnico inválido: %s. Ignorado.', 'glpinewentity'), $techEmail);
                             continue;
                         }
                         $techUserId = self::findUserByEmail($techEmail);

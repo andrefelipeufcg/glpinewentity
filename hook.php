@@ -53,5 +53,8 @@ function plugin_glpinewentity_uninstall(): bool {
         }
     }
 
+    ProfileRight::deleteByPlugin('glpinewentity');
+
     return true;
 }
+

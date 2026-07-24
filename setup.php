@@ -23,20 +23,20 @@ function plugin_init_glpinewentity(): void {
     $PLUGIN_HOOKS[Hooks::CSRF_COMPLIANT]['glpinewentity'] = true;
     $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['glpinewentity'] = 'front/sector.form.php';
 
-    Plugin::registerClass('PluginGlpinewentityWizard');
-    Plugin::registerClass('PluginGlpinewentitySector');
+    Plugin::registerClass('GlpiPlugin\Glpinewentity\Wizard');
+    Plugin::registerClass('GlpiPlugin\Glpinewentity\Sector');
 
     $plugin = new Plugin();
     if ($plugin->isActivated('glpinewentity')) {
-        if (isset($_SESSION['glpiactiveprofile']['id']) && $_SESSION['glpiactiveprofile']['id'] == 4) {
-            $PLUGIN_HOOKS['menu_toadd']['glpinewentity'] = ['config' => 'PluginGlpinewentityMenu'];
+        if (Session::haveRight('entity', READ)) {
+            $PLUGIN_HOOKS['menu_toadd']['glpinewentity'] = ['config' => 'GlpiPlugin\Glpinewentity\Menu'];
         }
     }
 }
 
 function plugin_version_glpinewentity(): array {
     return [
-        'name'         => 'GLPI New Entity',
+        'name'         => __('GLPI New Entity', 'glpinewentity'),
         'version'      => PLUGIN_GLPINEWENTITY_VERSION,
         'author'       => 'andrefelipeufcg',
         'license'      => 'GPLv3+',
