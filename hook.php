@@ -13,6 +13,33 @@
 function plugin_glpinewentity_install(): bool {
     global $DB;
 
+    // Concede acesso apenas ao perfil Super-Admin (requisito de segurança do Marketplace)
+    $superadmin_ids = [];
+    if (method_exists('\Profile', 'getSuperAdminProfilesId')) {
+        $superadmin_ids = \Profile::getSuperAdminProfilesId();
+    } else {
+        $superadmin_ids = [4]; // Perfil Super-Admin padrão no GLPI 10
+    }
+    
+    foreach ((array)$superadmin_ids as $superadmin_id) {
+        $iterator = $DB->request([
+            'SELECT' => 'id',
+            'FROM'   => 'glpi_profilerights',
+            'WHERE'  => [
+                'profiles_id' => $superadmin_id,
+                'name'        => 'plugin_glpinewentity'
+            ]
+        ]);
+        
+        if (count($iterator) == 0) {
+            $DB->insert('glpi_profilerights', [
+                'profiles_id' => $superadmin_id,
+                'name'        => 'plugin_glpinewentity',
+                'rights'      => 1
+            ]);
+        }
+    }
+
     $migration = new Migration(PLUGIN_GLPINEWENTITY_VERSION);
 
     if (!$DB->tableExists('glpi_plugin_glpinewentity_sectors')) {
@@ -28,8 +55,8 @@ function plugin_glpinewentity_install(): bool {
             KEY `entities_id` (`entities_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;";
 
-        $stmt = $DB->prepare($query);
-        $DB->executeStatement($stmt);
+        $migration->displayMessage("Creating glpi_plugin_glpinewentity_sectors table");
+        $DB->doQuery($query);
     }
 
     $migration->executeMigration();
@@ -53,5 +80,9 @@ function plugin_glpinewentity_uninstall(): bool {
         }
     }
 
+    ProfileRight::deleteByPlugin('glpinewentity');
+    $DB->delete('glpi_profilerights', ['name' => 'plugin_glpinewentity']);
+
     return true;
 }
+

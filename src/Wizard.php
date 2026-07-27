@@ -1,12 +1,22 @@
 <?php
 /**
  * -----------------------------------------------------------------------
- * GLPI New Entity — inc/wizard.class.php
+ * GLPI New Entity — src/Wizard.php
  * Lógica de negócio: cria Entidade, Admin, Grupos, Técnicos Atendentes e Categorias.
  * -----------------------------------------------------------------------
  */
 
-class PluginGlpinewentityWizard {
+namespace GlpiPlugin\Glpinewentity;
+
+use Entity;
+use Profile;
+use Profile_User;
+use Group;
+use Group_User;
+use ITILCategory;
+use User;
+
+class Wizard {
 
     /**
      * Processa a criação de toda a infraestrutura do novo setor.
@@ -38,6 +48,11 @@ class PluginGlpinewentityWizard {
         // ── Validação básica ──
         if (empty($sectorName) || empty($sectorAbbr)) {
             $result['errors'][] = 'O nome do setor e a sigla são obrigatórios.';
+            return $result;
+        }
+
+        if (!\Session::haveAccessToEntity($parentEntity)) {
+            $result['errors'][] = 'Acesso negado à entidade pai escolhida.';
             return $result;
         }
 
@@ -161,9 +176,10 @@ class PluginGlpinewentityWizard {
 
             // 2. Associar usuários ao NOVO perfil na entidade criada
             $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
+            $usersList = array_slice($usersList, 0, 100); // Previne exaustão
             foreach ($usersList as $userEmail) {
                 if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
-                    $result['errors'][] = "E-mail de usuário inválido para perfil '{$assignment['label']}': '{$userEmail}'. Ignorado.";
+                    $result['errors'][] = sprintf(__('E-mail de usuário inválido para perfil %s: %s. Ignorado.', 'glpinewentity'), $assignment['label'], $userEmail);
                     continue;
                 }
                 
@@ -225,9 +241,10 @@ class PluginGlpinewentityWizard {
                 $techUserIds = [];
                 if (!empty($sgTechs)) {
                     $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $sgTechs)));
+                    $techList = array_slice($techList, 0, 100); // Previne exaustão
                     foreach ($techList as $techEmail) {
                         if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
-                            $result['errors'][] = "E-mail de técnico atendente inválido: '{$techEmail}'. Ignorado.";
+                            $result['errors'][] = sprintf(__('E-mail de técnico atendente inválido: %s. Ignorado.', 'glpinewentity'), $techEmail);
                             continue;
                         }
                         $techUserId = self::findUserByEmail($techEmail);
@@ -501,15 +518,24 @@ class PluginGlpinewentityWizard {
             ];
 
             // Sincronizar usuários: remover os antigos da entidade e adicionar os novos
-            // Remover vinculações existentes deste perfil nesta entidade
-            $DB->delete('glpi_profiles_users', [
-                'profiles_id' => $profileId,
-                'entities_id' => $entityId
+            global $DB;
+            $iterator = $DB->request([
+                'SELECT' => 'id',
+                'FROM'   => 'glpi_profiles_users',
+                'WHERE'  => [
+                    'profiles_id' => $profileId,
+                    'entities_id' => $entityId
+                ]
             ]);
+            $profileUser = new Profile_User();
+            foreach ($iterator as $row) {
+                $profileUser->delete(['id' => $row['id']]);
+            }
 
             // Adicionar os novos
             if (!empty($assignment['users'])) {
                 $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
+                $usersList = array_slice($usersList, 0, 100); // Previne exaustão
                 foreach ($usersList as $userEmail) {
                     if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) continue;
                     $userId = self::findUserByEmail($userEmail);
@@ -537,57 +563,86 @@ class PluginGlpinewentityWizard {
         $subgroupsData = is_array($input['subgroups'] ?? null) ? $input['subgroups'] : [];
         
         if ($parentGroupId > 0) {
-            // Buscar subgrupos atuais
+            // Buscar todos os subgrupos atuais na entidade
             $currentSubgroups = [];
             $sgIter = $DB->request([
                 'SELECT' => ['id', 'name'],
                 'FROM'   => 'glpi_groups',
-                'WHERE'  => ['groups_id' => $parentGroupId]
+                'WHERE'  => ['entities_id' => $entityId]
             ]);
             foreach ($sgIter as $row) {
-                $currentSubgroups[$row['name']] = $row['id'];
+                if ($row['id'] != $parentGroupId) {
+                    $currentSubgroups[$row['name']][] = $row['id'];
+                }
             }
 
+            $sectorAbbr = $input['sector_abbr'] ?? '';
             $result['groups'] = [['id' => $parentGroupId, 'name' => "({$sectorAbbr})"]];
             $result['technicians'] = [];
 
-            foreach ($subgroupsData as $sg) {
+            // Mapeia o índice do subgrupo para o ID do grupo criado no GLPI
+            $createdGroupsByIndex = ['-1' => $parentGroupId];
+
+            foreach ($subgroupsData as $index => $sg) {
                 $sgName  = trim($sg['name'] ?? '');
                 $sgTechs = trim($sg['techs'] ?? '');
+                $sgParentIndex = isset($sg['parent']) ? trim($sg['parent']) : '-1';
 
                 if (empty($sgName) && empty($sgTechs)) continue;
 
-                // Definir o grupo-alvo
+                // Definir o pai correto a partir do mapeamento
+                $mappedParentId = $parentGroupId;
+                if (isset($createdGroupsByIndex[$sgParentIndex])) {
+                    $mappedParentId = $createdGroupsByIndex[$sgParentIndex];
+                }
+
                 $targetGroupId = $parentGroupId; // Padrão: Grupo Pai
 
                 if (!empty($sgName)) {
-                    if (isset($currentSubgroups[$sgName])) {
-                        $targetGroupId = $currentSubgroups[$sgName];
-                        unset($currentSubgroups[$sgName]); // Marca como processado
+                    if (!empty($currentSubgroups[$sgName])) {
+                        // Consome um dos IDs disponíveis (para resolver duplicatas)
+                        $targetGroupId = array_shift($currentSubgroups[$sgName]);
+                        
+                        // Atualiza o pai caso tenha mudado
+                        $subg = new Group();
+                        $subg->update([
+                            'id'        => $targetGroupId,
+                            'groups_id' => $mappedParentId
+                        ]);
                     } else {
                         // Criar subgrupo novo
                         $subg = new Group();
                         $targetGroupId = $subg->add([
                             'name'        => $sgName,
                             'entities_id' => $entityId,
-                            'groups_id'   => $parentGroupId,
+                            'groups_id'   => $mappedParentId,
                         ]);
                         if (!$targetGroupId) {
                             $result['errors'][] = "Falha ao criar subgrupo '{$sgName}'.";
                             continue;
                         }
                     }
+                    $createdGroupsByIndex[(string)$index] = $targetGroupId;
                     $result['groups'][] = ['id' => $targetGroupId, 'name' => $sgName];
                 }
 
                 // Sincronizar técnicos: remover os atuais do grupo e adicionar os novos
-                $DB->delete('glpi_groups_users', ['groups_id' => $targetGroupId]);
+                $guIter = $DB->request([
+                    'SELECT' => 'id',
+                    'FROM'   => 'glpi_groups_users',
+                    'WHERE'  => ['groups_id' => $targetGroupId]
+                ]);
+                $groupUser = new Group_User();
+                foreach ($guIter as $row) {
+                    $groupUser->delete(['id' => $row['id']]);
+                }
 
                 if (!empty($sgTechs)) {
                     $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $sgTechs)));
+                    $techList = array_slice($techList, 0, 100); // Previne exaustão
                     foreach ($techList as $techEmail) {
                         if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
-                            $result['errors'][] = "E-mail de técnico inválido: '{$techEmail}'. Ignorado.";
+                            $result['errors'][] = sprintf(__('E-mail de técnico inválido: %s. Ignorado.', 'glpinewentity'), $techEmail);
                             continue;
                         }
                         $techUserId = self::findUserByEmail($techEmail);
@@ -612,8 +667,14 @@ class PluginGlpinewentityWizard {
                 }
             }
 
-            // Subgrupos que sobraram (não estão mais no form) — deixar intactos
-            // (não apagamos para não perder dados acidentalmente)
+            // Subgrupos que sobraram (foram removidos no form ou são duplicados rejeitados)
+            // Agora os deletamos para limpar a base de dados
+            $subgToDelete = new Group();
+            foreach ($currentSubgroups as $sgName => $idsArray) {
+                foreach ($idsArray as $idToDelete) {
+                    $subgToDelete->delete(['id' => $idToDelete], 1); // purge force para limpar
+                }
+            }
         }
 
         return $result;

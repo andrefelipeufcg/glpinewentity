@@ -6,12 +6,17 @@
  * -----------------------------------------------------------------------
  */
 
-include ('../../../inc/includes.php');
+$inc = __DIR__ . '/../../../inc/includes.php';
+if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/inc/includes.php'; }
+if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/../inc/includes.php'; }
+include $inc;
+
+use GlpiPlugin\Glpinewentity\Sector;
 
 // Verifica direito de acesso
-Session::checkRight('config', READ);
+Session::checkRight('plugin_glpinewentity', READ);
 
-$sector = new PluginGlpinewentitySector();
+$sector = new Sector();
 
 // Se o usuário clicar em "+" (Adicionar) ou tentar exibir um item, o GLPI
 // chamará o showForm. Como queremos nosso próprio fluxo de wizard para adicionar
@@ -33,8 +38,14 @@ if (isset($_POST["add"])) {
 // -----------------------------------------------------------------------
 // Renderiza o grid de listagem padrão do GLPI
 // -----------------------------------------------------------------------
-Html::header(PluginGlpinewentitySector::getTypeName(Session::getPluralNumber()), '', 'config', 'pluginglpinewentitymenu', 'sector');
 
-Search::show('PluginGlpinewentitySector');
+// Força a limpeza do cache de menu na sessão para garantir que as alterações no menu apareçam.
+unset($_SESSION['glpimenu']);
+
+use GlpiPlugin\Glpinewentity\Menu;
+
+Html::header(Sector::getTypeName(Session::getPluralNumber()), '', 'config', strtolower(Menu::class), 'sector');
+
+Search::show(Sector::class);
 
 Html::footer();

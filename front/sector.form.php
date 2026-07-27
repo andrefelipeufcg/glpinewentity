@@ -6,10 +6,16 @@
  * -----------------------------------------------------------------------
  */
 
-include("../../../inc/includes.php");
+$inc = __DIR__ . '/../../../inc/includes.php';
+if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/inc/includes.php'; }
+if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/../inc/includes.php'; }
+include $inc;
 
-// Permissão: somente Super-Admin (ou quem possa gerenciar entidades)
-Session::checkRight("entity", CREATE);
+use GlpiPlugin\Glpinewentity\Sector;
+use GlpiPlugin\Glpinewentity\Wizard;
+
+// Permissão genérica de criação de entidade
+Session::checkRight("plugin_glpinewentity", READ);
 
 // -----------------------------------------------------------------------
 // POST: Processar criação
@@ -18,26 +24,27 @@ $showResult = false;
 $result     = [];
 $isEdit     = false;
 $sectorId   = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
-$sectorObj  = new PluginGlpinewentitySector();
+$sectorObj  = new Sector();
 
 if ($sectorId > 0) {
     if ($sectorObj->getFromDB($sectorId)) {
+        // Prevenção de IDOR: Checar acesso à entidade pai
+        if (!Session::haveAccessToEntity($sectorObj->fields['entities_id'])) {
+            Session::addMessageAfterRedirect(__('Acesso negado à entidade.', 'glpinewentity'), false, ERROR);
+            global $CFG_GLPI;
+            Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
+        }
         $isEdit = true;
     } else {
+        global $CFG_GLPI;
         Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
     }
 }
 
 if (isset($_POST['process_wizard'])) {
-    // No GLPI 11+, o CheckCsrfListener já valida e consome o token globalmente.
-    // Chamar checkCSRF novamente falha porque o token já foi consumido.
-    // Em versões antigas (ex: 9.5), precisamos checar manualmente.
-    if (!class_exists('Glpi\Kernel\Listener\ControllerListener\CheckCsrfListener')) {
-        Session::checkCSRF($_POST);
-    }
-
+    Session::checkValidSessionId();
     if ($isEdit) {
-        $result = PluginGlpinewentityWizard::processUpdate($_POST, $sectorObj->fields);
+        $result = Wizard::processUpdate($_POST, $sectorObj->fields);
         // Atualiza metadata independentemente de ter erro, pois os dados no banco já foram alterados
         $sectorObj->update([
             'id' => $sectorId,
@@ -47,7 +54,7 @@ if (isset($_POST['process_wizard'])) {
         ]);
         
         if (empty($result['errors'])) {
-            Session::addMessageAfterRedirect('Infraestrutura atualizada com sucesso!', true, INFO);
+            Session::addMessageAfterRedirect(__('Infraestrutura atualizada com sucesso!', 'glpinewentity'), true, INFO);
         } else {
             foreach ($result['errors'] as $err) {
                 Session::addMessageAfterRedirect($err, false, ERROR);
@@ -56,7 +63,7 @@ if (isset($_POST['process_wizard'])) {
         global $CFG_GLPI;
         Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php?id=' . $sectorId);
     } else {
-        $result = PluginGlpinewentityWizard::processCreation($_POST);
+        $result = Wizard::processCreation($_POST);
         
         if (empty($result['errors']) && !empty($result['entity_id'])) {
             $sectorObj->add([
@@ -65,7 +72,7 @@ if (isset($_POST['process_wizard'])) {
                 'sector_abbr' => $_POST['sector_abbr'],
                 'metadata' => json_encode($result)
             ]);
-            Session::addMessageAfterRedirect('Infraestrutura criada com sucesso!', true, INFO);
+            Session::addMessageAfterRedirect(__('Infraestrutura criada com sucesso!', 'glpinewentity'), true, INFO);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
         } else {
@@ -80,7 +87,7 @@ if (isset($_POST['process_wizard'])) {
                 foreach ($result['errors'] as $err) {
                     Session::addMessageAfterRedirect($err, false, ERROR);
                 }
-                Session::addMessageAfterRedirect('Infraestrutura criada parcialmente. Verifique os erros.', false, WARNING);
+                Session::addMessageAfterRedirect(__('Infraestrutura criada parcialmente. Verifique os erros.', 'glpinewentity'), false, WARNING);
                 global $CFG_GLPI;
                 Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php?id=' . $newSectorId);
             } else {
@@ -144,8 +151,8 @@ if ($isEdit) {
                 'ORDER'  => 'id ASC'
             ]);
             
-            $sgMap = [$parentGroupId => 0]; // group_id => index in $def_subgroups
-            $idx = 1;
+            $sgMap = [$parentGroupId => '-1']; // group_id => índice no form (0-based)
+            $formIdx = 0;
             
             $rows = [];
             foreach ($subgroupsIter as $row) {
@@ -155,17 +162,18 @@ if ($isEdit) {
             foreach ($rows as $row) {
                 // Se a view nativa mostra nomes certos mas tem um prefixo ou algo assim, pegamos o nome real
                 $def_subgroups[] = ['name' => $row['name'], 'techs' => [], 'parent' => '-1'];
-                $sgMap[$row['id']] = $idx++;
+                $sgMap[$row['id']] = (string)$formIdx++;
             }
             
             foreach ($rows as $row) {
-                $myIdx = $sgMap[$row['id']];
+                $myFormIdx = (int)$sgMap[$row['id']];
+                $myArrayIdx = $myFormIdx + 1; // o índice 0 de $def_subgroups é o pai
                 $parentGlpiId = $row['groups_id'];
                 if (isset($sgMap[$parentGlpiId])) {
                     if ($parentGlpiId == $parentGroupId) {
-                        $def_subgroups[$myIdx]['parent'] = '-1';
+                        $def_subgroups[$myArrayIdx]['parent'] = '-1';
                     } else {
-                        $def_subgroups[$myIdx]['parent'] = (string)$sgMap[$parentGlpiId];
+                        $def_subgroups[$myArrayIdx]['parent'] = (string)$sgMap[$parentGlpiId];
                     }
                 }
             }
@@ -191,7 +199,9 @@ if ($isEdit) {
             foreach ($techsIter as $row) {
                 $gId = $row['groups_id'];
                 if (isset($sgMap[$gId])) {
-                    $def_subgroups[$sgMap[$gId]]['techs'][] = $row['email'];
+                    $formIdxOrRoot = (int)$sgMap[$gId];
+                    $arrayIdx = $formIdxOrRoot === -1 ? 0 : $formIdxOrRoot + 1;
+                    $def_subgroups[$arrayIdx]['techs'][] = $row['email'];
                 }
             }
             $live_success = true;
@@ -349,7 +359,7 @@ if ($isEdit) {
 // -----------------------------------------------------------------------
 // RENDERIZAÇÃO DA PÁGINA
 // -----------------------------------------------------------------------
-Html::header('GLPI New Entity — Form', $_SERVER['PHP_SELF'], 'config', 'plugins');
+Html::header(Sector::getTypeName(Session::getPluralNumber()), '', 'config', strtolower(\GlpiPlugin\Glpinewentity\Menu::class), 'sector');
 
 global $CFG_GLPI;
 $form_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php';
@@ -678,11 +688,11 @@ echo "<style>
             echo "      <div class='parent-wrapper'>";
             echo "          <select name='subgroups[{$i}][parent]' class='form-select sg-parent-select' style='width: 100%;'>";
             echo "              <option value='-1' " . (($sg['parent'] ?? '-1') == '-1' ? 'selected' : '') . ">(SIGLA)</option>";
-            for ($prev = 0; $prev < $i; $prev++) {
-                $prevName = Html::cleanInputText($def_subgroups[$prev]['name'] ?? '');
+            for ($prevFormIdx = 0; $prevFormIdx < $i; $prevFormIdx++) {
+                $prevName = Html::cleanInputText($def_subgroups[$prevFormIdx + 1]['name'] ?? '');
                 if (!empty($prevName)) {
-                    $selected = (($sg['parent'] ?? '') == (string)$prev) ? 'selected' : '';
-                    echo "              <option value='{$prev}' {$selected}>{$prevName}</option>";
+                    $selected = (($sg['parent'] ?? '') == (string)$prevFormIdx) ? 'selected' : '';
+                    echo "              <option value='{$prevFormIdx}' {$selected}>{$prevName}</option>";
                 }
             }
             echo "          </select>";
@@ -735,7 +745,7 @@ echo "<style>
     echo "<td class='center' style='padding: 15px;'>";
     $btnTitle = $isEdit ? 'Salvar Modificações' : 'Criar Infraestrutura da Entidade';
     
-    echo "<button type='submit' class='btn btn-primary' style='font-size: 1.05em; padding: 8px 30px;'>";
+    echo "<button type='submit' id='btn-submit-wizard' class='btn btn-primary' style='font-size: 1.05em; padding: 8px 30px;'>";
     echo $btnTitle;
     echo "</button>";
     echo "</td>";
@@ -1009,6 +1019,10 @@ echo "<style>
                 alert('Por favor, preencha o nome do perfil, selecione de qual perfil copiar e certifique-se de que todos os e-mails informados são válidos (ex: nome@dominio.com) para todos os Perfis Adicionais.');
                 return false;
             }
+            
+            // Se chegou até aqui, todas as validações passaram.
+            // Troca o texto do botão para Salvando...
+            $('#btn-submit-wizard').html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Salvando...').css('pointer-events', 'none').css('opacity', '0.7');
         });
 
     });
