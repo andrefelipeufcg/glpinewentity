@@ -51,6 +51,11 @@ class Wizard {
             return $result;
         }
 
+        if (!\Session::haveAccessToEntity($parentEntity)) {
+            $result['errors'][] = 'Acesso negado à entidade pai escolhida.';
+            return $result;
+        }
+
         // ── Validação de Subgrupos e Técnicos ──
         $hasAnySubgroup = false;
         foreach ($subgroupsData as $sg) {

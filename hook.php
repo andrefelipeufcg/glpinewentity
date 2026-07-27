@@ -28,8 +28,8 @@ function plugin_glpinewentity_install(): bool {
             KEY `entities_id` (`entities_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;";
 
-        $stmt = $DB->prepare($query);
-        $DB->executeStatement($stmt);
+        $migration->displayMessage("Creating glpi_plugin_glpinewentity_sectors table");
+        $DB->doQuery($query);
     }
 
     $migration->executeMigration();
