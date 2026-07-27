@@ -38,7 +38,13 @@ if (isset($_POST["add"])) {
 // -----------------------------------------------------------------------
 // Renderiza o grid de listagem padrão do GLPI
 // -----------------------------------------------------------------------
-Html::header(Sector::getTypeName(Session::getPluralNumber()), '', 'config', 'GlpiPlugin\Glpinewentity\Menu', 'sector');
+
+// Força a limpeza do cache de menu na sessão para garantir que as alterações no menu apareçam.
+unset($_SESSION['glpimenu']);
+
+use GlpiPlugin\Glpinewentity\Menu;
+
+Html::header(Sector::getTypeName(Session::getPluralNumber()), '', 'config', strtolower(Menu::class), 'sector');
 
 Search::show(Sector::class);
 

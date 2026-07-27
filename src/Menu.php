@@ -8,9 +8,7 @@ use Toolbox;
 
 class Menu extends CommonGLPI {
 
-    public static function canView(): bool {
-        return Session::haveRight('entity', READ);
-    }
+    public static $rightname = 'entity';
 
     public static function getMenuName() {
         return __('GLPI New Entity', 'glpinewentity');
@@ -21,17 +19,26 @@ class Menu extends CommonGLPI {
             'title' => self::getMenuName(),
             'page'  => Toolbox::getItemTypeSearchUrl(Sector::class, false),
             'icon'  => 'ti ti-building-community',
-            'options' => [
-                'sector' => [
-                    'title' => Sector::getTypeName(Session::getPluralNumber()),
-                    'page'  => Toolbox::getItemTypeSearchUrl(Sector::class, false),
-                    'links' => [
-                        'search' => Toolbox::getItemTypeSearchUrl(Sector::class, false),
-                        'add'    => Sector::getFormURL(false)
-                    ]
-                ]
-            ]
         ];
+
+        if (Session::haveRight('entity', READ) || Session::haveRight('config', READ)) {
+            $menu['options'] = [
+                'sector' => [
+                    'icon'  => Sector::getIcon(),
+                    'links' => []
+                ]
+            ];
+
+            if (Session::haveRight('entity', READ) || Session::haveRight('config', READ)) {
+                $menu['options']['sector']['title'] = Sector::getTypeName(Session::getPluralNumber());
+                $menu['options']['sector']['page'] = Toolbox::getItemTypeSearchUrl(Sector::class, false);
+                $menu['options']['sector']['links']['search'] = Toolbox::getItemTypeSearchUrl(Sector::class, false);
+            }
+
+            if (Sector::canCreate()) {
+                $menu['options']['sector']['links']['add'] = Sector::getFormURL(false);
+            }
+        }
 
         return $menu;
     }

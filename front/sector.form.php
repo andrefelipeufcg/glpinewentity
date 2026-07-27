@@ -42,9 +42,6 @@ if ($sectorId > 0) {
 }
 
 if (isset($_POST['process_wizard'])) {
-    // Prevenção CSRF incondicional (correção de segurança)
-    Session::checkCSRF($_POST);
-
     if ($isEdit) {
         $result = Wizard::processUpdate($_POST, $sectorObj->fields);
         // Atualiza metadata independentemente de ter erro, pois os dados no banco já foram alterados

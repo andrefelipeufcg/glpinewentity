@@ -19,29 +19,39 @@ if (!defined('GLPI_ROOT')) {
 
 class Sector extends CommonDBTM {
     
+    public static $rightname = 'config';
+
     public static function canCreate(): bool {
-        return Session::haveRight('entity', CREATE);
+        return Session::haveRight('config', UPDATE) || Session::haveRight('entity', UPDATE);
     }
 
     public static function canView(): bool {
-        return Session::haveRight('entity', READ);
+        return Session::haveRight('config', READ) || Session::haveRight('entity', READ);
     }
 
     public static function canUpdate(): bool {
-        return Session::haveRight('entity', UPDATE);
+        return Session::haveRight('config', UPDATE) || Session::haveRight('entity', UPDATE);
     } 
 
     public static function canDelete(): bool {
-        return Session::haveRight('entity', DELETE);
+        return Session::haveRight('config', UPDATE) || Session::haveRight('entity', UPDATE);
     }
 
-    public static function getFormURL($full = true) {
-        return Plugin::getWebDir('glpinewentity', $full) . '/front/sector.form.php';
+    public function canCreateItem(): bool {
+        return self::canCreate();
     }
 
-    public static function getSearchURL($full = true) {
-        return Plugin::getWebDir('glpinewentity', $full) . '/front/sector.php';
-    } 
+    public function canViewItem(): bool {
+        return self::canView();
+    }
+
+    public function canUpdateItem(): bool {
+        return self::canUpdate();
+    }
+
+    public function canDeleteItem(): bool {
+        return self::canDelete();
+    }
 
     /**
      * Nome que aparece na interface do GLPI
