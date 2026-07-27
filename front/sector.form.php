@@ -355,7 +355,7 @@ if ($isEdit) {
 // -----------------------------------------------------------------------
 // RENDERIZAÇÃO DA PÁGINA
 // -----------------------------------------------------------------------
-Html::header('GLPI New Entity — Form', $_SERVER['PHP_SELF'], 'config', 'plugins');
+Html::header(Sector::getTypeName(Session::getPluralNumber()), '', 'config', strtolower(\GlpiPlugin\Glpinewentity\Menu::class), 'sector');
 
 global $CFG_GLPI;
 $form_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php';
