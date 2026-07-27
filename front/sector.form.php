@@ -15,7 +15,7 @@ use GlpiPlugin\Glpinewentity\Sector;
 use GlpiPlugin\Glpinewentity\Wizard;
 
 // Permissão genérica de criação de entidade
-Session::checkRight("entity", CREATE);
+Session::checkRight("plugin_glpinewentity", READ);
 
 // -----------------------------------------------------------------------
 // POST: Processar criação

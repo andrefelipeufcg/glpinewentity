@@ -21,7 +21,7 @@ class Menu extends CommonGLPI {
             'icon'  => 'ti ti-building-community',
         ];
 
-        if (Session::haveRight('entity', READ) || Session::haveRight('config', READ)) {
+        if (Session::haveRight('plugin_glpinewentity', READ)) {
             $menu['options'] = [
                 'sector' => [
                     'icon'  => Sector::getIcon(),
@@ -29,7 +29,7 @@ class Menu extends CommonGLPI {
                 ]
             ];
 
-            if (Session::haveRight('entity', READ) || Session::haveRight('config', READ)) {
+            if (Session::haveRight('plugin_glpinewentity', READ)) {
                 $menu['options']['sector']['title'] = Sector::getTypeName(Session::getPluralNumber());
                 $menu['options']['sector']['page'] = Toolbox::getItemTypeSearchUrl(Sector::class, false);
                 $menu['options']['sector']['links']['search'] = Toolbox::getItemTypeSearchUrl(Sector::class, false);

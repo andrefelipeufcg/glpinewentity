@@ -19,22 +19,22 @@ if (!defined('GLPI_ROOT')) {
 
 class Sector extends CommonDBTM {
     
-    public static $rightname = 'config';
+    public static $rightname = 'plugin_glpinewentity';
 
     public static function canCreate(): bool {
-        return Session::haveRight('config', UPDATE) || Session::haveRight('entity', UPDATE);
+        return Session::haveRight('plugin_glpinewentity', READ);
     }
 
     public static function canView(): bool {
-        return Session::haveRight('config', READ) || Session::haveRight('entity', READ);
+        return Session::haveRight('plugin_glpinewentity', READ);
     }
 
     public static function canUpdate(): bool {
-        return Session::haveRight('config', UPDATE) || Session::haveRight('entity', UPDATE);
+        return Session::haveRight('plugin_glpinewentity', READ);
     } 
 
     public static function canDelete(): bool {
-        return Session::haveRight('config', UPDATE) || Session::haveRight('entity', UPDATE);
+        return Session::haveRight('plugin_glpinewentity', READ);
     }
 
     public function canCreateItem(): bool {

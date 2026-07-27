@@ -14,7 +14,7 @@ include $inc;
 use GlpiPlugin\Glpinewentity\Sector;
 
 // Verifica direito de acesso
-Session::checkRight('entity', READ);
+Session::checkRight('plugin_glpinewentity', READ);
 
 $sector = new Sector();
 

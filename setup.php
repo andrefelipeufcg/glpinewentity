@@ -28,7 +28,7 @@ function plugin_init_glpinewentity(): void {
 
     $plugin = new Plugin();
     if ($plugin->isActivated('glpinewentity')) {
-        if (Session::haveRight('entity', READ)) {
+        if (Session::haveRight('plugin_glpinewentity', READ)) {
             $PLUGIN_HOOKS['menu_toadd']['glpinewentity'] = ['config' => 'GlpiPlugin\Glpinewentity\Menu'];
         }
     }
