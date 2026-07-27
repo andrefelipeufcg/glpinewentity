@@ -558,46 +558,66 @@ class Wizard {
         $subgroupsData = is_array($input['subgroups'] ?? null) ? $input['subgroups'] : [];
         
         if ($parentGroupId > 0) {
-            // Buscar subgrupos atuais
+            // Buscar todos os subgrupos atuais na entidade
             $currentSubgroups = [];
             $sgIter = $DB->request([
                 'SELECT' => ['id', 'name'],
                 'FROM'   => 'glpi_groups',
-                'WHERE'  => ['groups_id' => $parentGroupId]
+                'WHERE'  => ['entities_id' => $entityId]
             ]);
             foreach ($sgIter as $row) {
-                $currentSubgroups[$row['name']] = $row['id'];
+                if ($row['id'] != $parentGroupId) {
+                    $currentSubgroups[$row['name']] = $row['id'];
+                }
             }
 
+            $sectorAbbr = $input['sector_abbr'] ?? '';
             $result['groups'] = [['id' => $parentGroupId, 'name' => "({$sectorAbbr})"]];
             $result['technicians'] = [];
 
-            foreach ($subgroupsData as $sg) {
+            // Mapeia o índice do subgrupo para o ID do grupo criado no GLPI
+            $createdGroupsByIndex = ['-1' => $parentGroupId];
+
+            foreach ($subgroupsData as $index => $sg) {
                 $sgName  = trim($sg['name'] ?? '');
                 $sgTechs = trim($sg['techs'] ?? '');
+                $sgParentIndex = isset($sg['parent']) ? trim($sg['parent']) : '-1';
 
                 if (empty($sgName) && empty($sgTechs)) continue;
 
-                // Definir o grupo-alvo
+                // Definir o pai correto a partir do mapeamento
+                $mappedParentId = $parentGroupId;
+                if (isset($createdGroupsByIndex[$sgParentIndex])) {
+                    $mappedParentId = $createdGroupsByIndex[$sgParentIndex];
+                }
+
                 $targetGroupId = $parentGroupId; // Padrão: Grupo Pai
 
                 if (!empty($sgName)) {
                     if (isset($currentSubgroups[$sgName])) {
                         $targetGroupId = $currentSubgroups[$sgName];
                         unset($currentSubgroups[$sgName]); // Marca como processado
+                        
+                        // Atualiza o pai caso tenha mudado
+                        $subg = new Group();
+                        $subg->update([
+                            'id'        => $targetGroupId,
+                            'groups_id' => $mappedParentId
+                        ]);
                     } else {
                         // Criar subgrupo novo
                         $subg = new Group();
                         $targetGroupId = $subg->add([
                             'name'        => $sgName,
                             'entities_id' => $entityId,
-                            'groups_id'   => $parentGroupId,
+                            'groups_id'   => $mappedParentId,
                         ]);
                         if (!$targetGroupId) {
                             $result['errors'][] = "Falha ao criar subgrupo '{$sgName}'.";
                             continue;
                         }
                     }
+                    $createdGroupsByIndex[(string)$index] = $targetGroupId;
                     $result['groups'][] = ['id' => $targetGroupId, 'name' => $sgName];
                 }
 
