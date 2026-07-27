@@ -741,7 +741,7 @@ echo "<style>
     echo "<td class='center' style='padding: 15px;'>";
     $btnTitle = $isEdit ? 'Salvar Modificações' : 'Criar Infraestrutura da Entidade';
     
-    echo "<button type='submit' class='btn btn-primary' style='font-size: 1.05em; padding: 8px 30px;'>";
+    echo "<button type='submit' id='btn-submit-wizard' class='btn btn-primary' style='font-size: 1.05em; padding: 8px 30px;'>";
     echo $btnTitle;
     echo "</button>";
     echo "</td>";
@@ -1015,6 +1015,10 @@ echo "<style>
                 alert('Por favor, preencha o nome do perfil, selecione de qual perfil copiar e certifique-se de que todos os e-mails informados são válidos (ex: nome@dominio.com) para todos os Perfis Adicionais.');
                 return false;
             }
+            
+            // Se chegou até aqui, todas as validações passaram.
+            // Troca o texto do botão para Salvando...
+            $('#btn-submit-wizard').html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Salvando...').css('pointer-events', 'none').css('opacity', '0.7');
         });
 
     });
