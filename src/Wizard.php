@@ -567,7 +567,7 @@ class Wizard {
             ]);
             foreach ($sgIter as $row) {
                 if ($row['id'] != $parentGroupId) {
-                    $currentSubgroups[$row['name']] = $row['id'];
+                    $currentSubgroups[$row['name']][] = $row['id'];
                 }
             }
 
@@ -594,9 +594,9 @@ class Wizard {
                 $targetGroupId = $parentGroupId; // Padrão: Grupo Pai
 
                 if (!empty($sgName)) {
-                    if (isset($currentSubgroups[$sgName])) {
-                        $targetGroupId = $currentSubgroups[$sgName];
-                        unset($currentSubgroups[$sgName]); // Marca como processado
+                    if (!empty($currentSubgroups[$sgName])) {
+                        // Consome um dos IDs disponíveis (para resolver duplicatas)
+                        $targetGroupId = array_shift($currentSubgroups[$sgName]);
                         
                         // Atualiza o pai caso tenha mudado
                         $subg = new Group();
@@ -662,8 +662,14 @@ class Wizard {
                 }
             }
 
-            // Subgrupos que sobraram (não estão mais no form) — deixar intactos
-            // (não apagamos para não perder dados acidentalmente)
+            // Subgrupos que sobraram (foram removidos no form ou são duplicados rejeitados)
+            // Agora os deletamos para limpar a base de dados
+            $subgToDelete = new Group();
+            foreach ($currentSubgroups as $sgName => $idsArray) {
+                foreach ($idsArray as $idToDelete) {
+                    $subgToDelete->delete(['id' => $idToDelete], 1); // purge force para limpar
+                }
+            }
         }
 
         return $result;

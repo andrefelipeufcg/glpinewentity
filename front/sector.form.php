@@ -150,8 +150,8 @@ if ($isEdit) {
                 'ORDER'  => 'id ASC'
             ]);
             
-            $sgMap = [$parentGroupId => 0]; // group_id => index in $def_subgroups
-            $idx = 1;
+            $sgMap = [$parentGroupId => '-1']; // group_id => índice no form (0-based)
+            $formIdx = 0;
             
             $rows = [];
             foreach ($subgroupsIter as $row) {
@@ -161,17 +161,18 @@ if ($isEdit) {
             foreach ($rows as $row) {
                 // Se a view nativa mostra nomes certos mas tem um prefixo ou algo assim, pegamos o nome real
                 $def_subgroups[] = ['name' => $row['name'], 'techs' => [], 'parent' => '-1'];
-                $sgMap[$row['id']] = $idx++;
+                $sgMap[$row['id']] = (string)$formIdx++;
             }
             
             foreach ($rows as $row) {
-                $myIdx = $sgMap[$row['id']];
+                $myFormIdx = (int)$sgMap[$row['id']];
+                $myArrayIdx = $myFormIdx + 1; // o índice 0 de $def_subgroups é o pai
                 $parentGlpiId = $row['groups_id'];
                 if (isset($sgMap[$parentGlpiId])) {
                     if ($parentGlpiId == $parentGroupId) {
-                        $def_subgroups[$myIdx]['parent'] = '-1';
+                        $def_subgroups[$myArrayIdx]['parent'] = '-1';
                     } else {
-                        $def_subgroups[$myIdx]['parent'] = (string)$sgMap[$parentGlpiId];
+                        $def_subgroups[$myArrayIdx]['parent'] = (string)$sgMap[$parentGlpiId];
                     }
                 }
             }
@@ -197,7 +198,9 @@ if ($isEdit) {
             foreach ($techsIter as $row) {
                 $gId = $row['groups_id'];
                 if (isset($sgMap[$gId])) {
-                    $def_subgroups[$sgMap[$gId]]['techs'][] = $row['email'];
+                    $formIdxOrRoot = (int)$sgMap[$gId];
+                    $arrayIdx = $formIdxOrRoot === -1 ? 0 : $formIdxOrRoot + 1;
+                    $def_subgroups[$arrayIdx]['techs'][] = $row['email'];
                 }
             }
             $live_success = true;
@@ -684,11 +687,11 @@ echo "<style>
             echo "      <div class='parent-wrapper'>";
             echo "          <select name='subgroups[{$i}][parent]' class='form-select sg-parent-select' style='width: 100%;'>";
             echo "              <option value='-1' " . (($sg['parent'] ?? '-1') == '-1' ? 'selected' : '') . ">(SIGLA)</option>";
-            for ($prev = 0; $prev < $i; $prev++) {
-                $prevName = Html::cleanInputText($def_subgroups[$prev]['name'] ?? '');
+            for ($prevFormIdx = 0; $prevFormIdx < $i; $prevFormIdx++) {
+                $prevName = Html::cleanInputText($def_subgroups[$prevFormIdx + 1]['name'] ?? '');
                 if (!empty($prevName)) {
-                    $selected = (($sg['parent'] ?? '') == (string)$prev) ? 'selected' : '';
-                    echo "              <option value='{$prev}' {$selected}>{$prevName}</option>";
+                    $selected = (($sg['parent'] ?? '') == (string)$prevFormIdx) ? 'selected' : '';
+                    echo "              <option value='{$prevFormIdx}' {$selected}>{$prevName}</option>";
                 }
             }
             echo "          </select>";
