@@ -37,6 +37,14 @@ function plugin_glpinewentity_install(): bool {
                 'name'        => 'plugin_glpinewentity',
                 'rights'      => CREATE | UPDATE | PURGE | READ
             ]);
+        } else {
+            // Garante que o super-admin receba as novas permissões em caso de atualização
+            $row = $iterator->current();
+            $DB->update('glpi_profilerights', [
+                'rights' => CREATE | UPDATE | PURGE | READ
+            ], [
+                'id' => $row['id']
+            ]);
         }
     }
 
