@@ -35,7 +35,7 @@ function plugin_glpinewentity_install(): bool {
             $DB->insert('glpi_profilerights', [
                 'profiles_id' => $superadmin_id,
                 'name'        => 'plugin_glpinewentity',
-                'rights'      => 1
+                'rights'      => CREATE | UPDATE | PURGE | READ
             ]);
         }
     }
@@ -45,19 +45,22 @@ function plugin_glpinewentity_install(): bool {
     if (!$DB->tableExists('glpi_plugin_glpinewentity_sectors')) {
         $query = "CREATE TABLE `glpi_plugin_glpinewentity_sectors` (
             `id` int(11) UNSIGNED NOT NULL AUTO_INCREMENT,
-            `entities_id` int(11) UNSIGNED NOT NULL DEFAULT '0' COMMENT 'Entidade Pai',
-            `sector_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-            `sector_abbr` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-            `metadata` longtext COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'JSON com dados da infra (subgrupos, categorias, ids GLPI criados)',
-            `date_creation` timestamp NULL DEFAULT NULL,
-            `date_mod` timestamp NULL DEFAULT NULL,
-            PRIMARY KEY (`id`),
-            KEY `entities_id` (`entities_id`)
+            PRIMARY KEY (`id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci ROW_FORMAT=DYNAMIC;";
 
-        $migration->displayMessage("Creating glpi_plugin_glpinewentity_sectors table");
+        $migration->displayMessage("Creating glpi_plugin_glpinewentity_sectors table skeleton");
         $DB->doQuery($query);
     }
+
+    $migration->addField('glpi_plugin_glpinewentity_sectors', 'entities_id', 'int(11) UNSIGNED NOT NULL DEFAULT 0');
+    $migration->addField('glpi_plugin_glpinewentity_sectors', 'sector_name', 'varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL');
+    $migration->addField('glpi_plugin_glpinewentity_sectors', 'sector_abbr', 'varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL');
+    $migration->addField('glpi_plugin_glpinewentity_sectors', 'metadata', 'longtext COLLATE utf8mb4_unicode_ci DEFAULT NULL');
+    $migration->addField('glpi_plugin_glpinewentity_sectors', 'date_creation', 'timestamp NULL DEFAULT NULL');
+    $migration->addField('glpi_plugin_glpinewentity_sectors', 'date_mod', 'timestamp NULL DEFAULT NULL');
+    $migration->addKey('glpi_plugin_glpinewentity_sectors', 'entities_id');
+
+    $migration->migrationOneTable('glpi_plugin_glpinewentity_sectors');
 
     $migration->executeMigration();
 

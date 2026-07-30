@@ -71,8 +71,9 @@ class Wizard {
             $hasName = !empty($name);
             $hasTechs = !empty($techs);
             
+            $safeName = htmlspecialchars($name, ENT_QUOTES);
             if ($hasName && !$hasTechs) {
-                $result['errors'][] = "O subgrupo '{$name}' foi informado, mas nenhum e-mail de técnico atendente foi preenchido.";
+                $result['errors'][] = "O subgrupo '{$safeName}' foi informado, mas nenhum e-mail de técnico atendente foi preenchido.";
                 return $result;
             }
             if (!$hasName && $hasTechs) {
@@ -100,7 +101,8 @@ class Wizard {
         ]);
 
         if (!$entityId) {
-            $result['errors'][] = "Falha ao criar a entidade '{$entityName}'.";
+            $safeEntityName = htmlspecialchars($entityName, ENT_QUOTES);
+            $result['errors'][] = "Falha ao criar a entidade '{$safeEntityName}'.";
             return $result;
         }
         $result['entity_id'] = $entityId;
@@ -165,7 +167,8 @@ class Wizard {
             );
 
             if (!$newProfileId) {
-                $result['errors'][] = "Falha ao criar o perfil '{$assignment['new_name']}' (clone de #{$assignment['source_profile_id']}).";
+                $safeNewName = htmlspecialchars($assignment['new_name'], ENT_QUOTES);
+                $result['errors'][] = "Falha ao criar o perfil '{$safeNewName}' (clone de #{$assignment['source_profile_id']}).";
                 continue;
             }
 
@@ -279,7 +282,8 @@ class Wizard {
                     ]);
                     
                     if (!$targetGroupId) {
-                        $result['errors'][] = "Falha ao criar subgrupo '{$sgName}'.";
+                        $safeSgName = htmlspecialchars($sgName, ENT_QUOTES);
+                        $result['errors'][] = "Falha ao criar subgrupo '{$safeSgName}'.";
                         continue;
                     }
                     
@@ -359,7 +363,8 @@ class Wizard {
                     'name' => $cleanName,
                 ];
             } else {
-                $result['errors'][] = "Falha ao criar categoria '{$cleanName}'.";
+                $safeCleanName = htmlspecialchars($cleanName, ENT_QUOTES);
+                $result['errors'][] = "Falha ao criar categoria '{$safeCleanName}'.";
             }
         }
 
@@ -387,6 +392,11 @@ class Wizard {
         
         if (empty($sectorName) || empty($sectorAbbr)) {
             $result['errors'][] = 'O nome do setor e a sigla são obrigatórios.';
+            return $result;
+        }
+        
+        if (!\Session::haveAccessToEntity($parentEntity)) {
+            $result['errors'][] = 'Acesso negado à entidade pai escolhida.';
             return $result;
         }
         
