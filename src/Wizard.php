@@ -47,12 +47,12 @@ class Wizard {
 
         // ── Validação básica ──
         if (empty($sectorName) || empty($sectorAbbr)) {
-            $result['errors'][] = 'O nome do setor e a sigla são obrigatórios.';
+            $result['errors'][] = __('O nome do setor e a sigla são obrigatórios.', 'glpinewentity');
             return $result;
         }
 
         if (!\Session::haveAccessToEntity($parentEntity)) {
-            $result['errors'][] = 'Acesso negado à entidade pai escolhida.';
+            $result['errors'][] = __('Acesso negado à entidade pai escolhida.', 'glpinewentity');
             return $result;
         }
 
@@ -73,19 +73,19 @@ class Wizard {
             
             $safeName = htmlspecialchars($name, ENT_QUOTES);
             if ($hasName && !$hasTechs) {
-                $result['errors'][] = "O subgrupo '{$safeName}' foi informado, mas nenhum e-mail de técnico atendente foi preenchido.";
+                $result['errors'][] = sprintf(__('O subgrupo \'%s\' foi informado, mas nenhum e-mail de técnico atendente foi preenchido.', 'glpinewentity'), $safeName);
                 return $result;
             }
             if (!$hasName && $hasTechs) {
                 if ($hasAnySubgroup) {
-                    $result['errors'][] = "Não é permitido adicionar técnicos avulsos ao Grupo Pai quando há subgrupos informados. Preencha o nome do subgrupo no Bloco " . ($index + 1) . ".";
+                    $result['errors'][] = sprintf(__('Não é permitido adicionar técnicos avulsos ao Grupo Pai quando há subgrupos informados. Preencha o nome do subgrupo no Bloco %d.', 'glpinewentity'), $index + 1);
                     return $result;
                 }
             }
         }
 
         if (empty($categoryNames)) {
-            $result['errors'][] = 'Informe pelo menos uma Categoria de Serviço.';
+            $result['errors'][] = __('Informe pelo menos uma Categoria de Serviço.', 'glpinewentity');
             return $result;
         }
 
@@ -102,7 +102,7 @@ class Wizard {
 
         if (!$entityId) {
             $safeEntityName = htmlspecialchars($entityName, ENT_QUOTES);
-            $result['errors'][] = "Falha ao criar a entidade '{$safeEntityName}'.";
+            $result['errors'][] = sprintf(__('Falha ao criar a entidade \'%s\'.', 'glpinewentity'), $safeEntityName);
             return $result;
         }
         $result['entity_id'] = $entityId;
@@ -168,7 +168,7 @@ class Wizard {
 
             if (!$newProfileId) {
                 $safeNewName = htmlspecialchars($assignment['new_name'], ENT_QUOTES);
-                $result['errors'][] = "Falha ao criar o perfil '{$safeNewName}' (clone de #{$assignment['source_profile_id']}).";
+                $result['errors'][] = sprintf(__('Falha ao criar o perfil \'%1$s\' (clone de #%2$d).', 'glpinewentity'), $safeNewName, $assignment['source_profile_id']);
                 continue;
             }
 
@@ -188,7 +188,7 @@ class Wizard {
                 
                 $userId = self::findUserByEmail($userEmail);
                 if (!$userId) {
-                    $result['errors'][] = "Usuário '{$userEmail}' não encontrado no GLPI. Ignorado.";
+                    $result['errors'][] = sprintf(__('Usuário \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $userEmail);
                     continue;
                 }
                 
@@ -201,7 +201,7 @@ class Wizard {
                 ]);
 
                 if (!$puId) {
-                    $result['errors'][] = "Falha ao atribuir perfil '{$assignment['new_name']}' ao usuário '{$userEmail}'.";
+                    $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), $assignment['new_name'], $userEmail);
                 }
             }
         }
@@ -219,7 +219,7 @@ class Wizard {
         ]);
 
         if (!$parentGroupId) {
-            $result['errors'][] = "Falha ao criar grupo pai '{$parentGroupName}'.";
+            $result['errors'][] = sprintf(__('Falha ao criar grupo pai \'%s\'.', 'glpinewentity'), $parentGroupName);
         } else {
             $result['groups'][] = [
                 'id'   => $parentGroupId,
@@ -258,7 +258,7 @@ class Wizard {
                                 'email' => $techEmail . ($sgName ? " -> {$sgName}" : " -> Pai"),
                             ];
                         } else {
-                            $result['errors'][] = "Técnico atendente '{$techEmail}' não encontrado no GLPI. Ignorado.";
+                            $result['errors'][] = sprintf(__('Técnico atendente \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $techEmail);
                         }
                     }
                 }
@@ -283,7 +283,7 @@ class Wizard {
                     
                     if (!$targetGroupId) {
                         $safeSgName = htmlspecialchars($sgName, ENT_QUOTES);
-                        $result['errors'][] = "Falha ao criar subgrupo '{$safeSgName}'.";
+                        $result['errors'][] = sprintf(__('Falha ao criar subgrupo \'%s\'.', 'glpinewentity'), $safeSgName);
                         continue;
                     }
                     
@@ -364,7 +364,7 @@ class Wizard {
                 ];
             } else {
                 $safeCleanName = htmlspecialchars($cleanName, ENT_QUOTES);
-                $result['errors'][] = "Falha ao criar categoria '{$safeCleanName}'.";
+                $result['errors'][] = sprintf(__('Falha ao criar categoria \'%s\'.', 'glpinewentity'), $safeCleanName);
             }
         }
 
@@ -391,12 +391,12 @@ class Wizard {
         $parentEntity = (int)($input['parent_entity'] ?? 0);
         
         if (empty($sectorName) || empty($sectorAbbr)) {
-            $result['errors'][] = 'O nome do setor e a sigla são obrigatórios.';
+            $result['errors'][] = __('O nome do setor e a sigla são obrigatórios.', 'glpinewentity');
             return $result;
         }
         
         if (!\Session::haveAccessToEntity($parentEntity)) {
-            $result['errors'][] = 'Acesso negado à entidade pai escolhida.';
+            $result['errors'][] = __('Acesso negado à entidade pai escolhida.', 'glpinewentity');
             return $result;
         }
         
@@ -517,7 +517,7 @@ class Wizard {
                     $newName
                 );
                 if (!$profileId) {
-                    $result['errors'][] = "Falha ao criar o perfil '{$newName}'.";
+                    $result['errors'][] = sprintf(__('Falha ao criar o perfil \'%s\'.', 'glpinewentity'), $newName);
                     continue;
                 }
             }
@@ -550,7 +550,7 @@ class Wizard {
                     if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) continue;
                     $userId = self::findUserByEmail($userEmail);
                     if (!$userId) {
-                        $result['errors'][] = "Usuário '{$userEmail}' não encontrado no GLPI. Ignorado.";
+                        $result['errors'][] = sprintf(__('Usuário \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $userEmail);
                         continue;
                     }
                     $profileUser = new Profile_User();
@@ -561,7 +561,7 @@ class Wizard {
                         'is_recursive' => 1,
                     ]);
                     if (!$puId) {
-                        $result['errors'][] = "Falha ao atribuir perfil '{$assignment['new_name']}' ao usuário '{$userEmail}'.";
+                        $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), $assignment['new_name'], $userEmail);
                     }
                 }
             }
@@ -628,7 +628,7 @@ class Wizard {
                             'groups_id'   => $mappedParentId,
                         ]);
                         if (!$targetGroupId) {
-                            $result['errors'][] = "Falha ao criar subgrupo '{$sgName}'.";
+                            $result['errors'][] = sprintf(__('Falha ao criar subgrupo \'%s\'.', 'glpinewentity'), $sgName);
                             continue;
                         }
                     }
@@ -663,7 +663,7 @@ class Wizard {
                                 'groups_id' => $targetGroupId,
                             ]);
                             if (!$guId) {
-                                $result['errors'][] = "Falha ao associar técnico '{$techEmail}' ao subgrupo.";
+                                $result['errors'][] = sprintf(__('Falha ao associar técnico \'%s\' ao subgrupo.', 'glpinewentity'), $techEmail);
                             } else {
                                 $result['technicians'][] = [
                                     'id'    => $techUserId,
@@ -671,7 +671,7 @@ class Wizard {
                                 ];
                             }
                         } else {
-                            $result['errors'][] = "Técnico '{$techEmail}' não encontrado no GLPI. Ignorado.";
+                            $result['errors'][] = sprintf(__('Técnico \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $techEmail);
                         }
                     }
                 }
