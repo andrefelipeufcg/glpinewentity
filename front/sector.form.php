@@ -380,7 +380,7 @@ echo "<style>
 // =====================================================================
 
     echo "<form method='post' action='" . $form_url . "' id='form_wizard'>";
-    Html::generateValidSessionId();
+    echo "<input type='hidden' name='_glpi_csrf_token' value='" . \Session::getNewCSRFToken() . "'>";
     echo "<input type='hidden' name='process_wizard' value='1'>";
     if ($isEdit) {
         echo "<input type='hidden' name='id' value='{$sectorId}'>";
