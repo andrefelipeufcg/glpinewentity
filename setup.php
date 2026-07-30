@@ -14,7 +14,7 @@
 
 use Glpi\Plugin\Hooks;
 
-define('PLUGIN_GLPINEWENTITY_VERSION', '1.0.2');
+define('PLUGIN_GLPINEWENTITY_VERSION', '1.0.3');
 define('PLUGIN_GLPINEWENTITY_MIN_GLPI', '11.0.0');
 
 function plugin_init_glpinewentity(): void {
@@ -22,6 +22,7 @@ function plugin_init_glpinewentity(): void {
 
     $PLUGIN_HOOKS[Hooks::CSRF_COMPLIANT]['glpinewentity'] = true;
     $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['glpinewentity'] = 'front/sector.form.php';
+    $PLUGIN_HOOKS[Hooks::UNDISCLOSED_CONFIG_VALUE]['glpinewentity'] = 'plugin_glpinewentity_undisclosed_config_value';
 
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Wizard');
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Sector');
@@ -51,10 +52,15 @@ function plugin_version_glpinewentity(): array {
 
 function plugin_glpinewentity_check_prerequisites(): bool {
     if (version_compare(GLPI_VERSION, PLUGIN_GLPINEWENTITY_MIN_GLPI, '<')) {
-        echo 'Este plugin requer GLPI 11.0.0 ou superior.';
+        echo "<p class='error'>" . __('Este plugin requer GLPI 11.0.0 ou superior.', 'glpinewentity') . "</p>";
         return false;
     }
     return true;
+}
+
+function plugin_glpinewentity_undisclosed_config_value(array $config): array {
+    // Retornar mascarado se houver chaves de segredo no futuro
+    return $config;
 }
 
 function plugin_glpinewentity_check_config(): bool {

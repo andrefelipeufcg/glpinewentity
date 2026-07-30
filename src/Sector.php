@@ -22,7 +22,7 @@ class Sector extends CommonDBTM {
     public static $rightname = 'plugin_glpinewentity';
 
     public static function canCreate(): bool {
-        return Session::haveRight('plugin_glpinewentity', READ);
+        return Session::haveRight('plugin_glpinewentity', CREATE);
     }
 
     public static function canView(): bool {
@@ -30,11 +30,11 @@ class Sector extends CommonDBTM {
     }
 
     public static function canUpdate(): bool {
-        return Session::haveRight('plugin_glpinewentity', READ);
+        return Session::haveRight('plugin_glpinewentity', UPDATE);
     } 
 
     public static function canDelete(): bool {
-        return Session::haveRight('plugin_glpinewentity', READ);
+        return Session::haveRight('plugin_glpinewentity', PURGE);
     }
 
     public function canCreateItem(): bool {
