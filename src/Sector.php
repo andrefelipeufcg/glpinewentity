@@ -144,27 +144,283 @@ class Sector extends CommonDBTM {
     }
 
     public static function displayTabContentForItem(\CommonGLPI $item, $tabnum = 1, $withtemplate = 0) {
-        if ($item->getType() == __CLASS__) {
-            $titles = [
-                1 => 'Modelos de Chamado',
-                2 => 'Respostas Básicas',
-                3 => 'Soluções Básicas',
-                4 => 'Motivos de Pendências',
-                5 => 'Notificações',
-                6 => 'Formulário Padrão',
-            ];
-            $title = $titles[$tabnum] ?? '';
-            echo "<div class='center' style='margin-top: 20px;'>";
-            echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-            echo "<tr><th colspan='2' style='font-size: 1.2em;'>Configuração de {$title}</th></tr>";
-            echo "<tr class='tab_bg_1'><td class='center' style='padding: 30px;'>";
-            echo "<i class='fas fa-tools fa-3x' style='color: #ccc; margin-bottom: 15px;'></i><br>";
-            echo "Esta funcionalidade será implementada em breve.<br>Aqui haverá os botões para gerar as configurações de <strong>{$title}</strong> exclusivas para esta entidade.";
-            echo "</td></tr>";
-            echo "</table>";
-            echo "</div>";
+        if ($item->getType() != __CLASS__) {
+            return false;
         }
+
+        $titles = [
+            1 => 'Modelos de Chamado',
+            2 => 'Respostas Básicas',
+            3 => 'Soluções Básicas',
+            4 => 'Motivos de Pendências',
+            5 => 'Notificações',
+            6 => 'Formulário Padrão',
+        ];
+        $title = $titles[$tabnum] ?? '';
+
+        global $DB, $CFG_GLPI;
+
+        // Recupera metadata
+        $meta = json_decode($item->fields['metadata'] ?? '{}', true) ?: [];
+        $tabKey = 'tab_' . $tabnum;
+        $savedConfigs = $meta['configs'][$tabKey] ?? [];
+
+        // Definições por aba
+        $tableMapping = [
+            1 => 'glpi_tickettemplates',
+            2 => 'glpi_itilfollowuptemplates',
+            3 => 'glpi_solutiontemplates',
+            4 => 'glpi_pendingreasons',
+            5 => 'glpi_notifications', // Para notificações, copiamos de outras notifications
+            6 => 'glpi_plugin_formcreator_forms', // Se tiver Formcreator (mas no Builder usamos nativo glpi_forms, entao testamos)
+        ];
+        
+        // Verifica glpi_forms vs glpi_plugin_formcreator_forms
+        if ($tabnum == 6) {
+            if ($DB->tableExists('glpi_forms')) {
+                $tableMapping[6] = 'glpi_forms';
+            }
+        }
+
+        // Busca modelos existentes no GLPI para o select "Copiar de..."
+        $existingModels = [];
+        $tableName = $tableMapping[$tabnum] ?? '';
+        if ($tableName && $DB->tableExists($tableName)) {
+            $iterator = $DB->request([
+                'SELECT' => ['id', 'name'],
+                'FROM'   => $tableName,
+                'ORDER'  => 'name ASC'
+            ]);
+            foreach ($iterator as $row) {
+                $existingModels[$row['id']] = $row['name'];
+            }
+        }
+
+        // Determina os campos que serão exibidos baseado na aba
+        // 1: name, content (se houver, mas ticket template é mais complexo, vamos usar só name e o "Copiar de..." puxa o resto)
+        $hasContentField = in_array($tabnum, [2, 3, 5]); // Respostas, Soluções, Notificações
+        
+        $ajax_save_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/save_draft_configs.php';
+        $ajax_generate_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/generate_configs.php';
+
+        echo "<div class='center' style='margin-top: 20px;'>";
+        echo "<form id='form_configs_tab_{$tabnum}'>";
+        echo "<input type='hidden' name='action' value='save_draft'>";
+        echo "<input type='hidden' name='sector_id' value='{$item->getID()}'>";
+        echo "<input type='hidden' name='tabnum' value='{$tabnum}'>";
+
+        echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
+        echo "<tr><th colspan='2' style='font-size: 1.2em;'>Configuração de {$title}</th></tr>";
+        
+        echo "<tr class='tab_bg_1'><td colspan='2' style='padding: 20px;'>";
+        echo "<div style='margin-bottom: 20px; text-align: left; padding: 10px; background: #e9ecef; border-radius: 5px;'>";
+        echo "Crie ou edite os itens abaixo. Você pode selecionar um modelo existente do GLPI em <strong>'Copiar de...'</strong> para que a padronização use as mesmas configurações (campos, descrições, etc). Se não selecionar, será criado um item básico com o Nome (e Conteúdo, se aplicável) informados.";
+        echo "</div>";
+
+        echo "<div id='items-container-tab-{$tabnum}'>";
+
+        // Template oculto para adicionar novos
+        echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels);
+
+        // Renderiza existentes (salvos no rascunho) ou padrão se for vazio
+        if (empty($savedConfigs)) {
+            // Valores padrão iniciais para mostrar algo
+            $savedConfigs = self::getDefaultConfigsForTab($tabnum);
+        }
+
+        foreach ($savedConfigs as $idx => $config) {
+            echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx);
+        }
+
+        echo "</div>";
+
+        echo "<div style='text-align: left; padding: 10px 0;'>";
+        echo "<button type='button' class='btn btn-success btn-sm' onclick='addConfigItem({$tabnum})'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar Item</button>";
+        echo "</div>";
+
+        echo "</td></tr>";
+
+        // Botões de Ação
+        echo "<tr class='tab_bg_2'><td class='center' colspan='2' style='padding: 20px;'>";
+        
+        echo "<button type='button' class='btn btn-primary' onclick='saveDraftConfigs({$tabnum})' style='margin-right: 15px;'>";
+        echo "<i class='fas fa-save' style='margin-right: 5px;'></i> Salvar Rascunho";
+        echo "</button>";
+
+        echo "<button type='button' class='btn btn-success' onclick='generateSectorConfigs({$item->getID()}, {$tabnum})'>";
+        echo "<i class='fas fa-magic' style='margin-right: 5px;'></i> Aplicar Padronização para esta Entidade";
+        echo "</button>";
+        
+        echo "</td></tr>";
+
+        echo "</table>";
+        echo "</form>";
+        echo "</div>";
+
+        // JavaScript
+        echo "<script>
+        function addConfigItem(tabnum) {
+            let container = $('#items-container-tab-' + tabnum);
+            let template = container.find('.config-block.template').clone();
+            template.removeClass('template');
+            template.show();
+            // Reseta inputs
+            template.find('input[type=\"text\"], textarea').val('');
+            template.find('select').val('0');
+            container.append(template);
+        }
+
+        $(document).on('click', '.btn-remove-config', function() {
+            $(this).closest('.config-block').remove();
+        });
+
+        function saveDraftConfigs(tabnum) {
+            let formData = $('#form_configs_tab_' + tabnum).serialize();
+            $.ajax({
+                url: '{$ajax_save_url}',
+                type: 'POST',
+                data: formData,
+                success: function(response) {
+                    if(response.success) {
+                        alert('Rascunho salvo com sucesso!');
+                    } else {
+                        alert('Erro ao salvar rascunho: ' + (response.error || 'Erro desconhecido'));
+                    }
+                },
+                error: function() {
+                    alert('Erro na requisição.');
+                }
+            });
+        }
+
+        function generateSectorConfigs(sectorId, tabnum) {
+            if(confirm('Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?')) {
+                // Primeiro salva o rascunho, depois gera
+                let formData = $('#form_configs_tab_' + tabnum).serialize();
+                $.ajax({
+                    url: '{$ajax_save_url}',
+                    type: 'POST',
+                    data: formData,
+                    success: function(saveResp) {
+                        if(saveResp.success) {
+                            $.ajax({
+                                url: '{$ajax_generate_url}',
+                                type: 'POST',
+                                data: {
+                                    action: 'generate',
+                                    sector_id: sectorId,
+                                    tabnum: tabnum
+                                },
+                                success: function(genResp) {
+                                    if(genResp.success) {
+                                        alert('Configurações aplicadas com sucesso!');
+                                        window.location.reload();
+                                    } else {
+                                        alert('Erro ao gerar configurações: ' + (genResp.error || 'Erro desconhecido'));
+                                    }
+                                },
+                                error: function() {
+                                    alert('Erro na requisição de geração.');
+                                }
+                            });
+                        } else {
+                            alert('Erro ao salvar rascunho antes de aplicar.');
+                        }
+                    },
+                    error: function() {
+                        alert('Erro na requisição de salvamento.');
+                    }
+                });
+            }
+        }
+        </script>";
+
         return true;
+    }
+
+    private static function renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels) {
+        return self::renderConfigBlock($tabnum, $hasContentField, $existingModels, ['name' => '', 'content' => '', 'copy_from' => 0], -1, true);
+    }
+
+    private static function renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $isTemplate = false) {
+        $display = $isTemplate ? "display: none;" : "";
+        $class = "config-block" . ($isTemplate ? " template" : "");
+        
+        $name = \Html::cleanInputText($config['name'] ?? '');
+        $content = \Html::cleanInputText($config['content'] ?? '');
+        $copyFrom = (int)($config['copy_from'] ?? 0);
+
+        $html = "<div class='{$class}' style='border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; background: #fafafa; {$display}'>";
+        $html .= "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
+        $html .= "      <strong>Item de Configuração</strong>";
+        $html .= "      <button type='button' class='btn btn-sm btn-danger btn-remove-config'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
+        $html .= "  </div>";
+        
+        $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+        $html .= "      <div style='flex: 2;'>";
+        $html .= "          <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Nome / Título</label>";
+        $html .= "          <input type='text' name='items_name[]' class='form-control' style='width: 100%;' value='{$name}' placeholder='Ex: Nome Padrão do Item'>";
+        $html .= "      </div>";
+        $html .= "      <div style='flex: 1;'>";
+        $html .= "          <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Copiar de...</label>";
+        $html .= "          <select name='items_copy_from[]' class='form-select select2' style='width: 100%;'>";
+        $html .= "            <option value='0'>--- Nenhum (Criar Básico) ---</option>";
+        foreach ($existingModels as $id => $mName) {
+            $selected = ($id == $copyFrom) ? 'selected' : '';
+            $html .= "            <option value='{$id}' {$selected}>" . \Html::cleanInputText($mName) . "</option>";
+        }
+        $html .= "          </select>";
+        $html .= "      </div>";
+        $html .= "  </div>";
+
+        if ($hasContentField) {
+            $html .= "  <div>";
+            $html .= "      <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Conteúdo / Texto Base</label>";
+            $html .= "      <textarea name='items_content[]' class='form-control' style='width: 100%; height: 60px;' placeholder='Texto padrão para este item.'>{$content}</textarea>";
+            $html .= "  </div>";
+        } else {
+            // Hidden para manter o array pareado
+            $html .= "      <input type='hidden' name='items_content[]' value=''>";
+        }
+
+        $html .= "</div>";
+        return $html;
+    }
+
+    private static function getDefaultConfigsForTab($tabnum) {
+        switch ($tabnum) {
+            case 1: // Modelos de Chamado
+                return [
+                    ['name' => 'SIGLA - Incidente Padrão', 'content' => '', 'copy_from' => 0],
+                    ['name' => 'SIGLA - Requisição Padrão', 'content' => '', 'copy_from' => 0],
+                ];
+            case 2: // Respostas Básicas
+                return [
+                    ['name' => 'SIGLA - Acompanhamento Inicial', 'content' => 'Olá, recebemos sua solicitação e já estamos analisando.', 'copy_from' => 0],
+                    ['name' => 'SIGLA - Solicitação de Informação', 'content' => 'Para prosseguirmos com o atendimento, por favor nos informe mais detalhes sobre...', 'copy_from' => 0],
+                ];
+            case 3: // Soluções Básicas
+                return [
+                    ['name' => 'SIGLA - Incidente Resolvido', 'content' => 'O problema foi identificado e corrigido.', 'copy_from' => 0],
+                    ['name' => 'SIGLA - Requisição Atendida', 'content' => 'A solicitação foi atendida com sucesso conforme pedido.', 'copy_from' => 0],
+                ];
+            case 4: // Motivos de Pendências
+                return [
+                    ['name' => 'SIGLA - Aguardando Retorno do Usuário', 'content' => '', 'copy_from' => 0],
+                    ['name' => 'SIGLA - Aguardando Terceiros', 'content' => '', 'copy_from' => 0],
+                ];
+            case 5: // Notificações
+                return [
+                    ['name' => 'SIGLA - Novo Chamado (Ticket)', 'content' => 'Um novo chamado foi aberto: [TICKET_ID]', 'copy_from' => 0],
+                    ['name' => 'SIGLA - Chamado Solucionado', 'content' => 'O chamado [TICKET_ID] foi solucionado.', 'copy_from' => 0],
+                ];
+            case 6: // Formulário Padrão
+                return [
+                    ['name' => 'SIGLA - Formulário de Atendimento', 'content' => '', 'copy_from' => 0],
+                ];
+            default:
+                return [];
+        }
     }
 
     public function showForm($ID, array $options = []) {
