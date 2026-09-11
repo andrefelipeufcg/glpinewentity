@@ -2,8 +2,12 @@
 /**
  * -----------------------------------------------------------------------
  * GLPI New Entity — ajax/get_template_data.php
- * Retorna JSON com name, type, itilcategories_id, content para popular a UI
- * quando um modelo for selecionado no dropdown "Copiar de...".
+ * 
+ * Este script é um endpoint AJAX responsável por buscar no banco de dados 
+ * as configurações de um modelo de infraestrutura selecionado na tela 
+ * (ex: Modelo de Chamado, Motivo de Pendência) quando o usuário escolhe 
+ * algo no dropdown "Copiar de...". Ele retorna um JSON com os campos 
+ * preenchidos para que o JavaScript atualize a tela em tempo real.
  * -----------------------------------------------------------------------
  */
 
@@ -77,6 +81,20 @@ switch ($tabnum) {
         if ($item->getFromDB($id)) {
             $data['name'] = $item->fields['name'] ?? '';
             $data['content'] = $item->fields['content'] ?? '';
+        }
+        break;
+    case 4: // PendingReason
+        $item = new PendingReason();
+        if ($item->getFromDB($id)) {
+            $data['name'] = $item->fields['name'] ?? '';
+            $data['comment'] = $item->fields['comment'] ?? '';
+            $data['is_default'] = $item->fields['is_default'] ?? 0;
+            $data['is_pending_per_default'] = $item->fields['is_pending_per_default'] ?? 0;
+            $data['calendars_id'] = $item->fields['calendars_id'] ?? 0;
+            $data['followup_frequency'] = $item->fields['followup_frequency'] ?? 0;
+            $data['itilfollowuptemplates_id'] = $item->fields['itilfollowuptemplates_id'] ?? 0;
+            $data['followups_before_resolution'] = $item->fields['followups_before_resolution'] ?? 0;
+            $data['solutiontemplates_id'] = $item->fields['solutiontemplates_id'] ?? 0;
         }
         break;
     case 5: // Notification

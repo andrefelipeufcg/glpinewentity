@@ -199,7 +199,7 @@ class Sector extends CommonDBTM {
         // Determina os campos que serão exibidos baseado na aba
         $hasContentField = in_array($tabnum, [1, 2, 3, 5]); // Modelos, Respostas, Soluções, Notificações
         
-        $categories = [];
+        $extraOptions = [];
         if ($tabnum == 1 && $DB->tableExists('glpi_itilcategories')) {
             $catIter = $DB->request([
                 'SELECT' => ['id', 'completename'],
@@ -207,7 +207,32 @@ class Sector extends CommonDBTM {
                 'ORDER' => 'completename ASC'
             ]);
             foreach ($catIter as $row) {
-                $categories[$row['id']] = $row['completename'];
+                $extraOptions['categories'][$row['id']] = $row['completename'];
+            }
+        }
+        if ($tabnum == 4) {
+            $extraOptions['calendars'] = [];
+            if ($DB->tableExists('glpi_calendars')) {
+                foreach ($DB->request('glpi_calendars') as $row) {
+                    $extraOptions['calendars'][$row['id']] = $row['name'];
+                }
+            }
+            $extraOptions['itilfollowuptemplates'] = [];
+            if ($DB->tableExists('glpi_itilfollowuptemplates')) {
+                foreach ($DB->request('glpi_itilfollowuptemplates') as $row) {
+                    $extraOptions['itilfollowuptemplates'][$row['id']] = $row['name'];
+                }
+            }
+            $extraOptions['solutiontemplates'] = [];
+            if ($DB->tableExists('glpi_solutiontemplates')) {
+                foreach ($DB->request('glpi_solutiontemplates') as $row) {
+                    $extraOptions['solutiontemplates'][$row['id']] = $row['name'];
+                }
+            }
+            $extraOptions['frequencies'] = [];
+            if (class_exists('PendingReason')) {
+                $extraOptions['frequencies'] = \PendingReason::getFollowupFrequencyValues();
+                $extraOptions['res_limits'] = \PendingReason::getFollowupsBeforeResolutionValues();
             }
         }        
         $ajax_save_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/save_draft_configs.php';
@@ -230,7 +255,7 @@ class Sector extends CommonDBTM {
         echo "<div id='items-container-tab-{$tabnum}'>";
 
         // Template oculto para adicionar novos
-        echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $categories);
+        echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $extraOptions);
 
         // Renderiza existentes (salvos no rascunho) ou padrão se for vazio
         if (empty($savedConfigs)) {
@@ -239,7 +264,7 @@ class Sector extends CommonDBTM {
         }
 
         foreach ($savedConfigs as $idx => $config) {
-            echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $categories);
+            echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions);
         }
 
         echo "</div>";
@@ -312,6 +337,17 @@ class Sector extends CommonDBTM {
                             } else {
                                 block.find('.input-category').val('0');
                             }
+
+                            if (tabnum == 4) {
+                                block.find('.input-is-default').val(response.data.is_default || '0');
+                                block.find('.input-is-pending-per-default').val(response.data.is_pending_per_default || '0');
+                                block.find('.input-calendars-id').val(response.data.calendars_id || '0').trigger('change');
+                                block.find('.input-followup-frequency').val(response.data.followup_frequency || '0').trigger('change');
+                                block.find('.input-itilfollowuptemplates-id').val(response.data.itilfollowuptemplates_id || '0').trigger('change');
+                                block.find('.input-followups-before-resolution').val(response.data.followups_before_resolution || '0').trigger('change');
+                                block.find('.input-solutiontemplates-id').val(response.data.solutiontemplates_id || '0').trigger('change');
+                                block.find('.input-comment').val(response.data.comment || '');
+                            }
                         }
                     }
                 });
@@ -320,6 +356,17 @@ class Sector extends CommonDBTM {
                 block.find('.input-content').val('');
                 block.find('.input-type').val('1');
                 block.find('.input-category').val('0');
+                
+                if (tabnum == 4) {
+                    block.find('.input-is-default').val('0');
+                    block.find('.input-is-pending-per-default').val('0');
+                    block.find('.input-calendars-id').val('0').trigger('change');
+                    block.find('.input-followup-frequency').val('0').trigger('change');
+                    block.find('.input-itilfollowuptemplates-id').val('0').trigger('change');
+                    block.find('.input-followups-before-resolution').val('0').trigger('change');
+                    block.find('.input-solutiontemplates-id').val('0').trigger('change');
+                    block.find('.input-comment').val('');
+                }
             }
         });
 
@@ -387,11 +434,11 @@ class Sector extends CommonDBTM {
         return true;
     }
 
-    private static function renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $categories = []) {
-        return self::renderConfigBlock($tabnum, $hasContentField, $existingModels, ['name' => '', 'content' => '', 'copy_from' => 0, 'type' => 1, 'itilcategories_id' => 0], -1, $categories, true);
+    private static function renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $extraOptions = []) {
+        return self::renderConfigBlock($tabnum, $hasContentField, $existingModels, ['name' => '', 'content' => '', 'copy_from' => 0, 'type' => 1, 'itilcategories_id' => 0], -1, $extraOptions, true);
     }
 
-    private static function renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $categories = [], $isTemplate = false) {
+    private static function renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions = [], $isTemplate = false) {
         $display = $isTemplate ? "display: none;" : "";
         $class = "config-block" . ($isTemplate ? " template" : "");
         
@@ -400,6 +447,14 @@ class Sector extends CommonDBTM {
         $copyFrom = (int)($config['copy_from'] ?? 0);
         $type = (int)($config['type'] ?? 1); // 1 = Incident, 2 = Request
         $itilcategoryId = (int)($config['itilcategories_id'] ?? 0);
+        $is_default = (int)($config['is_default'] ?? 0);
+        $is_pending_per_default = (int)($config['is_pending_per_default'] ?? 0);
+        $calendars_id = (int)($config['calendars_id'] ?? 0);
+        $followup_frequency = (int)($config['followup_frequency'] ?? 0);
+        $itilfollowuptemplates_id = (int)($config['itilfollowuptemplates_id'] ?? 0);
+        $followups_before_resolution = (int)($config['followups_before_resolution'] ?? 0);
+        $solutiontemplates_id = (int)($config['solutiontemplates_id'] ?? 0);
+        $comment = \Html::cleanInputText($config['comment'] ?? '');
 
         $html = "<div class='{$class}' style='border: 1px solid #ccc; padding: 15px; margin-bottom: 15px;  {$display}'>";
         $html .= "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
@@ -440,13 +495,96 @@ class Sector extends CommonDBTM {
             $html .= "          <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Categoria ITIL</label>";
             $html .= "          <select name='items_category[]' class='form-select select2-cat input-category' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhuma ---</option>";
-            foreach ($categories as $id => $cName) {
+            foreach (($extraOptions['categories'] ?? []) as $id => $cName) {
                 $selected = ($id == $itilcategoryId) ? 'selected' : '';
                 $html .= "            <option value='{$id}' {$selected}>" . \Html::cleanInputText($cName) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
             $html .= "  </div>";
+        } elseif ($tabnum == 4) {
+            // Campos de PendingReason
+            $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Motivo padrão para pendência</label>";
+            $html .= "          <select name='items_is_default[]' class='form-select input-is-default' style='width: 100%;'>";
+            $html .= "            <option value='0' " . ($is_default == 0 ? 'selected' : '') . ">Não</option>";
+            $html .= "            <option value='1' " . ($is_default == 1 ? 'selected' : '') . ">Sim</option>";
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Pendente por padrão</label>";
+            $html .= "          <select name='items_is_pending_per_default[]' class='form-select input-is-pending-per-default' style='width: 100%;'>";
+            $html .= "            <option value='0' " . ($is_pending_per_default == 0 ? 'selected' : '') . ">Não</option>";
+            $html .= "            <option value='1' " . ($is_pending_per_default == 1 ? 'selected' : '') . ">Sim</option>";
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "  </div>";
+
+            $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Calendário</label>";
+            $html .= "          <select name='items_calendars_id[]' class='form-select select2-calendar input-calendars-id' style='width: 100%;'>";
+            $html .= "            <option value='0'>--- Nenhum ---</option>";
+            foreach (($extraOptions['calendars'] ?? []) as $cid => $cname) {
+                $sel = ($cid == $calendars_id) ? 'selected' : '';
+                $html .= "            <option value='{$cid}' {$sel}>" . \Html::cleanInputText($cname) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Frequência automática de acompanhamento/solução</label>";
+            $html .= "          <select name='items_followup_frequency[]' class='form-select select2-freq input-followup-frequency' style='width: 100%;'>";
+            $html .= "            <option value='0'>Desabilitado</option>";
+            foreach (($extraOptions['frequencies'] ?? []) as $fid => $fname) {
+                $sel = ($fid == $followup_frequency) ? 'selected' : '';
+                $html .= "            <option value='{$fid}' {$sel}>" . \Html::cleanInputText($fname) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "  </div>";
+
+            $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Modelo de acompanhamento</label>";
+            $html .= "          <select name='items_itilfollowuptemplates_id[]' class='form-select select2-foltpl input-itilfollowuptemplates-id' style='width: 100%;'>";
+            $html .= "            <option value='0'>--- Nenhum ---</option>";
+            foreach (($extraOptions['itilfollowuptemplates'] ?? []) as $fid => $fname) {
+                $sel = ($fid == $itilfollowuptemplates_id) ? 'selected' : '';
+                $html .= "            <option value='{$fid}' {$sel}>" . \Html::cleanInputText($fname) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Acompanhamentos antes de solução automática</label>";
+            $html .= "          <select name='items_followups_before_resolution[]' class='form-select select2-fbr input-followups-before-resolution' style='width: 100%;'>";
+            $html .= "            <option value='0'>Desabilitado</option>";
+            foreach (($extraOptions['res_limits'] ?? []) as $rid => $rname) {
+                $sel = ($rid == $followups_before_resolution) ? 'selected' : '';
+                $html .= "            <option value='{$rid}' {$sel}>" . \Html::cleanInputText($rname) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "  </div>";
+
+            $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Modelo de solução</label>";
+            $html .= "          <select name='items_solutiontemplates_id[]' class='form-select select2-soltpl input-solutiontemplates-id' style='width: 100%;'>";
+            $html .= "            <option value='0'>--- Nenhum ---</option>";
+            foreach (($extraOptions['solutiontemplates'] ?? []) as $sid => $sname) {
+                $sel = ($sid == $solutiontemplates_id) ? 'selected' : '';
+                $html .= "            <option value='{$sid}' {$sel}>" . \Html::cleanInputText($sname) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "  </div>";
+
+            $html .= "  <div>";
+            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Comentários</label>";
+            $html .= "      <textarea name='items_comment[]' class='form-control input-comment' style='width: 100%; height: 60px;'>{$comment}</textarea>";
+            $html .= "  </div>";
+
         } else {
             $html .= "  <input type='hidden' name='items_type[]' class='input-type' value='1'>";
             $html .= "  <input type='hidden' name='items_category[]' class='input-category' value='0'>";

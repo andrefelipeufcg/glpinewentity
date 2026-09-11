@@ -1,4 +1,14 @@
 <?php
+/**
+ * -----------------------------------------------------------------------
+ * GLPI New Entity — ajax/generate_configs.php
+ * 
+ * Este script é um endpoint AJAX acionado pelo botão "Aplicar Padronização".
+ * Ele lê o rascunho salvo no banco de dados e repassa para as classes 
+ * Builder corretas (TicketTemplateBuilder, WaitReasonBuilder, etc.), que 
+ * farão a criação final dos modelos e registros na Entidade do sistema.
+ * -----------------------------------------------------------------------
+ */
 
 use GlpiPlugin\Glpinewentity\Builders\TicketTemplateBuilder;
 use GlpiPlugin\Glpinewentity\Builders\FollowupLibraryBuilder;
