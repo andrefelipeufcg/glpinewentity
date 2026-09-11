@@ -41,6 +41,13 @@ class TicketTemplateBuilder
                 // ou se quisermos garantir os mínimos de urgencia, category e content, podemos adicionar.
                 // Para manter simples, só forçamos se for criação do zero.
                 if (empty($config['copy_from'])) {
+                    $this->setPredefinedField($templateId, $so['name'] ?? -1, $name);
+                    $this->setPredefinedField($templateId, $so['type'] ?? -1, $config['type'] ?? 1);
+                    $this->setPredefinedField($templateId, $so['itilcategories_id'] ?? -1, $config['itilcategories_id'] ?? 0);
+                    if (!empty($config['content'])) {
+                        $this->setPredefinedField($templateId, $so['content'] ?? -1, $config['content']);
+                    }
+
                     foreach (self::MANDATORY_FIELDS as $key) {
                         $this->ensureMandatory($templateId, $so[$key] ?? -1);
                     }
@@ -133,6 +140,19 @@ class TicketTemplateBuilder
         $field = new TicketTemplateMandatoryField();
         if (!$field->getFromDBByCrit(['tickettemplates_id' => $templateId, 'num' => $num])) {
             $field->add(['tickettemplates_id' => $templateId, 'num' => $num]);
+        }
+    }
+
+    private function setPredefinedField(int $templateId, int $num, $value): void
+    {
+        if ($num < 0 || empty($value)) {
+            return;
+        }
+        $field = new \TicketTemplatePredefinedField();
+        if (!$field->getFromDBByCrit(['tickettemplates_id' => $templateId, 'num' => $num])) {
+            $field->add(['tickettemplates_id' => $templateId, 'num' => $num, 'value' => $value]);
+        } else {
+            $field->update(['id' => $field->getID(), 'value' => $value]);
         }
     }
 }

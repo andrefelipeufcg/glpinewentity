@@ -197,9 +197,19 @@ class Sector extends CommonDBTM {
         }
 
         // Determina os campos que serão exibidos baseado na aba
-        // 1: name, content (se houver, mas ticket template é mais complexo, vamos usar só name e o "Copiar de..." puxa o resto)
-        $hasContentField = in_array($tabnum, [2, 3, 5]); // Respostas, Soluções, Notificações
+        $hasContentField = in_array($tabnum, [1, 2, 3, 5]); // Modelos, Respostas, Soluções, Notificações
         
+        $categories = [];
+        if ($tabnum == 1 && $DB->tableExists('glpi_itilcategories')) {
+            $catIter = $DB->request([
+                'SELECT' => ['id', 'completename'],
+                'FROM' => 'glpi_itilcategories',
+                'ORDER' => 'completename ASC'
+            ]);
+            foreach ($catIter as $row) {
+                $categories[$row['id']] = $row['completename'];
+            }
+        }        
         $ajax_save_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/save_draft_configs.php';
         $ajax_generate_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/generate_configs.php';
 
@@ -220,7 +230,7 @@ class Sector extends CommonDBTM {
         echo "<div id='items-container-tab-{$tabnum}'>";
 
         // Template oculto para adicionar novos
-        echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels);
+        echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $categories);
 
         // Renderiza existentes (salvos no rascunho) ou padrão se for vazio
         if (empty($savedConfigs)) {
@@ -229,7 +239,7 @@ class Sector extends CommonDBTM {
         }
 
         foreach ($savedConfigs as $idx => $config) {
-            echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx);
+            echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $categories);
         }
 
         echo "</div>";
@@ -258,6 +268,8 @@ class Sector extends CommonDBTM {
         echo "</div>";
 
         // JavaScript
+        $ajax_get_template_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/get_template_data.php';
+
         echo "<script>
         function addConfigItem(tabnum) {
             let container = $('#items-container-tab-' + tabnum);
@@ -272,6 +284,43 @@ class Sector extends CommonDBTM {
 
         $(document).on('click', '.btn-remove-config', function() {
             $(this).closest('.config-block').remove();
+        });
+
+        $(document).on('change', '.select2-copy-from', function() {
+            let id = $(this).val();
+            let tabnum = $(this).data('tab');
+            let block = $(this).closest('.config-block');
+            
+            if (id > 0) {
+                $.ajax({
+                    url: '{$ajax_get_template_url}',
+                    type: 'POST',
+                    data: { id: id, tabnum: tabnum },
+                    success: function(response) {
+                        if (response.success && response.data) {
+                            block.find('.input-name').val(response.data.name || '');
+                            block.find('.input-content').val(response.data.content || '');
+                            
+                            if (response.data.type) {
+                                block.find('.input-type').val(response.data.type);
+                            } else {
+                                block.find('.input-type').val('1');
+                            }
+                            
+                            if (response.data.itilcategories_id !== undefined) {
+                                block.find('.input-category').val(response.data.itilcategories_id);
+                            } else {
+                                block.find('.input-category').val('0');
+                            }
+                        }
+                    }
+                });
+            } else {
+                block.find('.input-name').val('');
+                block.find('.input-content').val('');
+                block.find('.input-type').val('1');
+                block.find('.input-category').val('0');
+            }
         });
 
         function saveDraftConfigs(tabnum) {
@@ -338,17 +387,19 @@ class Sector extends CommonDBTM {
         return true;
     }
 
-    private static function renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels) {
-        return self::renderConfigBlock($tabnum, $hasContentField, $existingModels, ['name' => '', 'content' => '', 'copy_from' => 0], -1, true);
+    private static function renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $categories = []) {
+        return self::renderConfigBlock($tabnum, $hasContentField, $existingModels, ['name' => '', 'content' => '', 'copy_from' => 0, 'type' => 1, 'itilcategories_id' => 0], -1, $categories, true);
     }
 
-    private static function renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $isTemplate = false) {
+    private static function renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $categories = [], $isTemplate = false) {
         $display = $isTemplate ? "display: none;" : "";
         $class = "config-block" . ($isTemplate ? " template" : "");
         
         $name = \Html::cleanInputText($config['name'] ?? '');
         $content = \Html::cleanInputText($config['content'] ?? '');
         $copyFrom = (int)($config['copy_from'] ?? 0);
+        $type = (int)($config['type'] ?? 1); // 1 = Incident, 2 = Request
+        $itilcategoryId = (int)($config['itilcategories_id'] ?? 0);
 
         $html = "<div class='{$class}' style='border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; background: #fafafa; {$display}'>";
         $html .= "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
@@ -356,31 +407,58 @@ class Sector extends CommonDBTM {
         $html .= "      <button type='button' class='btn btn-sm btn-danger btn-remove-config'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
         $html .= "  </div>";
         
-        $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
-        $html .= "      <div style='flex: 2;'>";
-        $html .= "          <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Nome / Título</label>";
-        $html .= "          <input type='text' name='items_name[]' class='form-control' style='width: 100%;' value='{$name}' placeholder='Ex: Nome Padrão do Item'>";
-        $html .= "      </div>";
-        $html .= "      <div style='flex: 1;'>";
-        $html .= "          <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Copiar de...</label>";
-        $html .= "          <select name='items_copy_from[]' class='form-select select2' style='width: 100%;'>";
-        $html .= "            <option value='0'>--- Nenhum (Criar Básico) ---</option>";
+        // Copiar de... (apenas visível se for template, ou seja, "adicionar item")
+        $showCopyFrom = $isTemplate ? "block" : "none";
+        $html .= "  <div style='display: {$showCopyFrom}; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd;'>";
+        $html .= "      <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Copiar de...</label>";
+        $html .= "      <select name='items_copy_from[]' class='form-select select2-copy-from' style='width: 100%;' data-tab='{$tabnum}'>";
+        $html .= "        <option value='0'>--- Nenhum (Criar Básico) ---</option>";
         foreach ($existingModels as $id => $mName) {
             $selected = ($id == $copyFrom) ? 'selected' : '';
-            $html .= "            <option value='{$id}' {$selected}>" . \Html::cleanInputText($mName) . "</option>";
+            $html .= "        <option value='{$id}' {$selected}>" . \Html::cleanInputText($mName) . "</option>";
         }
-        $html .= "          </select>";
+        $html .= "      </select>";
+        $html .= "  </div>";
+
+        $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+        $html .= "      <div style='flex: 1;'>";
+        $html .= "          <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Nome / Título</label>";
+        $html .= "          <input type='text' name='items_name[]' class='form-control input-name' style='width: 100%;' value='{$name}' placeholder='Ex: Nome Padrão do Item'>";
         $html .= "      </div>";
         $html .= "  </div>";
+
+        if ($tabnum == 1) {
+            $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Tipo</label>";
+            $html .= "          <select name='items_type[]' class='form-select input-type' style='width: 100%;'>";
+            $html .= "            <option value='1' " . ($type == 1 ? 'selected' : '') . ">Incidente</option>";
+            $html .= "            <option value='2' " . ($type == 2 ? 'selected' : '') . ">Requisição</option>";
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "      <div style='flex: 2;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Categoria ITIL</label>";
+            $html .= "          <select name='items_category[]' class='form-select select2-cat input-category' style='width: 100%;'>";
+            $html .= "            <option value='0'>--- Nenhuma ---</option>";
+            foreach ($categories as $id => $cName) {
+                $selected = ($id == $itilcategoryId) ? 'selected' : '';
+                $html .= "            <option value='{$id}' {$selected}>" . \Html::cleanInputText($cName) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "  </div>";
+        } else {
+            $html .= "  <input type='hidden' name='items_type[]' class='input-type' value='1'>";
+            $html .= "  <input type='hidden' name='items_category[]' class='input-category' value='0'>";
+        }
 
         if ($hasContentField) {
             $html .= "  <div>";
             $html .= "      <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Conteúdo / Texto Base</label>";
-            $html .= "      <textarea name='items_content[]' class='form-control' style='width: 100%; height: 60px;' placeholder='Texto padrão para este item.'>{$content}</textarea>";
+            $html .= "      <textarea name='items_content[]' class='form-control input-content' style='width: 100%; height: 60px;' placeholder='Texto padrão para este item.'>{$content}</textarea>";
             $html .= "  </div>";
         } else {
-            // Hidden para manter o array pareado
-            $html .= "      <input type='hidden' name='items_content[]' value=''>";
+            $html .= "      <input type='hidden' name='items_content[]' class='input-content' value=''>";
         }
 
         $html .= "</div>";
@@ -391,8 +469,8 @@ class Sector extends CommonDBTM {
         switch ($tabnum) {
             case 1: // Modelos de Chamado
                 return [
-                    ['name' => 'SIGLA - Incidente Padrão', 'content' => '', 'copy_from' => 0],
-                    ['name' => 'SIGLA - Requisição Padrão', 'content' => '', 'copy_from' => 0],
+                    ['name' => 'SIGLA - Incidente Padrão', 'content' => '', 'type' => 1, 'copy_from' => 0],
+                    ['name' => 'SIGLA - Requisição Padrão', 'content' => '', 'type' => 2, 'copy_from' => 0],
                 ];
             case 2: // Respostas Básicas
                 return [
