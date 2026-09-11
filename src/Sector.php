@@ -64,7 +64,7 @@ class Sector extends CommonDBTM {
     }
 
     static function getTypeName($nb = 0) {
-        return _n('Infraestrutura de Setor', 'Infraestruturas de Setores', $nb, 'glpinewentity');
+        return _n('Infraestrutura da entidade', 'Infraestruturas da entidade', $nb, 'glpinewentity');
     }
 
     /**
@@ -223,7 +223,7 @@ class Sector extends CommonDBTM {
         echo "<tr><th colspan='2' style='font-size: 1.2em;'>Configuração de {$title}</th></tr>";
         
         echo "<tr class='tab_bg_1'><td colspan='2' style='padding: 20px;'>";
-        echo "<div style='margin-bottom: 20px; text-align: left; padding: 10px; background: #e9ecef; border-radius: 5px;'>";
+        echo "<div style='margin-bottom: 20px; text-align: left; padding: 10px;  border-radius: 5px;'>";
         echo "Crie ou edite os itens abaixo. Você pode selecionar um modelo existente do GLPI em <strong>'Copiar de...'</strong> para que a padronização use as mesmas configurações (campos, descrições, etc). Se não selecionar, será criado um item básico com o Nome (e Conteúdo, se aplicável) informados.";
         echo "</div>";
 
@@ -245,7 +245,7 @@ class Sector extends CommonDBTM {
         echo "</div>";
 
         echo "<div style='text-align: left; padding: 10px 0;'>";
-        echo "<button type='button' class='btn btn-success btn-sm' onclick='addConfigItem({$tabnum})'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar Item</button>";
+        echo "<button type='button' class='btn btn-success btn-sm' style='color: white !important;' onclick='addConfigItem({$tabnum})'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar Item</button>";
         echo "</div>";
 
         echo "</td></tr>";
@@ -257,7 +257,7 @@ class Sector extends CommonDBTM {
         echo "<i class='fas fa-save' style='margin-right: 5px;'></i> Salvar Rascunho";
         echo "</button>";
 
-        echo "<button type='button' class='btn btn-success' onclick='generateSectorConfigs({$item->getID()}, {$tabnum})'>";
+        echo "<button type='button' class='btn btn-success' style='color: white !important;' onclick='generateSectorConfigs({$item->getID()}, {$tabnum})'>";
         echo "<i class='fas fa-magic' style='margin-right: 5px;'></i> Aplicar Padronização para esta Entidade";
         echo "</button>";
         
@@ -401,16 +401,16 @@ class Sector extends CommonDBTM {
         $type = (int)($config['type'] ?? 1); // 1 = Incident, 2 = Request
         $itilcategoryId = (int)($config['itilcategories_id'] ?? 0);
 
-        $html = "<div class='{$class}' style='border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; background: #fafafa; {$display}'>";
+        $html = "<div class='{$class}' style='border: 1px solid #ccc; padding: 15px; margin-bottom: 15px;  {$display}'>";
         $html .= "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
         $html .= "      <strong>Item de Configuração</strong>";
-        $html .= "      <button type='button' class='btn btn-sm btn-danger btn-remove-config'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
+        $html .= "      <button type='button' class='btn btn-sm btn-danger btn-remove-config' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
         $html .= "  </div>";
         
         // Copiar de... (apenas visível se for template, ou seja, "adicionar item")
         $showCopyFrom = $isTemplate ? "block" : "none";
         $html .= "  <div style='display: {$showCopyFrom}; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd;'>";
-        $html .= "      <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Copiar de...</label>";
+        $html .= "      <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Copiar de...</label>";
         $html .= "      <select name='items_copy_from[]' class='form-select select2-copy-from' style='width: 100%;' data-tab='{$tabnum}'>";
         $html .= "        <option value='0'>--- Nenhum (Criar Básico) ---</option>";
         foreach ($existingModels as $id => $mName) {
@@ -422,7 +422,7 @@ class Sector extends CommonDBTM {
 
         $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
         $html .= "      <div style='flex: 1;'>";
-        $html .= "          <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Nome / Título</label>";
+        $html .= "          <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Nome / Título</label>";
         $html .= "          <input type='text' name='items_name[]' class='form-control input-name' style='width: 100%;' value='{$name}' placeholder='Ex: Nome Padrão do Item'>";
         $html .= "      </div>";
         $html .= "  </div>";
@@ -430,14 +430,14 @@ class Sector extends CommonDBTM {
         if ($tabnum == 1) {
             $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
             $html .= "      <div style='flex: 1;'>";
-            $html .= "          <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Tipo</label>";
+            $html .= "          <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Tipo</label>";
             $html .= "          <select name='items_type[]' class='form-select input-type' style='width: 100%;'>";
             $html .= "            <option value='1' " . ($type == 1 ? 'selected' : '') . ">Incidente</option>";
             $html .= "            <option value='2' " . ($type == 2 ? 'selected' : '') . ">Requisição</option>";
             $html .= "          </select>";
             $html .= "      </div>";
             $html .= "      <div style='flex: 2;'>";
-            $html .= "          <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Categoria ITIL</label>";
+            $html .= "          <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Categoria ITIL</label>";
             $html .= "          <select name='items_category[]' class='form-select select2-cat input-category' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhuma ---</option>";
             foreach ($categories as $id => $cName) {
@@ -454,7 +454,7 @@ class Sector extends CommonDBTM {
 
         if ($hasContentField) {
             $html .= "  <div>";
-            $html .= "      <label style='display: block; margin-bottom: 5px; color: #444; font-weight:bold;'>Conteúdo / Texto Base</label>";
+            $html .= "      <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Conteúdo / Texto Base</label>";
             $html .= "      <textarea name='items_content[]' class='form-control input-content' style='width: 100%; height: 60px;' placeholder='Texto padrão para este item.'>{$content}</textarea>";
             $html .= "  </div>";
         } else {
@@ -776,6 +776,10 @@ echo "<style>
             padding-top: 15px !important;
             padding-bottom: 15px !important;
         }
+        /* Afastar texto da aba da borda direita */
+        .glpi-tabs .nav-item .nav-link {
+            padding-right: 20px !important;
+        }
     </style>";
 
 // =====================================================================
@@ -796,7 +800,7 @@ echo "<style>
     echo "</th></tr>";
     echo "</table>";
 
-    echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
+    echo "<hr style='width: 750px; border-top: 3px solid; opacity: 0.2; margin: 20px auto 10px auto;'>";
 
     // ── Bloco 1: Dados da Entidade ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
@@ -835,7 +839,7 @@ echo "<style>
 
     echo "</table>";
 
-    echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
+    echo "<hr style='width: 750px; border-top: 3px solid; opacity: 0.2; margin: 20px auto 10px auto;'>";
 
     // ── Bloco 2: Perfis ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
@@ -859,12 +863,12 @@ echo "<style>
     echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
     echo "  <div style='display: flex; gap: 10px;'>";
     echo "    <div style='flex: 1;'>";
-    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Perfil Padrão</label>";
+    echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
     $adminVal = $def_sector_abbr ? Html::cleanInputText($def_sector_abbr) . ' - Admin' : '';
-    echo "      <input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly value='{$adminVal}'>";
+    echo "      <input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$adminVal}'>";
     echo "    </div>";
     echo "    <div style='flex: 1;'>";
-    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
+    echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
     echo "      <select name='copy_profile_admin' class='form-select profile-select2' style='width: 100%;'>";
     echo "        <option value='0'>-----</option>";
     $adminId = $def_profiles['admin']['id'] ?? 0;
@@ -880,7 +884,7 @@ echo "<style>
     echo "    </div>";
     echo "  </div>";
     echo "  <div>";
-    echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
+    echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
     $adminEmails = Html::cleanInputText(implode("\n", $def_profiles['admin']['emails'] ?? []));
     echo "    <textarea name='users_profile_admin' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$adminEmails}</textarea>";
     echo "  </div>";
@@ -890,12 +894,12 @@ echo "<style>
     echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
     echo "  <div style='display: flex; gap: 10px;'>";
     echo "    <div style='flex: 1;'>";
-    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Perfil Padrão</label>";
+    echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
     $supportVal = $def_sector_abbr ? Html::cleanInputText($def_sector_abbr) . ' - Atendimento' : '';
-    echo "      <input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly value='{$supportVal}'>";
+    echo "      <input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$supportVal}'>";
     echo "    </div>";
     echo "    <div style='flex: 1;'>";
-    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
+    echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
     echo "      <select name='copy_profile_support' class='form-select profile-select2' style='width: 100%;'>";
     echo "        <option value='0'>-----</option>";
     $supportId = $def_profiles['support']['id'] ?? 0;
@@ -911,7 +915,7 @@ echo "<style>
     echo "    </div>";
     echo "  </div>";
     echo "  <div>";
-    echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
+    echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
     $supportEmails = Html::cleanInputText(implode("\n", $def_profiles['support']['emails'] ?? []));
     echo "    <textarea name='users_profile_support' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$supportEmails}</textarea>";
     echo "  </div>";
@@ -921,12 +925,12 @@ echo "<style>
     echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;'>";
     echo "  <div style='display: flex; gap: 10px;'>";
     echo "    <div style='flex: 1;'>";
-    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Perfil Padrão</label>";
+    echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
     $transferVal = $def_sector_abbr ? Html::cleanInputText($def_sector_abbr) . ' - Transferência de Chamados' : '';
-    echo "      <input type='text' id='profile_transfer' name='profiles_default[]' class='form-control' style='width: 100%; border: none; background: #e9ecef;' readonly value='{$transferVal}'>";
+    echo "      <input type='text' id='profile_transfer' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$transferVal}'>";
     echo "    </div>";
     echo "    <div style='flex: 1;'>";
-    echo "      <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
+    echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
     echo "      <select name='copy_profile_transfer' class='form-select profile-select2' style='width: 100%;'>";
     echo "        <option value='0'>-----</option>";
     $transferId = $def_profiles['transfer']['id'] ?? 0;
@@ -942,7 +946,7 @@ echo "<style>
     echo "    </div>";
     echo "  </div>";
     echo "  <div>";
-    echo "    <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
+    echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
     $transferEmails = Html::cleanInputText(implode("\n", $def_profiles['transfer']['emails'] ?? []));
     echo "    <textarea name='users_profile_transfer' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$transferEmails}</textarea>";
     echo "  </div>";
@@ -959,18 +963,18 @@ echo "<style>
     echo "<div id='profiles-container'>";
     
     // Template oculto para adicionar perfis customizados
-    echo "<div class='profile-block template' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa; display: none;'>";
+    echo "<div class='profile-block template' style='border: 1px solid #ccc; padding: 10px; margin: 10px;  display: none;'>";
     echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
     echo "      <strong>Perfil Adicional</strong>";
-    echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-profile'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
+    echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-profile' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
     echo "  </div>";
     echo "  <div style='display: flex; gap: 10px; align-items: flex-start;'>";
     echo "      <div style='flex: 1;'>";
-    echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Nome do Perfil</label>";
+    echo "          <label style='display: block; margin-bottom: 5px; '>Nome do Perfil</label>";
     echo "          <input type='text' class='form-control profile-input' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' name='name_profile_custom[]'>";
     echo "      </div>";
     echo "      <div style='flex: 1;'>";
-    echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
+    echo "          <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
     echo "          <select name='copy_profile_custom[]' class='form-select profile-select2' style='width: 100%;'>";
     echo "            <option value='0'>-----</option>";
     foreach ($profiles as $pid => $pname) {
@@ -980,7 +984,7 @@ echo "<style>
     echo "      </div>";
     echo "  </div>";
     echo "  <div style='margin-top: 10px;'>";
-    echo "      <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
+    echo "      <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
     echo "      <textarea name='users_profile_custom[]' class='form-control profile-users-input' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
     echo "  </div>";
     echo "</div>";
@@ -991,19 +995,19 @@ echo "<style>
             $cEmails = Html::cleanInputText(implode("\n", $cProf['emails'] ?? []));
             $cId = $cProf['id'];
             
-            echo "<div class='profile-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
+            echo "<div class='profile-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
             echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
             echo "      <strong>Perfil Adicional</strong>";
-            echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-profile'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
+            echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-profile' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
             echo "  </div>";
             echo "  <div style='display: flex; gap: 10px; align-items: flex-start;'>";
             echo "      <div style='flex: 1;'>";
-            echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Nome do Perfil</label>";
+            echo "          <label style='display: block; margin-bottom: 5px; '>Nome do Perfil</label>";
             echo "          <input type='text' class='form-control profile-input' name='name_profile_custom[]' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' value='" . Html::cleanInputText($cProf['name']) . "'>";
             echo "          <small class='text-muted'>O nome original não é carregado na edição, preencha novamente se desejar salvar outro.</small>";
             echo "      </div>";
             echo "      <div style='flex: 1;'>";
-            echo "          <label style='display: block; margin-bottom: 5px; color: #444;'>Copiar de...</label>";
+            echo "          <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
             echo "          <select name='copy_profile_custom[]' class='form-select profile-select2' style='width: 100%;'>";
             echo "            <option value='0'>-----</option>";
             foreach ($profiles as $pid => $pname) {
@@ -1014,7 +1018,7 @@ echo "<style>
             echo "      </div>";
             echo "  </div>";
             echo "  <div style='margin-top: 10px;'>";
-            echo "      <label style='display: block; margin-bottom: 5px; color: #444; font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
+            echo "      <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
             echo "      <textarea name='users_profile_custom[]' class='form-control profile-users-input' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$cEmails}</textarea>";
             echo "  </div>";
             echo "</div>";
@@ -1023,14 +1027,14 @@ echo "<style>
 
     echo "</div>";
     echo "<div style='padding: 0 10px 10px 10px;'>";
-    echo "<button type='button' class='btn btn-success btn-sm' id='btn-add-profile'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar Perfil</button>";
+    echo "<button type='button' class='btn btn-success btn-sm' style='color: white !important;' id='btn-add-profile'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar Perfil</button>";
     echo "</div>";
     echo "</td>";
     echo "</tr>";
 
     echo "</table>";
 
-    echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
+    echo "<hr style='width: 750px; border-top: 3px solid; opacity: 0.2; margin: 20px auto 10px auto;'>";
 
 
     // ── Bloco 3: Grupos e Técnicos Atendentes ──
@@ -1046,10 +1050,10 @@ echo "<style>
         $sg0Name = Html::cleanInputText($def_subgroups[0]['name'] ?? '');
         $sg0Techs = Html::cleanInputText($def_subgroups[0]['techs'] ?? '');
         
-        echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
+        echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
         echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
         echo "      <strong>Subgrupo <span class='sg-index'>1</span></strong>";
-        echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='display:none;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
+        echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='color: white !important;' style='display:none;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
         echo "  </div>";
         echo "  <div style='margin-bottom: 10px;'>";
         echo "      <label>Nome do Subgrupo</label>";
@@ -1078,10 +1082,10 @@ echo "<style>
             $sgName = Html::cleanInputText($sg['name']);
             $sgTechs = Html::cleanInputText($sg['techs'] ?? '');
             
-            echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; background: #fafafa;'>";
+            echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
             echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
             echo "      <strong>Subgrupo <span class='sg-index'>".($i+1)."</span></strong>";
-            echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='".($i==0 ? 'display:none;' : '')."'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
+            echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-subgroup' style='color: white !important;' style='".($i==0 ? 'display:none;' : '')."'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
             echo "  </div>";
             echo "  <div style='margin-bottom: 10px;'>";
             echo "      <label>Nome do Subgrupo</label>";
@@ -1123,7 +1127,7 @@ echo "<style>
 
     echo "</table>";
 
-    echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
+    echo "<hr style='width: 750px; border-top: 3px solid; opacity: 0.2; margin: 20px auto 10px auto;'>";
 
     // ── Bloco 4: Catálogo de Serviços ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
@@ -1141,7 +1145,7 @@ echo "<style>
 
 
 
-    echo "<hr style='width: 750px; border-top: 3px solid black; margin: 20px auto 10px auto;'>";
+    echo "<hr style='width: 750px; border-top: 3px solid; opacity: 0.2; margin: 20px auto 10px auto;'>";
 
     // ── Botão Submeter ──
     echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
