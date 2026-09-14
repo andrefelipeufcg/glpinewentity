@@ -59,6 +59,16 @@ $fbr = $_POST['items_followups_before_resolution'] ?? [];
 $soltpl_id = $_POST['items_solutiontemplates_id'] ?? [];
 $comments = $_POST['items_comment'] ?? [];
 
+// Tab 5 special fields
+$is_active = $_POST['items_is_active'] ?? [];
+$itemtype = $_POST['items_itemtype'] ?? [];
+$event = $_POST['items_event'] ?? [];
+$attach_documents = $_POST['items_attach_documents'] ?? [];
+$allow_response = $_POST['items_allow_response'] ?? [];
+$notificationtemplates_id = $_POST['items_notificationtemplates_id'] ?? [];
+$targets = $_POST['items_target'] ?? [];
+$exclusions = $_POST['items_exclusion'] ?? [];
+
 $configsToSave = [];
 for ($i = 0; $i < count($names); $i++) {
     $name = trim($names[$i] ?? '');
@@ -83,6 +93,18 @@ for ($i = 0; $i < count($names); $i++) {
         $itemConf['followups_before_resolution'] = (int)($fbr[$i] ?? 0);
         $itemConf['solutiontemplates_id'] = (int)($soltpl_id[$i] ?? 0);
         $itemConf['comment'] = trim($comments[$i] ?? '');
+    }
+    
+    if ($tabnum == 5) {
+        $itemConf['is_active'] = (int)($is_active[$i] ?? 0);
+        $itemConf['itemtype'] = trim($itemtype[$i] ?? 'Ticket');
+        $itemConf['event'] = trim($event[$i] ?? 'new');
+        $itemConf['attach_documents'] = (int)($attach_documents[$i] ?? -2);
+        $itemConf['allow_response'] = (int)($allow_response[$i] ?? 1);
+        $itemConf['notificationtemplates_id'] = (int)($notificationtemplates_id[$i] ?? 0);
+        $itemConf['comment'] = trim($comments[$i] ?? '');
+        $itemConf['target'] = trim($targets[$i] ?? '');
+        $itemConf['exclusion'] = trim($exclusions[$i] ?? '');
     }
     
     $configsToSave[] = $itemConf;

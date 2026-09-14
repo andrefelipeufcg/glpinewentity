@@ -101,7 +101,86 @@ switch ($tabnum) {
         $item = new Notification();
         if ($item->getFromDB($id)) {
             $data['name'] = $item->fields['name'] ?? '';
-            // Content might be tricky, it's in the template. Just name is fine.
+            $data['is_active'] = $item->fields['is_active'] ?? 0;
+            $data['itemtype'] = $item->fields['itemtype'] ?? 'Ticket';
+            $data['event'] = $item->fields['event'] ?? 'new';
+            $data['attach_documents'] = $item->fields['attach_documents'] ?? -2;
+            $data['allow_response'] = $item->fields['allow_response'] ?? 1;
+            $data['comment'] = $item->fields['comment'] ?? '';
+
+            // Tentar descobrir o template atual
+            global $DB;
+            $iterator = $DB->request([
+                'FROM' => 'glpi_notifications_notificationtemplates',
+                'WHERE' => ['notifications_id' => $id]
+            ]);
+            $data['notificationtemplates_id'] = 0;
+            foreach ($iterator as $row) {
+                $data['notificationtemplates_id'] = $row['notificationtemplates_id'];
+                break;
+            }
+
+            // Instanciar NotificationTarget com o evento correto para que os hooks de plugins
+            // (como Behaviors) sejam disparados e os labels sejam resolvidos corretamente.
+            $targetObj = null;
+            $event = $data['event'] ?? '';
+            $itemtype = $data['itemtype'] ?? 'Ticket';
+            if (class_exists('\NotificationTarget')) {
+                $baseTarget = \NotificationTarget::getInstanceByType($itemtype);
+                if ($baseTarget) {
+                    $targetClass = get_class($baseTarget);
+                    try {
+                        $targetObj = new $targetClass(null, $event);
+                    } catch (\Throwable $e) {
+                        $targetObj = $baseTarget;
+                    }
+                }
+            }
+            $data['targets_list'] = [];
+            $data['exclusions_list'] = [];
+            $targetsDb = $DB->request([
+                'FROM' => 'glpi_notificationtargets',
+                'WHERE' => ['notifications_id' => $id]
+            ]);
+            foreach ($targetsDb as $t) {
+                $type = $t['type'];
+                $items_id = $t['items_id'];
+                $label = '';
+                // Primeiro tentar resolver via NotificationTarget labels (inclui plugins)
+                if ($targetObj && isset($targetObj->notification_targets_labels[$type][$items_id])) {
+                    $label = $targetObj->notification_targets_labels[$type][$items_id];
+                }
+                // Fallback: resolver por tipo (Profile, Group, User)
+                if (empty($label)) {
+                    if ($items_id > 0) {
+                        if ($type == \Notification::PROFILE_TYPE) {
+                            $prof = new \Profile();
+                            if ($prof->getFromDB($items_id)) { $label = "Perfil: " . $prof->fields['name']; }
+                        } elseif ($type == \Notification::GROUP_TYPE) {
+                            $grp = new \Group();
+                            if ($grp->getFromDB($items_id)) { $label = "Grupo: " . $grp->fields['name']; }
+                        } elseif ($type == \Notification::USER_TYPE) {
+                            $usr = new \User();
+                            if ($usr->getFromDB($items_id)) { $label = "Usuário: " . $usr->getName(); }
+                        }
+                    }
+                }
+                if (empty($label)) {
+                    $label = "Tipo $type (Item $items_id)";
+                }
+                $key = $type . '_' . $items_id;
+                if ($t['is_exclusion']) {
+                    $data['exclusions_list'][] = $label;
+                    if (!isset($first_exclusion)) $first_exclusion = $key;
+                } else {
+                    $data['targets_list'][] = $label;
+                    if (!isset($first_target)) $first_target = $key;
+                }
+            }
+            $data['targets_text'] = implode(', ', $data['targets_list']);
+            $data['exclusions_text'] = implode(', ', $data['exclusions_list']);
+            $data['target'] = !empty($first_target) ? $first_target : '';
+            $data['exclusion'] = !empty($first_exclusion) ? $first_exclusion : '';
         }
         break;
     case 6: // Form

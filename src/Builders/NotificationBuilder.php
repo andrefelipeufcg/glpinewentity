@@ -30,7 +30,6 @@ class NotificationBuilder
     private function createNotification(array $config, int $entities_id): void
     {
         $name = trim($config['name'] ?? '');
-        $content = trim($config['content'] ?? '');
         $sourceId = (int)($config['copy_from'] ?? 0);
 
         if (empty($name)) {
@@ -50,98 +49,43 @@ class NotificationBuilder
         }
 
         // 1. Cria a notificação
-        $notificationId = cloneItem(
-            new Notification(), 
-            $sourceData, 
-            [
-                'name' => $name,
-                'entities_id' => $entities_id,
-                'is_recursive' => 1,
-                'itemtype' => $sourceData['itemtype'] ?? 'Ticket',
-                'event' => $sourceData['event'] ?? 'new',
-                'mode' => $sourceData['mode'] ?? 'mailing',
-                'is_active' => 1
-            ]
-        );
+        $input = [
+            'name' => $name,
+            'entities_id' => $entities_id,
+            'is_recursive' => 1,
+            'itemtype' => $config['itemtype'] ?? ($sourceData['itemtype'] ?? 'Ticket'),
+            'event' => $config['event'] ?? ($sourceData['event'] ?? 'new'),
+            'mode' => $config['mode'] ?? 'mailing',
+            'is_active' => $config['is_active'] ?? 1,
+            'attach_documents' => $config['attach_documents'] ?? -2,
+            'allow_response' => $config['allow_response'] ?? 1,
+            'comment' => $config['comment'] ?? '',
+        ];
+
+        $notificationId = 0;
+        if (!empty($sourceData)) {
+            $notificationId = cloneItem(new Notification(), $sourceData, $input);
+        } else {
+            $notificationId = (int)$notification->add($input);
+        }
 
         if (!$notificationId) {
             return;
         }
 
-        // 2. Lida com o Template
-        $templateId = 0;
+        // 2. Lida com o Template (apenas vincula o que foi selecionado na interface)
+        $templateId = (int)($config['notificationtemplates_id'] ?? 0);
 
-        // Se copiamos de uma notificação, vamos ver qual template ela usava
-        if ($sourceId > 0) {
+        // Se o usuário selecionou "Padrão da Origem" mas a origem tinha um, a gente usa
+        if ($templateId === 0 && $sourceId > 0) {
             global $DB;
             $iterator = $DB->request([
                 'FROM' => 'glpi_notifications_notificationtemplates',
                 'WHERE' => ['notifications_id' => $sourceId]
             ]);
-            
-            $sourceTemplateId = 0;
-            $mode = 'mailing';
             foreach ($iterator as $row) {
-                $sourceTemplateId = $row['notificationtemplates_id'];
-                $mode = $row['mode'];
+                $templateId = (int)$row['notificationtemplates_id'];
                 break;
-            }
-
-            if ($sourceTemplateId > 0) {
-                // Clona o template
-                $template = new NotificationTemplate();
-                if ($template->getFromDB($sourceTemplateId)) {
-                    $templateId = cloneItem(
-                        new NotificationTemplate(), 
-                        $template->fields, 
-                        [
-                            'name' => $name . ' Template',
-                            'entities_id' => $entities_id,
-                            'is_recursive' => 1
-                        ]
-                    );
-
-                    // Clona traduções
-                    if ($templateId > 0) {
-                        $transIter = $DB->request([
-                            'FROM' => 'glpi_notificationtemplatetranslations',
-                            'WHERE' => ['notificationtemplates_id' => $sourceTemplateId]
-                        ]);
-                        
-                        $trans = new NotificationTemplateTranslation();
-                        foreach ($transIter as $tRow) {
-                            $tRow['notificationtemplates_id'] = $templateId;
-                            if (!empty($content)) {
-                                $tRow['content_text'] = $content;
-                                $tRow['content_html'] = nl2br(htmlentities($content));
-                            }
-                            unset($tRow['id']);
-                            $trans->add($tRow);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Se não conseguiu clonar ou não tinha origem, cria um básico
-        if ($templateId === 0) {
-            $template = new NotificationTemplate();
-            $templateId = (int) $template->add([
-                'name' => $name . ' Template',
-                'itemtype' => $sourceData['itemtype'] ?? 'Ticket',
-                'entities_id' => $entities_id,
-                'is_recursive' => 1,
-            ]);
-
-            if (!empty($content)) {
-                $trans = new NotificationTemplateTranslation();
-                $trans->add([
-                    'notificationtemplates_id' => $templateId,
-                    'language' => '',
-                    'subject' => $name,
-                    'content_html' => nl2br(htmlentities($content)),
-                    'content_text' => $content,
-                ]);
             }
         }
 
@@ -150,13 +94,38 @@ class NotificationBuilder
             $join = new Notification_NotificationTemplate();
             $join->add([
                 'notifications_id' => $notificationId,
-                'mode' => $sourceData['mode'] ?? 'mailing',
                 'notificationtemplates_id' => $templateId,
+                'mode' => 'mailing'
             ]);
-            
-            // Clona também os targets (recipients) da notificação original
-            if ($sourceId > 0) {
-                cloneTargets($sourceId, $notificationId);
+        }
+
+        // 4. Inserir Destinatário e Exclusão selecionados na interface
+        $targetStr = trim($config['target'] ?? '');
+        $exclusionStr = trim($config['exclusion'] ?? '');
+
+        if (!empty($targetStr)) {
+            $parts = explode('_', $targetStr);
+            if (count($parts) >= 2) {
+                $target = new \NotificationTarget();
+                $target->add([
+                    'notifications_id' => $notificationId,
+                    'type' => $parts[0],
+                    'items_id' => $parts[1],
+                    'is_exclusion' => 0
+                ]);
+            }
+        }
+
+        if (!empty($exclusionStr)) {
+            $parts = explode('_', $exclusionStr);
+            if (count($parts) >= 2) {
+                $target = new \NotificationTarget();
+                $target->add([
+                    'notifications_id' => $notificationId,
+                    'type' => $parts[0],
+                    'items_id' => $parts[1],
+                    'is_exclusion' => 1
+                ]);
             }
         }
     }
@@ -173,19 +142,4 @@ function cloneItem($obj, array $sourceData, array $overrides = []) {
         $data[$k] = $v;
     }
     return (int) $obj->add($data);
-}
-
-function cloneTargets($sourceId, $newId) {
-    global $DB;
-    $iterator = $DB->request([
-        'FROM' => 'glpi_notificationtargets',
-        'WHERE' => ['notifications_id' => $sourceId]
-    ]);
-    
-    $target = new \NotificationTarget();
-    foreach ($iterator as $row) {
-        unset($row['id']);
-        $row['notifications_id'] = $newId;
-        $target->add($row);
-    }
 }

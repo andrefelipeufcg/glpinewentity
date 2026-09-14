@@ -197,7 +197,7 @@ class Sector extends CommonDBTM {
         }
 
         // Determina os campos que serão exibidos baseado na aba
-        $hasContentField = in_array($tabnum, [1, 2, 3, 5]); // Modelos, Respostas, Soluções, Notificações
+        $hasContentField = in_array($tabnum, [1, 2, 3]); // Modelos, Respostas, Soluções
         
         $extraOptions = [];
         if ($tabnum == 1 && $DB->tableExists('glpi_itilcategories')) {
@@ -233,6 +233,70 @@ class Sector extends CommonDBTM {
             if (class_exists('PendingReason')) {
                 $extraOptions['frequencies'] = \PendingReason::getFollowupFrequencyValues();
                 $extraOptions['res_limits'] = \PendingReason::getFollowupsBeforeResolutionValues();
+            }
+        }
+        if ($tabnum == 5) {
+            $extraOptions['templates'] = [];
+            if ($DB->tableExists('glpi_notificationtemplates')) {
+                foreach ($DB->request('glpi_notificationtemplates') as $row) {
+                    $extraOptions['templates'][$row['id']] = $row['name'];
+                }
+            }
+            $extraOptions['itemtypes'] = [];
+            global $CFG_GLPI;
+            if (isset($CFG_GLPI['notificationtemplates_types']) && is_array($CFG_GLPI['notificationtemplates_types'])) {
+                foreach ($CFG_GLPI['notificationtemplates_types'] as $type) {
+                    if ($itemObj = \getItemForItemtype($type)) {
+                        $extraOptions['itemtypes'][$type] = $itemObj->getTypeName();
+                    } else {
+                        $extraOptions['itemtypes'][$type] = $type;
+                    }
+                }
+            } else {
+                $extraOptions['itemtypes'] = ['Ticket' => 'Ticket'];
+            }
+            $extraOptions['events'] = [];
+            if (class_exists('NotificationTarget')) {
+                $target = \NotificationTarget::getInstanceByType('Ticket');
+                if ($target) {
+                    $extraOptions['events'] = $target->getAllEvents();
+                    $extraOptions['all_targets'] = [];
+                    $extraOptions['all_exclusions'] = [];
+                    $allowed_exclusion_types = [\Notification::PROFILE_TYPE, \Notification::GROUP_TYPE];
+
+                    // Instanciar o NotificationTarget para CADA evento possível,
+                    // pois targets são condicionais ao evento e os plugins (ex: Behaviors)
+                    // adicionam targets via hook ITEM_ADD_TARGETS no construtor.
+                    $targetClass = get_class($target);
+                    foreach (array_keys($extraOptions['events']) as $evt) {
+                        try {
+                            $evtTarget = new $targetClass(null, $evt);
+                            if (isset($evtTarget->notification_targets) && isset($evtTarget->notification_targets_labels)) {
+                                foreach ($evtTarget->notification_targets as $key => $val) {
+                                    if (isset($extraOptions['all_targets'][$key])) {
+                                        continue; // já adicionado por outro evento
+                                    }
+                                    $parts = explode('_', $key);
+                                    if (count($parts) >= 2) {
+                                        $type = $parts[0];
+                                        $id = $parts[1];
+                                        if (isset($evtTarget->notification_targets_labels[$type][$id])) {
+                                            $label = $evtTarget->notification_targets_labels[$type][$id];
+                                            $extraOptions['all_targets'][$key] = $label;
+                                            if (in_array((int)$type, $allowed_exclusion_types, true)) {
+                                                $extraOptions['all_exclusions'][$key] = $label;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (\Throwable $e) {
+                            // ignorar erros de instanciação por evento
+                        }
+                    }
+                    asort($extraOptions['all_targets']);
+                    asort($extraOptions['all_exclusions']);
+                }
             }
         }        
         $ajax_save_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/save_draft_configs.php';
@@ -348,6 +412,18 @@ class Sector extends CommonDBTM {
                                 block.find('.input-solutiontemplates-id').val(response.data.solutiontemplates_id || '0').trigger('change');
                                 block.find('.input-comment').val(response.data.comment || '');
                             }
+
+                            if (tabnum == 5) {
+                                block.find('.input-is-active').val(response.data.is_active !== undefined ? response.data.is_active : '0');
+                                block.find('.input-itemtype').val(response.data.itemtype || 'Ticket').trigger('change');
+                                block.find('.input-event').val(response.data.event || 'new').trigger('change');
+                                block.find('.input-attach-documents').val(response.data.attach_documents !== undefined ? response.data.attach_documents : '-2');
+                                block.find('.input-allow-response').val(response.data.allow_response !== undefined ? response.data.allow_response : '1');
+                                block.find('.input-notificationtemplates-id').val(response.data.notificationtemplates_id || '0').trigger('change');
+                                block.find('.input-comment').val(response.data.comment || '');
+                                block.find('.input-target').val(response.data.target || '').trigger('change');
+                                block.find('.input-exclusion').val(response.data.exclusion || '').trigger('change');
+                            }
                         }
                     }
                 });
@@ -366,6 +442,18 @@ class Sector extends CommonDBTM {
                     block.find('.input-followups-before-resolution').val('0').trigger('change');
                     block.find('.input-solutiontemplates-id').val('0').trigger('change');
                     block.find('.input-comment').val('');
+                }
+                
+                if (tabnum == 5) {
+                    block.find('.input-is-active').val('1');
+                    block.find('.input-itemtype').val('Ticket').trigger('change');
+                    block.find('.input-event').val('new').trigger('change');
+                    block.find('.input-attach-documents').val('-2');
+                    block.find('.input-allow-response').val('1');
+                    block.find('.input-notificationtemplates-id').val('0').trigger('change');
+                    block.find('.input-comment').val('');
+                    block.find('.input-target').val('').trigger('change');
+                    block.find('.input-exclusion').val('').trigger('change');
                 }
             }
         });
@@ -455,6 +543,16 @@ class Sector extends CommonDBTM {
         $followups_before_resolution = (int)($config['followups_before_resolution'] ?? 0);
         $solutiontemplates_id = (int)($config['solutiontemplates_id'] ?? 0);
         $comment = \Html::cleanInputText($config['comment'] ?? '');
+
+        // Tab 5 vars
+        $is_active = (int)($config['is_active'] ?? 1);
+        $itemtype = \Html::cleanInputText($config['itemtype'] ?? 'Ticket');
+        $event = \Html::cleanInputText($config['event'] ?? 'new');
+        $attach_documents = (int)($config['attach_documents'] ?? -2);
+        $allow_response = (int)($config['allow_response'] ?? 1);
+        $notificationtemplates_id = (int)($config['notificationtemplates_id'] ?? 0);
+        $target_val = \Html::cleanInputText($config['target'] ?? '');
+        $exclusion_val = \Html::cleanInputText($config['exclusion'] ?? '');
 
         $html = "<div class='{$class}' style='border: 1px solid #ccc; padding: 15px; margin-bottom: 15px;  {$display}'>";
         $html .= "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
@@ -575,6 +673,95 @@ class Sector extends CommonDBTM {
             foreach (($extraOptions['solutiontemplates'] ?? []) as $sid => $sname) {
                 $sel = ($sid == $solutiontemplates_id) ? 'selected' : '';
                 $html .= "            <option value='{$sid}' {$sel}>" . \Html::cleanInputText($sname) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "  </div>";
+
+            $html .= "  <div>";
+            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Comentários</label>";
+            $html .= "      <textarea name='items_comment[]' class='form-control input-comment' style='width: 100%; height: 60px;'>{$comment}</textarea>";
+            $html .= "  </div>";
+
+        } elseif ($tabnum == 5) {
+            // Campos de Notification
+            $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Ativo</label>";
+            $html .= "          <select name='items_is_active[]' class='form-select input-is-active' style='width: 100%;'>";
+            $html .= "            <option value='0' " . ($is_active == 0 ? 'selected' : '') . ">Não</option>";
+            $html .= "            <option value='1' " . ($is_active == 1 ? 'selected' : '') . ">Sim</option>";
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Tipo</label>";
+            $html .= "          <select name='items_itemtype[]' class='form-select select2-itemtype input-itemtype' style='width: 100%;'>";
+            foreach (($extraOptions['itemtypes'] ?? []) as $it => $itname) {
+                $sel = ($it == $itemtype) ? 'selected' : '';
+                $html .= "            <option value='{$it}' {$sel}>" . \Html::cleanInputText($itname) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "  </div>";
+
+            $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Evento</label>";
+            $html .= "          <select name='items_event[]' class='form-select select2-event input-event' style='width: 100%;'>";
+            foreach (($extraOptions['events'] ?? []) as $ev => $evname) {
+                $sel = ($ev == $event) ? 'selected' : '';
+                $html .= "            <option value='{$ev}' {$sel}>" . \Html::cleanInputText($evname) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Padrão (Modelo de Notificação)</label>";
+            $html .= "          <select name='items_notificationtemplates_id[]' class='form-select select2-tpl input-notificationtemplates-id' style='width: 100%;'>";
+            $html .= "            <option value='0'>--- Padrão da Origem ---</option>";
+            foreach (($extraOptions['templates'] ?? []) as $tid => $tname) {
+                $sel = ($tid == $notificationtemplates_id) ? 'selected' : '';
+                $html .= "            <option value='{$tid}' {$sel}>" . \Html::cleanInputText($tname) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "  </div>";
+
+            $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Adicionar documentos</label>";
+            $html .= "          <select name='items_attach_documents[]' class='form-select input-attach-documents' style='width: 100%;'>";
+            $html .= "            <option value='-2' " . ($attach_documents == -2 ? 'selected' : '') . ">Usar configuração global</option>";
+            $html .= "            <option value='0' " . ($attach_documents == 0 ? 'selected' : '') . ">Não</option>";
+            $html .= "            <option value='1' " . ($attach_documents == 1 ? 'selected' : '') . ">Sim</option>";
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Permitir resposta</label>";
+            $html .= "          <select name='items_allow_response[]' class='form-select input-allow-response' style='width: 100%;'>";
+            $html .= "            <option value='0' " . ($allow_response == 0 ? 'selected' : '') . ">Não</option>";
+            $html .= "            <option value='1' " . ($allow_response == 1 ? 'selected' : '') . ">Sim</option>";
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "  </div>";
+
+            $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Destinatário</label>";
+            $html .= "          <select name='items_target[]' class='form-select select2-target input-target' style='width: 100%;'>";
+            $html .= "            <option value=''>--- Nenhum ---</option>";
+            foreach (($extraOptions['all_targets'] ?? []) as $tkey => $tname) {
+                $sel = ($tkey == $target_val) ? 'selected' : '';
+                $html .= "            <option value='{$tkey}' {$sel}>" . \Html::cleanInputText($tname) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Exclusão</label>";
+            $html .= "          <select name='items_exclusion[]' class='form-select select2-exclusion input-exclusion' style='width: 100%;'>";
+            $html .= "            <option value=''>--- Nenhuma ---</option>";
+            foreach (($extraOptions['all_exclusions'] ?? []) as $ekey => $ename) {
+                $sel = ($ekey == $exclusion_val) ? 'selected' : '';
+                $html .= "            <option value='{$ekey}' {$sel}>" . \Html::cleanInputText($ename) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
