@@ -18,7 +18,33 @@ use GlpiPlugin\Glpinewentity\Builders\NotificationBuilder;
 use GlpiPlugin\Glpinewentity\Builders\FormBuilder;
 use GlpiPlugin\Glpinewentity\Sector;
 
-include('../../../inc/includes.php');
+define('GLPI_KEEP_CSRF_TOKEN', true);
+
+$inc = __DIR__ . '/../../../inc/includes.php';
+if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/inc/includes.php'; }
+if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/../inc/includes.php'; }
+
+if (!file_exists($inc) && isset($_SERVER['SCRIPT_NAME'])) {
+    $scriptDir = dirname($_SERVER['SCRIPT_NAME']);
+    $parts = explode('/', trim($scriptDir, '/'));
+    $pluginPos = array_search('plugins', $parts);
+    if ($pluginPos !== false && $pluginPos > 0) {
+        $sub = implode('/', array_slice($parts, 0, $pluginPos));
+        $check = rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/') . '/' . $sub . '/inc/includes.php';
+        if (file_exists($check)) {
+            $inc = $check;
+        }
+    }
+}
+
+if (!file_exists($inc) && isset($_SERVER['CONTEXT_DOCUMENT_ROOT'])) {
+    $check = rtrim($_SERVER['CONTEXT_DOCUMENT_ROOT'], '/') . '/inc/includes.php';
+    if (file_exists($check)) {
+        $inc = $check;
+    }
+}
+
+include $inc;
 
 header('Content-Type: application/json');
 

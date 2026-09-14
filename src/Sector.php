@@ -384,6 +384,7 @@ class Sector extends CommonDBTM {
 
         // JavaScript
         $ajax_get_template_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/get_template_data.php';
+        $ajax_render_richtext_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/render_richtext.php';
 
         echo "<script>
         function addConfigItem(tabnum) {
@@ -391,14 +392,55 @@ class Sector extends CommonDBTM {
             let template = container.find('.config-block.template').clone();
             template.removeClass('template');
             template.show();
+            
             // Reseta inputs
             template.find('input[type=\"text\"], textarea').val('');
             template.find('select').val('0');
+
+            // Limpa Select2 para recriar
+            template.find('.select2-container').remove();
+            let selects = template.find('select');
+            selects.removeClass('select2-hidden-accessible').removeAttr('data-select2-id').removeAttr('tabindex').removeAttr('aria-hidden').show();
+            selects.find('option').removeAttr('data-select2-id');
+
             container.append(template);
+            
+            // Inicializa Select2
+            template.find('.select2-copy-from').select2({ width: '100%' });
+            if(template.find('.select2-cat').length > 0) {
+                template.find('.select2-cat').select2({ width: '100%' });
+            }
+
+            // Substituir textarea simples por Rich Text (abas 1, 2, 3)
+            if ([1, 2, 3].indexOf(tabnum) !== -1) {
+                let plainTextarea = template.find('textarea.input-content');
+                if (plainTextarea.length > 0) {
+                    let wrapper = $('<div class=\"input-content-wrapper\"></div>');
+                    plainTextarea.replaceWith(wrapper);
+                    
+                    $.ajax({
+                        url: '{$ajax_render_richtext_url}',
+                        type: 'POST',
+                        data: { name: 'items_content[]', value: '' },
+                        success: function(html) {
+                            wrapper.html(html);
+                            // Executa os scripts retornados pelo GLPI para inicializar o TinyMCE
+                            wrapper.find('script').each(function() {
+                                eval($(this).text());
+                            });
+                        }
+                    });
+                }
+            }
         }
 
         $(document).on('click', '.btn-remove-config', function() {
-            $(this).closest('.config-block').remove();
+            let block = $(this).closest('.config-block');
+            let editorId = block.find('.input-content-wrapper textarea').attr('id');
+            if (editorId && typeof tinymce !== 'undefined' && tinymce.get(editorId)) {
+                tinymce.get(editorId).remove();
+            }
+            block.remove();
         });
 
         $(document).on('change', '.select2-copy-from', function() {
@@ -414,7 +456,18 @@ class Sector extends CommonDBTM {
                     success: function(response) {
                         if (response.success && response.data) {
                             block.find('.input-name').val(response.data.name || '');
-                            block.find('.input-content').val(response.data.content || '');
+                            
+                            // Busca o editor TinyMCE no wrapper (blocos renderizados pelo servidor) ou pelo textarea simples (blocos clonados)
+                            let contentTextarea = block.find('.input-content-wrapper textarea').first();
+                            if (contentTextarea.length === 0) {
+                                contentTextarea = block.find('textarea.input-content');
+                            }
+                            let contentEditorId = contentTextarea.attr('id');
+                            if (contentEditorId && typeof tinymce !== 'undefined' && tinymce.get(contentEditorId)) {
+                                tinymce.get(contentEditorId).setContent(response.data.content || '');
+                            } else {
+                                contentTextarea.val(response.data.content || '');
+                            }
                             
                             if (response.data.type) {
                                 block.find('.input-type').val(response.data.type);
@@ -440,15 +493,25 @@ class Sector extends CommonDBTM {
                             }
 
                             if (tabnum == 5) {
-                                block.find('.input-is-active').val(response.data.is_active !== undefined ? response.data.is_active : '0');
+                                block.find('.input-is-active').val(response.data.is_active || '1');
                                 block.find('.input-itemtype').val(response.data.itemtype || 'Ticket').trigger('change');
                                 block.find('.input-event').val(response.data.event || 'new').trigger('change');
                                 block.find('.input-attach-documents').val(response.data.attach_documents !== undefined ? response.data.attach_documents : '-2');
                                 block.find('.input-allow-response').val(response.data.allow_response !== undefined ? response.data.allow_response : '1');
                                 block.find('.input-notificationtemplates-id').val(response.data.notificationtemplates_id || '0').trigger('change');
                                 block.find('.input-comment').val(response.data.comment || '');
-                                block.find('.input-target').val(response.data.target || '').trigger('change');
-                                block.find('.input-exclusion').val(response.data.exclusion || '').trigger('change');
+                                
+                                if (response.data.target) {
+                                    block.find('.input-target').val(response.data.target).trigger('change');
+                                } else {
+                                    block.find('.input-target').val('').trigger('change');
+                                }
+                                
+                                if (response.data.exclusion) {
+                                    block.find('.input-exclusion').val(response.data.exclusion).trigger('change');
+                                } else {
+                                    block.find('.input-exclusion').val('').trigger('change');
+                                }
                             }
 
                             if (tabnum == 6) {
@@ -466,7 +529,19 @@ class Sector extends CommonDBTM {
                 });
             } else {
                 block.find('.input-name').val('');
-                block.find('.input-content').val('');
+                
+                // Limpar editor das abas 1, 2 e 3 se existir
+                let contentTextarea = block.find('.input-content-wrapper textarea').first();
+                if (contentTextarea.length === 0) {
+                    contentTextarea = block.find('textarea.input-content');
+                }
+                let contentEditorId = contentTextarea.attr('id');
+                if (contentEditorId && typeof tinymce !== 'undefined' && tinymce.get(contentEditorId)) {
+                    tinymce.get(contentEditorId).setContent('');
+                } else {
+                    contentTextarea.val('');
+                }
+
                 block.find('.input-type').val('1');
                 block.find('.input-category').val('0');
                 
@@ -507,6 +582,9 @@ class Sector extends CommonDBTM {
         });
 
         function saveDraftConfigs(tabnum) {
+            if (typeof tinymce !== 'undefined') {
+                tinymce.triggerSave();
+            }
             let formData = $('#form_configs_tab_' + tabnum).serialize();
             $.ajax({
                 url: '{$ajax_save_url}',
@@ -867,7 +945,25 @@ class Sector extends CommonDBTM {
         if ($hasContentField && $tabnum != 6) {
             $html .= "  <div>";
             $html .= "      <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Conteúdo / Texto Base</label>";
-            $html .= "      <textarea name='items_content[]' class='form-control input-content' style='width: 100%; height: 60px;' placeholder='Texto padrão para este item.'>{$content}</textarea>";
+            if (in_array($tabnum, [1, 2, 3]) && !$isTemplate) {
+                // Blocos visíveis: renderiza com Rich Text (TinyMCE) via Html::textarea
+                ob_start();
+                $rand = mt_rand();
+                \Html::textarea([
+                    'name'            => 'items_content[]',
+                    'value'           => $content,
+                    'enable_richtext' => true,
+                    'rand'            => $rand,
+                    'rows'            => 4
+                ]);
+                $textareaHtml = ob_get_clean();
+                $html .= "      <div class='input-content-wrapper'>{$textareaHtml}</div>";
+            } elseif (in_array($tabnum, [1, 2, 3]) && $isTemplate) {
+                // Template oculto: textarea simples (TinyMCE será inicializado via JS ao clonar)
+                $html .= "      <textarea name='items_content[]' class='form-control input-content' style='width: 100%; height: 80px;' placeholder='Texto padrão para este item.'>{$content}</textarea>";
+            } else {
+                $html .= "      <textarea name='items_content[]' class='form-control input-content' style='width: 100%; height: 60px;' placeholder='Texto padrão para este item.'>{$content}</textarea>";
+            }
             $html .= "  </div>";
         } else {
             $html .= "      <input type='hidden' name='items_content[]' class='input-content' value=''>";
