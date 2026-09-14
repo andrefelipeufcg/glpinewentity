@@ -54,12 +54,16 @@ class FormBuilder
             $sourceData = $form->fields;
         }
 
+        $description = trim($config['description'] ?? '');
+        $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
+
         $insertData = [
             'name' => $name,
             'entities_id' => $entities_id,
             'is_recursive' => 1,
-            'is_active' => $sourceData['is_active'] ?? 1,
-            'description' => $sourceData['description'] ?? __('Formulário padrão gerado automaticamente para a entidade.', 'glpinewentity'),
+            'is_active' => 1, // forced to active as per user request
+            'description' => $description ?: ($sourceData['description'] ?? __('Formulário padrão gerado automaticamente para a entidade.', 'glpinewentity')),
+            'forms_categories_id' => $forms_categories_id ?: ($sourceData['forms_categories_id'] ?? 0),
         ];
 
         // Copiar outros campos se existirem

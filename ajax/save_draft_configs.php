@@ -65,49 +65,58 @@ $itemtype = $_POST['items_itemtype'] ?? [];
 $event = $_POST['items_event'] ?? [];
 $attach_documents = $_POST['items_attach_documents'] ?? [];
 $allow_response = $_POST['items_allow_response'] ?? [];
-$notificationtemplates_id = $_POST['items_notificationtemplates_id'] ?? [];
-$targets = $_POST['items_target'] ?? [];
-$exclusions = $_POST['items_exclusion'] ?? [];
+$notiftpl_id = $_POST['items_notificationtemplates_id'] ?? [];
+$target_val = $_POST['items_target'] ?? [];
+$exclusion_val = $_POST['items_exclusion'] ?? [];
+
+// Tab 6 special fields
+$descriptions = $_POST['items_description'] ?? [];
+$forms_categories_id = $_POST['items_forms_categories_id'] ?? [];
 
 $configsToSave = [];
-for ($i = 0; $i < count($names); $i++) {
-    $name = trim($names[$i] ?? '');
-    if (empty($name)) {
+foreach ($names as $i => $name) {
+    if ($tabnum == 6 && empty($name) && empty($descriptions[$i])) {
+        // Allow empty block for tab 6 if untouched, or we just save it anyway so user can return
+    } else if (empty($name) && empty($copyFrom[$i]) && $tabnum != 6) {
         continue;
     }
-    
-    $itemConf = [
+
+    $itemConfig = [
         'name'      => $name,
-        'content'   => trim($contents[$i] ?? ''),
+        'content'   => $contents[$i] ?? '',
         'copy_from' => (int)($copyFrom[$i] ?? 0),
-        'type'      => (int)($types[$i] ?? 0),
+        'type'      => (int)($types[$i] ?? 1),
         'itilcategories_id' => (int)($categories[$i] ?? 0),
+        'comment'   => $comments[$i] ?? '',
     ];
-    
+
     if ($tabnum == 4) {
-        $itemConf['is_default'] = (int)($is_default[$i] ?? 0);
-        $itemConf['is_pending_per_default'] = (int)($is_pending[$i] ?? 0);
-        $itemConf['calendars_id'] = (int)($calendars_id[$i] ?? 0);
-        $itemConf['followup_frequency'] = (int)($followup_frequency[$i] ?? 0);
-        $itemConf['itilfollowuptemplates_id'] = (int)($foltpl_id[$i] ?? 0);
-        $itemConf['followups_before_resolution'] = (int)($fbr[$i] ?? 0);
-        $itemConf['solutiontemplates_id'] = (int)($soltpl_id[$i] ?? 0);
-        $itemConf['comment'] = trim($comments[$i] ?? '');
+        $itemConfig['is_default'] = (int)($is_default[$i] ?? 0);
+        $itemConfig['is_pending_per_default'] = (int)($is_pending[$i] ?? 0);
+        $itemConfig['calendars_id'] = (int)($calendars_id[$i] ?? 0);
+        $itemConfig['followup_frequency'] = (int)($followup_frequency[$i] ?? 0);
+        $itemConfig['itilfollowuptemplates_id'] = (int)($foltpl_id[$i] ?? 0);
+        $itemConfig['followups_before_resolution'] = (int)($fbr[$i] ?? 0);
+        $itemConfig['solutiontemplates_id'] = (int)($soltpl_id[$i] ?? 0);
     }
     
     if ($tabnum == 5) {
-        $itemConf['is_active'] = (int)($is_active[$i] ?? 0);
-        $itemConf['itemtype'] = trim($itemtype[$i] ?? 'Ticket');
-        $itemConf['event'] = trim($event[$i] ?? 'new');
-        $itemConf['attach_documents'] = (int)($attach_documents[$i] ?? -2);
-        $itemConf['allow_response'] = (int)($allow_response[$i] ?? 1);
-        $itemConf['notificationtemplates_id'] = (int)($notificationtemplates_id[$i] ?? 0);
-        $itemConf['comment'] = trim($comments[$i] ?? '');
-        $itemConf['target'] = trim($targets[$i] ?? '');
-        $itemConf['exclusion'] = trim($exclusions[$i] ?? '');
+        $itemConfig['is_active'] = (int)($is_active[$i] ?? 1);
+        $itemConfig['itemtype'] = $itemtype[$i] ?? 'Ticket';
+        $itemConfig['event'] = $event[$i] ?? 'new';
+        $itemConfig['attach_documents'] = (int)($attach_documents[$i] ?? -2);
+        $itemConfig['allow_response'] = (int)($allow_response[$i] ?? 1);
+        $itemConfig['notificationtemplates_id'] = (int)($notiftpl_id[$i] ?? 0);
+        $itemConfig['target'] = $target_val[$i] ?? '';
+        $itemConfig['exclusion'] = $exclusion_val[$i] ?? '';
     }
-    
-    $configsToSave[] = $itemConf;
+
+    if ($tabnum == 6) {
+        $itemConfig['description'] = $descriptions[$i] ?? '';
+        $itemConfig['forms_categories_id'] = (int)($forms_categories_id[$i] ?? 0);
+    }
+
+    $configsToSave[] = $itemConfig;
 }
 
 // Puxa metadata atual

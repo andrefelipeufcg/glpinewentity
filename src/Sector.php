@@ -177,8 +177,8 @@ class Sector extends CommonDBTM {
         
         // Verifica glpi_forms vs glpi_plugin_formcreator_forms
         if ($tabnum == 6) {
-            if ($DB->tableExists('glpi_forms')) {
-                $tableMapping[6] = 'glpi_forms';
+            if ($DB->tableExists('glpi_forms_forms')) {
+                $tableMapping[6] = 'glpi_forms_forms';
             }
         }
 
@@ -191,9 +191,16 @@ class Sector extends CommonDBTM {
                 'FROM'   => $tableName,
                 'ORDER'  => 'name ASC'
             ]);
+            $modelsPadrao = [];
+            $modelsNormal = [];
             foreach ($iterator as $row) {
-                $existingModels[$row['id']] = $row['name'];
+                if (preg_match('/^\[padr[aã]o\]/i', $row['name'])) {
+                    $modelsPadrao[$row['id']] = $row['name'];
+                } else {
+                    $modelsNormal[$row['id']] = $row['name'];
+                }
             }
+            $existingModels = $modelsPadrao + $modelsNormal;
         }
 
         // Determina os campos que serão exibidos baseado na aba
@@ -298,7 +305,19 @@ class Sector extends CommonDBTM {
                     asort($extraOptions['all_exclusions']);
                 }
             }
-        }        
+        }
+
+        if ($tabnum == 6 && $DB->tableExists('glpi_forms_categories')) {
+            $catIter = $DB->request([
+                'SELECT' => ['id', 'name'],
+                'FROM'   => 'glpi_forms_categories',
+                'ORDER'  => 'name ASC'
+            ]);
+            foreach ($catIter as $row) {
+                $extraOptions['form_categories'][$row['id']] = $row['name'];
+            }
+        }
+
         $ajax_save_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/save_draft_configs.php';
         $ajax_generate_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/generate_configs.php';
 
@@ -318,24 +337,31 @@ class Sector extends CommonDBTM {
 
         echo "<div id='items-container-tab-{$tabnum}'>";
 
-        // Template oculto para adicionar novos
-        echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $extraOptions);
+        if ($tabnum == 6) {
+            // Para o tab 6 (Formulário Padrão), teremos apenas 1 bloco fixo
+            $config = empty($savedConfigs) ? ['name' => '', 'content' => '', 'copy_from' => 0, 'description' => '', 'forms_categories_id' => 0] : $savedConfigs[0];
+            echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, 0, $extraOptions, false, true);
+        } else {
+            // Template oculto para adicionar novos
+            echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $extraOptions);
 
-        // Renderiza existentes (salvos no rascunho) ou padrão se for vazio
-        if (empty($savedConfigs)) {
-            // Valores padrão iniciais para mostrar algo
-            $savedConfigs = self::getDefaultConfigsForTab($tabnum);
+            // Renderiza existentes (salvos no rascunho) ou padrão se for vazio
+            if (empty($savedConfigs)) {
+                // Valores padrão iniciais para mostrar algo
+                $savedConfigs = self::getDefaultConfigsForTab($tabnum);
+            }
+
+            foreach ($savedConfigs as $idx => $config) {
+                echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions);
+            }
         }
-
-        foreach ($savedConfigs as $idx => $config) {
-            echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions);
-        }
-
         echo "</div>";
 
-        echo "<div style='text-align: left; padding: 10px 0;'>";
-        echo "<button type='button' class='btn btn-success btn-sm' style='color: white !important;' onclick='addConfigItem({$tabnum})'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar Item</button>";
-        echo "</div>";
+        if ($tabnum != 6) {
+            echo "<div style='text-align: left; padding: 10px 0;'>";
+            echo "<button type='button' class='btn btn-success btn-sm' style='color: white !important;' onclick='addConfigItem({$tabnum})'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar Item</button>";
+            echo "</div>";
+        }
 
         echo "</td></tr>";
 
@@ -424,6 +450,17 @@ class Sector extends CommonDBTM {
                                 block.find('.input-target').val(response.data.target || '').trigger('change');
                                 block.find('.input-exclusion').val(response.data.exclusion || '').trigger('change');
                             }
+
+                            if (tabnum == 6) {
+                                let textarea = block.find('.input-description-wrapper textarea');
+                                let editorId = textarea.attr('id');
+                                if (editorId && typeof tinymce !== 'undefined' && tinymce.get(editorId)) {
+                                    tinymce.get(editorId).setContent(response.data.description || '');
+                                } else {
+                                    textarea.val(response.data.description || '');
+                                }
+                                block.find('.input-forms-category').val(response.data.forms_categories_id || '0').trigger('change');
+                            }
                         }
                     }
                 });
@@ -454,6 +491,17 @@ class Sector extends CommonDBTM {
                     block.find('.input-comment').val('');
                     block.find('.input-target').val('').trigger('change');
                     block.find('.input-exclusion').val('').trigger('change');
+                }
+
+                if (tabnum == 6) {
+                    let textarea = block.find('.input-description-wrapper textarea');
+                    let editorId = textarea.attr('id');
+                    if (editorId && typeof tinymce !== 'undefined' && tinymce.get(editorId)) {
+                        tinymce.get(editorId).setContent('');
+                    } else {
+                        textarea.val('');
+                    }
+                    block.find('.input-forms-category').val('0').trigger('change');
                 }
             }
         });
@@ -526,7 +574,7 @@ class Sector extends CommonDBTM {
         return self::renderConfigBlock($tabnum, $hasContentField, $existingModels, ['name' => '', 'content' => '', 'copy_from' => 0, 'type' => 1, 'itilcategories_id' => 0], -1, $extraOptions, true);
     }
 
-    private static function renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions = [], $isTemplate = false) {
+    private static function renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions = [], $isTemplate = false, $isSingleBlock = false) {
         $display = $isTemplate ? "display: none;" : "";
         $class = "config-block" . ($isTemplate ? " template" : "");
         
@@ -554,14 +602,20 @@ class Sector extends CommonDBTM {
         $target_val = \Html::cleanInputText($config['target'] ?? '');
         $exclusion_val = \Html::cleanInputText($config['exclusion'] ?? '');
 
+        // Tab 6 vars
+        $description = \Html::cleanInputText($config['description'] ?? '');
+        $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
+
         $html = "<div class='{$class}' style='border: 1px solid #ccc; padding: 15px; margin-bottom: 15px;  {$display}'>";
         $html .= "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
         $html .= "      <strong>Item de Configuração</strong>";
-        $html .= "      <button type='button' class='btn btn-sm btn-danger btn-remove-config' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
+        if (!$isSingleBlock) {
+            $html .= "      <button type='button' class='btn btn-sm btn-danger btn-remove-config' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
+        }
         $html .= "  </div>";
         
-        // Copiar de... (apenas visível se for template, ou seja, "adicionar item")
-        $showCopyFrom = $isTemplate ? "block" : "none";
+        // Copiar de... (apenas visível se for template OU for um bloco único como no Tab 6)
+        $showCopyFrom = ($isTemplate || $isSingleBlock) ? "block" : "none";
         $html .= "  <div style='display: {$showCopyFrom}; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd;'>";
         $html .= "      <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Copiar de...</label>";
         $html .= "      <select name='items_copy_from[]' class='form-select select2-copy-from' style='width: 100%;' data-tab='{$tabnum}'>";
@@ -772,12 +826,45 @@ class Sector extends CommonDBTM {
             $html .= "      <textarea name='items_comment[]' class='form-control input-comment' style='width: 100%; height: 60px;'>{$comment}</textarea>";
             $html .= "  </div>";
 
+        } elseif ($tabnum == 6) {
+            $html .= "  <input type='hidden' name='items_is_active[]' class='input-is-active' value='1'>";
+
+            $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Configuração do catálogo de serviços - categoria</label>";
+            $html .= "          <select name='items_forms_categories_id[]' class='form-select select2-forms-category input-forms-category' style='width: 100%;'>";
+            $html .= "            <option value='0'>--- Nenhuma ---</option>";
+            foreach (($extraOptions['form_categories'] ?? []) as $cid => $cname) {
+                $sel = ($cid == $forms_categories_id) ? 'selected' : '';
+                $html .= "            <option value='{$cid}' {$sel}>" . \Html::cleanInputText($cname) . "</option>";
+            }
+            $html .= "          </select>";
+            $html .= "      </div>";
+            $html .= "  </div>";
+
+            $html .= "  <div>";
+            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Configuração do catálogo de serviços - descrição</label>";
+            
+            ob_start();
+            $rand = mt_rand();
+            \Html::textarea([
+                'name'            => 'items_description[]',
+                'value'           => $description,
+                'enable_richtext' => true,
+                'rand'            => $rand,
+                'rows'            => 4
+            ]);
+            $textareaHtml = ob_get_clean();
+            
+            $html .= "      <div class='input-description-wrapper'>{$textareaHtml}</div>";
+            $html .= "  </div>";
         } else {
             $html .= "  <input type='hidden' name='items_type[]' class='input-type' value='1'>";
             $html .= "  <input type='hidden' name='items_category[]' class='input-category' value='0'>";
         }
 
-        if ($hasContentField) {
+        // Para tab 6, o $hasContentField deve ser false na lógica base, mas garantimos que não imprima textarea de content
+        if ($hasContentField && $tabnum != 6) {
             $html .= "  <div>";
             $html .= "      <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Conteúdo / Texto Base</label>";
             $html .= "      <textarea name='items_content[]' class='form-control input-content' style='width: 100%; height: 60px;' placeholder='Texto padrão para este item.'>{$content}</textarea>";

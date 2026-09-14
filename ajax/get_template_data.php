@@ -18,6 +18,8 @@ if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/inc/inclu
 if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/../inc/includes.php'; }
 include $inc;
 
+global $DB, $CFG_GLPI;
+
 header('Content-Type: application/json');
 
 if (!Session::haveRight('plugin_glpinewentity', UPDATE)) {
@@ -184,11 +186,15 @@ switch ($tabnum) {
         }
         break;
     case 6: // Form
-        if (class_exists('Glpi\\Form\\Form')) {
-            $item = new Glpi\Form\Form();
-            if ($item->getFromDB($id)) {
-                $data['name'] = $item->fields['name'] ?? '';
-                $data['content'] = $item->fields['description'] ?? '';
+        global $DB;
+        if (class_exists('Glpi\\Plugin\\Formcreator\\Form') || class_exists('PluginFormcreatorForm') || $DB->tableExists('glpi_forms_forms')) {
+            // Using DB directly to be safe if class is not easily instantiable
+            $iter = $DB->request('glpi_forms_forms', ['id' => $id]);
+            if ($iter->count() > 0) {
+                $row = $iter->current();
+                $data['name'] = $row['name'] ?? '';
+                $data['description'] = $row['description'] ?? '';
+                $data['forms_categories_id'] = $row['forms_categories_id'] ?? 0;
             }
         }
         break;
