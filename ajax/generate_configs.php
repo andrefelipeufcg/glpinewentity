@@ -116,6 +116,7 @@ try {
             echo json_encode(['success' => false, 'error' => 'Aba desconhecida.']);
             exit;
     }
+    Session::addMessageAfterRedirect('Configurações aplicadas com sucesso!', true, INFO);
 
     echo json_encode(['success' => true, 'count' => $count]);
 } catch (\Exception $e) {

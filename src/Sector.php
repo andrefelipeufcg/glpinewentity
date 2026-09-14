@@ -592,7 +592,7 @@ class Sector extends CommonDBTM {
                 data: formData,
                 success: function(response) {
                     if(response.success) {
-                        alert('Rascunho salvo com sucesso!');
+                        window.location.reload();
                     } else {
                         alert('Erro ao salvar rascunho: ' + (response.error || 'Erro desconhecido'));
                     }
@@ -623,7 +623,6 @@ class Sector extends CommonDBTM {
                                 },
                                 success: function(genResp) {
                                     if(genResp.success) {
-                                        alert('Configurações aplicadas com sucesso!');
                                         window.location.reload();
                                     } else {
                                         alert('Erro ao gerar configurações: ' + (genResp.error || 'Erro desconhecido'));

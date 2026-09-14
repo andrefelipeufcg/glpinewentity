@@ -134,6 +134,7 @@ if ($sector->update([
     'id'       => $sectorId,
     'metadata' => json_encode($meta)
 ])) {
+    Session::addMessageAfterRedirect(__('Rascunho salvo com sucesso!', 'glpinewentity'), true, INFO);
     echo json_encode(['success' => true]);
 } else {
     echo json_encode(['success' => false, 'error' => __('Falha ao atualizar o banco de dados.', 'glpinewentity')]);
