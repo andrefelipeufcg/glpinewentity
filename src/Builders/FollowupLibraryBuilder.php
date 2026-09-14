@@ -1,4 +1,10 @@
 <?php
+/**
+ * -----------------------------------------------------------------------
+ * GLPI New Entity — src/Builders/FollowupLibraryBuilder.php
+ * Construtor responsável por criar os modelos de respostas básicas (acompanhamentos).
+ * -----------------------------------------------------------------------
+ */
 
 namespace GlpiPlugin\Glpinewentity\Builders;
 

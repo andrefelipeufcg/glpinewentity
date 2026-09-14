@@ -49,7 +49,7 @@ $copyFrom = $_POST['items_copy_from'] ?? [];
 $types    = $_POST['items_type'] ?? [];
 $categories = $_POST['items_category'] ?? [];
 
-// Tab 4 special fields
+// Campos especiais da aba 4
 $is_default = $_POST['items_is_default'] ?? [];
 $is_pending = $_POST['items_is_pending_per_default'] ?? [];
 $calendars_id = $_POST['items_calendars_id'] ?? [];
@@ -59,7 +59,7 @@ $fbr = $_POST['items_followups_before_resolution'] ?? [];
 $soltpl_id = $_POST['items_solutiontemplates_id'] ?? [];
 $comments = $_POST['items_comment'] ?? [];
 
-// Tab 5 special fields
+// Campos especiais da aba 5
 $is_active = $_POST['items_is_active'] ?? [];
 $itemtype = $_POST['items_itemtype'] ?? [];
 $event = $_POST['items_event'] ?? [];
@@ -69,14 +69,14 @@ $notiftpl_id = $_POST['items_notificationtemplates_id'] ?? [];
 $target_val = $_POST['items_target'] ?? [];
 $exclusion_val = $_POST['items_exclusion'] ?? [];
 
-// Tab 6 special fields
+// Campos especiais da aba 6
 $descriptions = $_POST['items_description'] ?? [];
 $forms_categories_id = $_POST['items_forms_categories_id'] ?? [];
 
 $configsToSave = [];
 foreach ($names as $i => $name) {
     if ($tabnum == 6 && empty($name) && empty($descriptions[$i])) {
-        // Allow empty block for tab 6 if untouched, or we just save it anyway so user can return
+        // Permitir bloco vazio para a aba 6 se não for modificado, ou apenas salvamos de qualquer forma para o usuário poder retornar
     } else if (empty($name) && empty($copyFrom[$i]) && $tabnum != 6) {
         continue;
     }

@@ -1,4 +1,10 @@
 <?php
+/**
+ * -----------------------------------------------------------------------
+ * GLPI New Entity — src/Builders/FormBuilder.php
+ * Construtor responsável por clonar ou criar formulários padrão (GLPI 11).
+ * -----------------------------------------------------------------------
+ */
 
 namespace GlpiPlugin\Glpinewentity\Builders;
 
@@ -61,7 +67,7 @@ class FormBuilder
             'name' => $name,
             'entities_id' => $entities_id,
             'is_recursive' => 1,
-            'is_active' => 1, // forced to active as per user request
+            'is_active' => 1, // forçado para ativo conforme solicitação do usuário
             'description' => $description ?: ($sourceData['description'] ?? __('Formulário padrão gerado automaticamente para a entidade.', 'glpinewentity')),
             'forms_categories_id' => $forms_categories_id ?: ($sourceData['forms_categories_id'] ?? 0),
         ];

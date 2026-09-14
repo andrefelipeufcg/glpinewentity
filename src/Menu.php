@@ -1,4 +1,10 @@
 <?php
+/**
+ * -----------------------------------------------------------------------
+ * GLPI New Entity — src/Menu.php
+ * Define a entrada do menu no GLPI para o plugin e gerencia os links de navegação.
+ * -----------------------------------------------------------------------
+ */
 
 namespace GlpiPlugin\Glpinewentity;
 

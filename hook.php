@@ -3,7 +3,6 @@
  * -----------------------------------------------------------------------
  * GLPI New Entity — hook.php
  * Rotinas de instalação e desinstalação do plugin.
- * V1 não cria tabelas próprias (usa apenas tabelas nativas do GLPI).
  * -----------------------------------------------------------------------
  */
 

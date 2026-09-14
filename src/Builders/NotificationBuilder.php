@@ -1,4 +1,10 @@
 <?php
+/**
+ * -----------------------------------------------------------------------
+ * GLPI New Entity — src/Builders/NotificationBuilder.php
+ * Construtor responsável por configurar e gerar as notificações da entidade.
+ * -----------------------------------------------------------------------
+ */
 
 namespace GlpiPlugin\Glpinewentity\Builders;
 

@@ -1,4 +1,10 @@
 <?php
+/**
+ * -----------------------------------------------------------------------
+ * GLPI New Entity — src/Builders/SolutionLibraryBuilder.php
+ * Construtor responsável por criar os modelos de soluções básicas.
+ * -----------------------------------------------------------------------
+ */
 
 namespace GlpiPlugin\Glpinewentity\Builders;
 

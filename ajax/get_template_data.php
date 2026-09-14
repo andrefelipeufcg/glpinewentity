@@ -42,7 +42,7 @@ switch ($tabnum) {
         $item = new TicketTemplate();
         if ($item->getFromDB($id)) {
             $data['name'] = $item->fields['name'] ?? '';
-            // Predefined fields
+            // Campos pré-definidos
             global $DB;
             $so = array_flip(\TicketTemplate::getAllowedFields(true));
             
@@ -65,9 +65,9 @@ switch ($tabnum) {
                 }
             }
 
-            // Fallback for type from entity config if not found in predefined fields
+            // Fallback para o tipo da configuração da entidade se não for encontrado nos campos pré-definidos
             if (!isset($data['type'])) {
-                $data['type'] = Entity::getUsedConfig('tickettype', $item->fields['entities_id'], '', 1); // 1 = Incident by default
+                $data['type'] = Entity::getUsedConfig('tickettype', $item->fields['entities_id'], '', 1); // 1 = Incidente por padrão
             }
         }
         break;
@@ -152,7 +152,7 @@ switch ($tabnum) {
                 if ($targetObj && isset($targetObj->notification_targets_labels[$type][$items_id])) {
                     $label = $targetObj->notification_targets_labels[$type][$items_id];
                 }
-                // Fallback: resolver por tipo (Profile, Group, User)
+                // Fallback: resolver por tipo (Perfil, Grupo, Usuário)
                 if (empty($label)) {
                     if ($items_id > 0) {
                         if ($type == \Notification::PROFILE_TYPE) {
@@ -188,7 +188,7 @@ switch ($tabnum) {
     case 6: // Form
         global $DB;
         if (class_exists('Glpi\\Plugin\\Formcreator\\Form') || class_exists('PluginFormcreatorForm') || $DB->tableExists('glpi_forms_forms')) {
-            // Using DB directly to be safe if class is not easily instantiable
+            // Usando DB diretamente para segurança caso a classe não seja facilmente instanciável
             $iter = $DB->request('glpi_forms_forms', ['id' => $id]);
             if ($iter->count() > 0) {
                 $row = $iter->current();

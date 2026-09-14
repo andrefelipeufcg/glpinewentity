@@ -1,4 +1,10 @@
 <?php
+/**
+ * -----------------------------------------------------------------------
+ * GLPI New Entity — src/Builders/WaitReasonBuilder.php
+ * Construtor responsável por criar os motivos de pendências (PendingReasons).
+ * -----------------------------------------------------------------------
+ */
 
 namespace GlpiPlugin\Glpinewentity\Builders;
 

@@ -581,7 +581,7 @@ class Sector extends CommonDBTM {
         $name = \Html::cleanInputText($config['name'] ?? '');
         $content = \Html::cleanInputText($config['content'] ?? '');
         $copyFrom = (int)($config['copy_from'] ?? 0);
-        $type = (int)($config['type'] ?? 1); // 1 = Incident, 2 = Request
+        $type = (int)($config['type'] ?? 1); // 1 = Incidente, 2 = Requisição
         $itilcategoryId = (int)($config['itilcategories_id'] ?? 0);
         $is_default = (int)($config['is_default'] ?? 0);
         $is_pending_per_default = (int)($config['is_pending_per_default'] ?? 0);
@@ -592,7 +592,7 @@ class Sector extends CommonDBTM {
         $solutiontemplates_id = (int)($config['solutiontemplates_id'] ?? 0);
         $comment = \Html::cleanInputText($config['comment'] ?? '');
 
-        // Tab 5 vars
+        // Variáveis da aba 5
         $is_active = (int)($config['is_active'] ?? 1);
         $itemtype = \Html::cleanInputText($config['itemtype'] ?? 'Ticket');
         $event = \Html::cleanInputText($config['event'] ?? 'new');
@@ -602,7 +602,7 @@ class Sector extends CommonDBTM {
         $target_val = \Html::cleanInputText($config['target'] ?? '');
         $exclusion_val = \Html::cleanInputText($config['exclusion'] ?? '');
 
-        // Tab 6 vars
+        // Variáveis da aba 6
         $description = \Html::cleanInputText($config['description'] ?? '');
         $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
 
