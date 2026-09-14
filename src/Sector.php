@@ -657,7 +657,8 @@ class Sector extends CommonDBTM {
         $class = "config-block" . ($isTemplate ? " template" : "");
         
         $name = \Html::cleanInputText($config['name'] ?? '');
-        $content = \Html::cleanInputText($config['content'] ?? '');
+        $contentRaw = $config['content'] ?? '';
+        $content = \Html::cleanInputText($contentRaw);
         $copyFrom = (int)($config['copy_from'] ?? 0);
         $type = (int)($config['type'] ?? 1); // 1 = Incidente, 2 = Requisição
         $itilcategoryId = (int)($config['itilcategories_id'] ?? 0);
@@ -681,7 +682,8 @@ class Sector extends CommonDBTM {
         $exclusion_val = \Html::cleanInputText($config['exclusion'] ?? '');
 
         // Variáveis da aba 6
-        $description = \Html::cleanInputText($config['description'] ?? '');
+        $descriptionRaw = $config['description'] ?? '';
+        $description = \Html::cleanInputText($descriptionRaw);
         $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
 
         $html = "<div class='{$class}' style='border: 1px solid #ccc; padding: 15px; margin-bottom: 15px;  {$display}'>";
@@ -927,7 +929,7 @@ class Sector extends CommonDBTM {
             $rand = mt_rand();
             \Html::textarea([
                 'name'            => 'items_description[]',
-                'value'           => $description,
+                'value'           => $descriptionRaw,
                 'enable_richtext' => true,
                 'rand'            => $rand,
                 'rows'            => 4
@@ -951,7 +953,7 @@ class Sector extends CommonDBTM {
                 $rand = mt_rand();
                 \Html::textarea([
                     'name'            => 'items_content[]',
-                    'value'           => $content,
+                    'value'           => $contentRaw,
                     'enable_richtext' => true,
                     'rand'            => $rand,
                     'rows'            => 4
