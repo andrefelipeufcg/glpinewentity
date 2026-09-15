@@ -90,8 +90,7 @@ function plugin_glpinewentity_uninstall(): bool {
         }
     }
 
-    ProfileRight::deleteByPlugin('glpinewentity');
-    $DB->delete('glpi_profilerights', ['name' => 'plugin_glpinewentity']);
+    ProfileRight::deleteProfileRights(['plugin_glpinewentity']);
 
     return true;
 }
@@ -127,5 +126,54 @@ function plugin_glpinewentity_pre_item_add(CommonDBTM $item): void {
     if ($template->getFromDB($templateId) && (int)$template->fields['entities_id'] > 0) {
         $item->input['entities_id'] = (int)$template->fields['entities_id'];
     }
+}
+
+/**
+ * Ajusta a entidade exibida no formulário de pré-visualização do modelo.
+ */
+function plugin_glpinewentity_pre_item_form(array $params): void {
+    $item = $params['item'] ?? null;
+    $options = $params['options'] ?? [];
+    $templateId = (int)($options['template_preview'] ?? 0);
+
+    if (!$item instanceof Ticket || $templateId <= 0) {
+        return;
+    }
+
+    $template = new TicketTemplate();
+    if (!$template->getFromDB($templateId)) {
+        return;
+    }
+
+    $entityId = (int)$template->fields['entities_id'];
+    if ($entityId <= 0) {
+        return;
+    }
+
+    $entity = new Entity();
+    if (!$entity->getFromDB($entityId)) {
+        return;
+    }
+
+    // O Twig usa este campo para montar o seletor visível da entidade.
+    $item->fields['entities_id'] = $entityId;
+
+    $entityName = json_encode($entity->fields['completename'] ?? $entity->fields['name']);
+    echo "<script>
+        $(function() {
+            var entityId = " . $entityId . ";
+            var entityName = " . $entityName . ";
+            $('select[name=\"entities_id\"]').each(function() {
+                var select = $(this);
+                if (!select.find('option[value=' + entityId + ']').length) {
+                    select.append(new Option(entityName, entityId, true, true));
+                } else {
+                    select.val(String(entityId));
+                }
+                select.trigger('change');
+            });
+            $('input[type=\"hidden\"][name=\"entities_id\"]').val(entityId);
+        });
+    </script>";
 }
 

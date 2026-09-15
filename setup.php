@@ -28,6 +28,9 @@ function plugin_init_glpinewentity(): void {
     $PLUGIN_HOOKS[Hooks::PRE_ITEM_ADD]['glpinewentity'] = [
         'Ticket' => 'plugin_glpinewentity_pre_item_add',
     ];
+    $PLUGIN_HOOKS[Hooks::PRE_ITEM_FORM]['glpinewentity'] = [
+        'Ticket' => 'plugin_glpinewentity_pre_item_form',
+    ];
 
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Wizard');
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Sector');
