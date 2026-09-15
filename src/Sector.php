@@ -418,6 +418,9 @@ class Sector extends CommonDBTM {
             if(template.find('.select2-cat').length > 0) {
                 template.find('.select2-cat').select2({ width: '100%' });
             }
+            if(template.find('.select2-forms-category').length > 0) {
+                template.find('.select2-forms-category').select2({ width: '100%' });
+            }
 
             // Substituir textarea simples por Rich Text (abas 1, 2, 3)
             if ([1, 2, 3].indexOf(tabnum) !== -1) {
@@ -526,7 +529,30 @@ class Sector extends CommonDBTM {
                                 } else {
                                     textarea.val(response.data.description || '');
                                 }
-                                block.find('.input-forms-category').val(response.data.forms_categories_id || '0').trigger('change');
+                                let formsCatSelect = block.find('select[name=\"items_forms_categories_id[]\"]');
+                                if (formsCatSelect.length > 0) {
+                                    formsCatSelect.val(response.data.forms_categories_id || '0').trigger('change');
+                                }
+                                
+                                let container = block.find('.illustration-wrapper');
+                                if (container.length > 0) {
+                                    let iconVal = response.data.icon || 'request-service';
+                                    let hiddenInput = container.find('[data-glpi-icon-picker-value]');
+                                    hiddenInput.val(iconVal);
+                                    
+                                    let nativePreview = container.find('[data-glpi-icon-picker-value-preview-native]');
+                                    let customPreview = container.find('[data-glpi-icon-picker-value-preview-custom]');
+                                    
+                                    if (iconVal.startsWith('custom_')) {
+                                        nativePreview.html('<i class=\"request-service fa-fw\" style=\"font-size: 100px;\"></i>');
+                                        nativePreview.removeClass('d-none');
+                                        customPreview.addClass('d-none');
+                                    } else {
+                                        nativePreview.html('<i class=\"' + iconVal + ' fa-fw\" style=\"font-size: 100px;\"></i>');
+                                        nativePreview.removeClass('d-none');
+                                        customPreview.addClass('d-none');
+                                    }
+                                }
                             }
                         }
                     }
@@ -580,7 +606,20 @@ class Sector extends CommonDBTM {
                     } else {
                         textarea.val('');
                     }
-                    block.find('.input-forms-category').val('0').trigger('change');
+                    let formsCatSelect = block.find('select[name=\"items_forms_categories_id[]\"]');
+                    if (formsCatSelect.length > 0) {
+                        formsCatSelect.val('0').trigger('change');
+                    }
+                    
+                    let container = block.find('.illustration-wrapper');
+                    if (container.length > 0) {
+                        let hiddenInput = container.find('[data-glpi-icon-picker-value]');
+                        hiddenInput.val('request-service');
+                        let nativePreview = container.find('[data-glpi-icon-picker-value-preview-native]');
+                        nativePreview.html('<i class=\"request-service fa-fw\" style=\"font-size: 100px;\"></i>');
+                        nativePreview.removeClass('d-none');
+                        container.find('[data-glpi-icon-picker-value-preview-custom]').addClass('d-none');
+                    }
                 }
             }
         });
@@ -670,6 +709,8 @@ class Sector extends CommonDBTM {
                     }
                 });
             });
+            $('.select2-copy-from').select2({ width: '100%' });
+            $('.select2-forms-category').select2({ width: '100%' });
         });
         </script>";
 
@@ -732,7 +773,7 @@ class Sector extends CommonDBTM {
         $html .= "        <option value='0'>--- Nenhum (Criar Básico) ---</option>";
         foreach ($existingModels as $id => $mName) {
             $selected = ($id == $copyFrom) ? 'selected' : '';
-            $html .= "        <option value='{$id}' {$selected}>" . \Html::cleanInputText($mName) . "</option>";
+            $html .= "        <option value='{$id}' {$selected}>" . \Html::cleanInputText(ltrim($mName, '- ')) . "</option>";
         }
         $html .= "      </select>";
         $html .= "  </div>";
@@ -942,22 +983,35 @@ class Sector extends CommonDBTM {
             $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
             $html .= "      <div style='flex: 1;'>";
             $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Configuração do catálogo de serviços - categoria</label>";
-            $html .= "          <select name='items_forms_categories_id[]' class='form-select select2-forms-category input-forms-category' style='width: 100%;'>";
-            $html .= "            <option value='0'>--- Nenhuma ---</option>";
-            foreach (($extraOptions['form_categories'] ?? []) as $cid => $cname) {
-                $sel = ($cid == $forms_categories_id) ? 'selected' : '';
-                $html .= "            <option value='{$cid}' {$sel}>" . \Html::cleanInputText($cname) . "</option>";
-            }
-            $html .= "          </select>";
+            $html .= \Glpi\Form\Category::dropdown([
+                'name'    => 'items_forms_categories_id[]',
+                'value'   => $forms_categories_id,
+                'display' => false,
+                'width'   => '100%',
+                'display_emptychoice' => true
+            ]);
             $html .= "      </div>";
             $html .= "  </div>";
 
-            $html .= "  <div>";
-            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Configuração do catálogo de serviços - descrição</label>";
+            $html .= "  <div style='display: flex; gap: 15px; align-items: stretch; margin-bottom: 10px;'>";
+            $html .= "      <div style='flex: 1;'>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Configuração do catálogo de serviços - descrição</label>";
             
             $encodedDescription = base64_encode($descriptionRaw);
-            $html .= "      <div class='input-description-wrapper richtext-pending' data-field-name='items_description[]' data-field-value='{$encodedDescription}'>";
-            $html .= "          <textarea name='items_description[]' class='form-control input-description' style='width: 100%; height: 80px;'>{$description}</textarea>";
+            $html .= "          <div class='input-description-wrapper richtext-pending' data-field-name='items_description[]' data-field-value='{$encodedDescription}'>";
+            $html .= "              <textarea name='items_description[]' class='form-control input-description' style='width: 100%; height: 80px;'>{$description}</textarea>";
+            $html .= "          </div>";
+            $html .= "      </div>";
+            
+            $icon = \Html::cleanInputText($config['icon'] ?? 'request-service');
+            
+            $twig = \Glpi\Application\View\TemplateRenderer::getInstance()->getEnvironment();
+            $twig_code = "{% import 'components/form/fields_macros.html.twig' as fields %}{{ fields.illustrationField('items_icon[]', icon_value, 'Ilustração', {'is_horizontal': false, 'full_width': true}) }}";
+            $template = $twig->createTemplate($twig_code);
+            $illustrationHtml = $template->render(['icon_value' => $icon]);
+            
+            $html .= "      <div style='width: 150px; flex-shrink: 0;'>";
+            $html .=            $illustrationHtml;
             $html .= "      </div>";
             $html .= "  </div>";
         } else {

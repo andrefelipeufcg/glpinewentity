@@ -195,6 +195,7 @@ switch ($tabnum) {
                 $data['name'] = $row['name'] ?? '';
                 $data['description'] = $row['description'] ?? '';
                 $data['forms_categories_id'] = $row['forms_categories_id'] ?? 0;
+                $data['icon'] = $row['icon'] ?? 'request-service';
             }
         }
         break;
