@@ -387,6 +387,14 @@ class Sector extends CommonDBTM {
         $ajax_render_richtext_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/render_richtext.php';
 
         echo "<script>
+        function decodeBase64Utf8(value) {
+            let binary = atob(value);
+            let bytes = Uint8Array.from(binary, function(character) {
+                return character.charCodeAt(0);
+            });
+            return new TextDecoder('utf-8').decode(bytes);
+        }
+
         function addConfigItem(tabnum) {
             let container = $('#items-container-tab-' + tabnum);
             let template = container.find('.config-block.template').clone();
@@ -650,7 +658,7 @@ class Sector extends CommonDBTM {
                 let fieldName = wrapper.data('field-name');
                 let encodedValue = wrapper.data('field-value') || '';
                 let decodedValue = '';
-                try { decodedValue = atob(encodedValue); } catch(e) { decodedValue = ''; }
+                try { decodedValue = decodeBase64Utf8(encodedValue); } catch(e) { decodedValue = ''; }
 
                 $.ajax({
                     url: '{$ajax_render_richtext_url}',
