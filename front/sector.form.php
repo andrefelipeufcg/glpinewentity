@@ -108,6 +108,14 @@ if (isset($_POST['process_wizard'])) {
 
 Html::header(Sector::getTypeName(Session::getPluralNumber()), '', 'config', strtolower(\GlpiPlugin\Glpinewentity\Menu::class), 'sector');
 
-$sectorObj->display(['id' => $sectorId]);
+$options = ['id' => $sectorId];
+if ($sectorId > 0 && isset($sectorObj->fields['metadata'])) {
+    $meta = json_decode($sectorObj->fields['metadata'], true);
+    if (!empty($meta['entity_id'])) {
+        $options['entities_id'] = $meta['entity_id'];
+    }
+}
+
+$sectorObj->display($options);
 
 Html::footer();
