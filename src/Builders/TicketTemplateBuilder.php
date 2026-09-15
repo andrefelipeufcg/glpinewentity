@@ -81,7 +81,7 @@ class TicketTemplateBuilder
         $so = array_flip(\TicketTemplate::getAllowedFields(true));
 
         if ($generatedId > 0 && $template->getFromDB($generatedId)) {
-            // Update the name and fields if necessary
+            // Atualiza o nome e os campos quando necessário
             $template->update([
                  'id' => $generatedId,
                  'name' => $name,

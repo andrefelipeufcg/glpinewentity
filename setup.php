@@ -20,9 +20,14 @@ define('PLUGIN_GLPINEWENTITY_MIN_GLPI', '11.0.0');
 function plugin_init_glpinewentity(): void {
     global $PLUGIN_HOOKS;
 
+    include_once __DIR__ . '/hook.php';
+
     $PLUGIN_HOOKS[Hooks::CSRF_COMPLIANT]['glpinewentity'] = true;
     $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['glpinewentity'] = 'front/sector.form.php';
     $PLUGIN_HOOKS[Hooks::UNDISCLOSED_CONFIG_VALUE]['glpinewentity'] = 'plugin_glpinewentity_undisclosed_config_value';
+    $PLUGIN_HOOKS[Hooks::PRE_ITEM_ADD]['glpinewentity'] = [
+        'Ticket' => 'plugin_glpinewentity_pre_item_add',
+    ];
 
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Wizard');
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Sector');
