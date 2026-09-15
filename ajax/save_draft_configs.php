@@ -72,6 +72,7 @@ $exclusion_val = $_POST['items_exclusion'] ?? [];
 // Campos especiais da aba 6
 $descriptions = $_POST['items_description'] ?? [];
 $forms_categories_id = $_POST['items_forms_categories_id'] ?? [];
+$illustrations = $_POST['items_illustration'] ?? [];
 
 $generated_ids = $_POST['items_generated_id'] ?? [];
 
@@ -117,6 +118,8 @@ foreach ($names as $i => $name) {
     if ($tabnum == 6) {
         $itemConfig['description'] = $descriptions[$i] ?? '';
         $itemConfig['forms_categories_id'] = (int)($forms_categories_id[$i] ?? 0);
+        // Mantém a ilustração escolhida ao salvar ou aplicar a padronização.
+        $itemConfig['illustration'] = $illustrations[$i] ?? 'request-service';
     }
 
     $configsToSave[] = $itemConfig;

@@ -309,12 +309,12 @@ class Sector extends CommonDBTM {
 
         if ($tabnum == 6 && $DB->tableExists('glpi_forms_categories')) {
             $catIter = $DB->request([
-                'SELECT' => ['id', 'name'],
+                'SELECT' => ['id', 'name', 'completename'],
                 'FROM'   => 'glpi_forms_categories',
-                'ORDER'  => 'name ASC'
+                'ORDER'  => 'completename ASC'
             ]);
             foreach ($catIter as $row) {
-                $extraOptions['form_categories'][$row['id']] = $row['name'];
+                $extraOptions['form_categories'][$row['id']] = !empty($row['completename']) ? $row['completename'] : $row['name'];
             }
         }
 
@@ -385,6 +385,7 @@ class Sector extends CommonDBTM {
         // JavaScript
         $ajax_get_template_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/get_template_data.php';
         $ajax_render_richtext_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/render_richtext.php';
+        $default_illustration_preview = json_encode((new \Glpi\UI\IllustrationManager())->renderIcon('request-service', 100));
 
         echo "<script>
         function decodeBase64Utf8(value) {
@@ -417,9 +418,6 @@ class Sector extends CommonDBTM {
             template.find('.select2-copy-from').select2({ width: '100%' });
             if(template.find('.select2-cat').length > 0) {
                 template.find('.select2-cat').select2({ width: '100%' });
-            }
-            if(template.find('.select2-forms-category').length > 0) {
-                template.find('.select2-forms-category').select2({ width: '100%' });
             }
 
             // Substituir textarea simples por Rich Text (abas 1, 2, 3)
@@ -531,24 +529,22 @@ class Sector extends CommonDBTM {
                                 }
                                 let formsCatSelect = block.find('select[name=\"items_forms_categories_id[]\"]');
                                 if (formsCatSelect.length > 0) {
-                                    formsCatSelect.val(response.data.forms_categories_id || '0').trigger('change');
+                                    // O dropdown nativo busca a opção remota antes de selecioná-la.
+                                    formsCatSelect.trigger('setValue', response.data.forms_categories_id || '0');
                                 }
                                 
                                 let container = block.find('.illustration-wrapper');
                                 if (container.length > 0) {
-                                    let iconVal = response.data.icon || 'request-service';
+                                    // A ilustração copiada pertence ao formulário de origem.
+                                    let illustrationVal = response.data.illustration || 'request-service';
                                     let hiddenInput = container.find('[data-glpi-icon-picker-value]');
-                                    hiddenInput.val(iconVal);
+                                    hiddenInput.val(illustrationVal);
                                     
                                     let nativePreview = container.find('[data-glpi-icon-picker-value-preview-native]');
                                     let customPreview = container.find('[data-glpi-icon-picker-value-preview-custom]');
                                     
-                                    if (iconVal.startsWith('custom_')) {
-                                        nativePreview.html('<i class=\"request-service fa-fw\" style=\"font-size: 100px;\"></i>');
-                                        nativePreview.removeClass('d-none');
-                                        customPreview.addClass('d-none');
-                                    } else {
-                                        nativePreview.html('<i class=\"' + iconVal + ' fa-fw\" style=\"font-size: 100px;\"></i>');
+                                    if (response.data.illustration_preview) {
+                                        nativePreview.html(response.data.illustration_preview);
                                         nativePreview.removeClass('d-none');
                                         customPreview.addClass('d-none');
                                     }
@@ -608,7 +604,7 @@ class Sector extends CommonDBTM {
                     }
                     let formsCatSelect = block.find('select[name=\"items_forms_categories_id[]\"]');
                     if (formsCatSelect.length > 0) {
-                        formsCatSelect.val('0').trigger('change');
+                        formsCatSelect.trigger('setValue', '0');
                     }
                     
                     let container = block.find('.illustration-wrapper');
@@ -616,7 +612,7 @@ class Sector extends CommonDBTM {
                         let hiddenInput = container.find('[data-glpi-icon-picker-value]');
                         hiddenInput.val('request-service');
                         let nativePreview = container.find('[data-glpi-icon-picker-value-preview-native]');
-                        nativePreview.html('<i class=\"request-service fa-fw\" style=\"font-size: 100px;\"></i>');
+                        nativePreview.html({$default_illustration_preview});
                         nativePreview.removeClass('d-none');
                         container.find('[data-glpi-icon-picker-value-preview-custom]').addClass('d-none');
                     }
@@ -710,7 +706,23 @@ class Sector extends CommonDBTM {
                 });
             });
             $('.select2-copy-from').select2({ width: '100%' });
-            $('.select2-forms-category').select2({ width: '100%' });
+            $('.select2-cat').select2({ width: '100%' });
+            $('.select2-calendar').select2({ width: '100%' });
+            $('.select2-freq').select2({ width: '100%' });
+            $('.select2-foltpl').select2({ width: '100%' });
+            $('.select2-fbr').select2({ width: '100%' });
+            $('.select2-soltpl').select2({ width: '100%' });
+            $('.select2-itemtype').select2({ width: '100%' });
+            $('.select2-event').select2({ width: '100%' });
+            $('.select2-tpl').select2({ width: '100%' });
+            $('.select2-target').select2({ width: '100%' });
+            $('.select2-exclusion').select2({ width: '100%' });
+
+            // A aba é carregada por AJAX; aplica ao Select2 já criado a mesma
+            // remoção de max-width que o formulário normal recebe fora da tabela.
+            $('.glpinewentity-form-category .select2-container, .glpinewentity-form-category .select2-selection--single').each(function() {
+                this.style.setProperty('max-width', 'none', 'important');
+            });
         });
         </script>";
 
@@ -980,21 +992,16 @@ class Sector extends CommonDBTM {
         } elseif ($tabnum == 6) {
             $html .= "  <input type='hidden' name='items_is_active[]' class='input-is-active' value='1'>";
 
-            $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
-            $html .= "      <div style='flex: 1;'>";
-            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Configuração do catálogo de serviços - categoria</label>";
-            $html .= \Glpi\Form\Category::dropdown([
-                'name'    => 'items_forms_categories_id[]',
-                'value'   => $forms_categories_id,
-                'display' => false,
-                'width'   => '100%',
-                'display_emptychoice' => true
-            ]);
-            $html .= "      </div>";
-            $html .= "  </div>";
+            // Renderiza o mesmo macro usado pelo formulário padrão do GLPI.
+            $twig = \Glpi\Application\View\TemplateRenderer::getInstance()->getEnvironment();
+            $categoryTemplate = $twig->createTemplate(<<<'TWIG'
+{% import 'components/form/fields_macros.html.twig' as fields %}
+{{ fields.dropdownField('Glpi\\Form\\Category', 'items_forms_categories_id[]', category_id, 'Configuração do catálogo de serviços - categoria', {'is_horizontal': false, 'full_width': true, 'add_field_class': 'glpinewentity-form-category'}) }}
+TWIG);
+            $categoryDropdownHtml = $categoryTemplate->render(['category_id' => $forms_categories_id]);
 
-            $html .= "  <div style='display: flex; gap: 15px; align-items: stretch; margin-bottom: 10px;'>";
-            $html .= "      <div style='flex: 1;'>";
+            $html .= "  <div style='margin-bottom: 10px;'>";
+            $html .= "          <div style='margin-bottom: 10px;'>" . $categoryDropdownHtml . "</div>";
             $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Configuração do catálogo de serviços - descrição</label>";
             
             $encodedDescription = base64_encode($descriptionRaw);
@@ -1003,17 +1010,16 @@ class Sector extends CommonDBTM {
             $html .= "          </div>";
             $html .= "      </div>";
             
-            $icon = \Html::cleanInputText($config['icon'] ?? 'request-service');
+            $illustration = \Html::cleanInputText($config['illustration'] ?? $config['icon'] ?? 'request-service');
             
-            $twig = \Glpi\Application\View\TemplateRenderer::getInstance()->getEnvironment();
-            $twig_code = "{% import 'components/form/fields_macros.html.twig' as fields %}{{ fields.illustrationField('items_icon[]', icon_value, 'Ilustração', {'is_horizontal': false, 'full_width': true}) }}";
+            $twig_code = "{% import 'components/form/fields_macros.html.twig' as fields %}{{ fields.illustrationField('items_illustration[]', illustration_value, 'Ilustração', {'is_horizontal': false, 'full_width': true}) }}";
             $template = $twig->createTemplate($twig_code);
-            $illustrationHtml = $template->render(['icon_value' => $icon]);
+            $illustrationHtml = $template->render(['illustration_value' => $illustration]);
             
-            $html .= "      <div style='width: 150px; flex-shrink: 0;'>";
+            // Mantém a ilustração em uma linha própria, sem limitar a largura da categoria.
+            $html .= "      <div class='illustration-wrapper' style='width: 200px; margin-top: 10px;'>";
             $html .=            $illustrationHtml;
             $html .= "      </div>";
-            $html .= "  </div>";
         } else {
             $html .= "  <input type='hidden' name='items_type[]' class='input-type' value='1'>";
             $html .= "  <input type='hidden' name='items_category[]' class='input-category' value='0'>";
@@ -1356,6 +1362,10 @@ echo "<style>
         .tab_cadre_fixe td:not([style*=\"padding: 0\"]) {
             padding-top: 15px !important;
             padding-bottom: 15px !important;
+        }
+        /* Remove apenas o limite legado que corta a categoria nesta aba. */
+        .tab_cadre_fixe .glpinewentity-form-category .select2-container .select2-selection.select2-selection--single {
+            max-width: none !important;
         }
         /* Afastar texto da aba da borda direita */
         .glpi-tabs .nav-item .nav-link {

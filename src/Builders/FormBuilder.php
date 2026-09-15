@@ -56,6 +56,7 @@ class FormBuilder
 
         $description = trim($config['description'] ?? '');
         $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
+        $illustration = $config['illustration'] ?? $config['icon'] ?? 'request-service';
 
         if ($generatedId > 0 && $form->getFromDB($generatedId)) {
             $form->update([
@@ -63,7 +64,8 @@ class FormBuilder
                  'name' => $name,
                  'entities_id' => $entities_id,
                  'description' => $description,
-                 'forms_categories_id' => $forms_categories_id
+                 'forms_categories_id' => $forms_categories_id,
+                 'illustration' => $illustration,
             ]);
             return $generatedId;
         }
@@ -85,10 +87,11 @@ class FormBuilder
             'is_active' => 1, // forçado para ativo conforme solicitação do usuário
             'description' => $description ?: ($sourceData['description'] ?? __('Formulário padrão gerado automaticamente para a entidade.', 'glpinewentity')),
             'forms_categories_id' => $forms_categories_id ?: ($sourceData['forms_categories_id'] ?? 0),
+            'illustration' => $illustration,
         ];
 
         // Copiar outros campos se existirem
-        $fieldsToCopy = ['icon', 'color', 'content', 'help'];
+        $fieldsToCopy = ['color', 'content', 'help'];
         foreach ($fieldsToCopy as $field) {
             if (isset($sourceData[$field])) {
                 $insertData[$field] = $sourceData[$field];
