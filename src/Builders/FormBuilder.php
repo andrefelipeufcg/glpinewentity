@@ -27,31 +27,49 @@ class FormBuilder
     /**
      * @param int $entities_id
      * @param array $configs Dados vindos do formulário (JSON)
-     * @return int Number of forms created.
+     * @return array Array contendo 'count' e 'configs' atualizado.
      */
-    public function build(int $entities_id, array $configs = []): int
+    public function build(int $entities_id, array $configs = []): array
     {
         $count = 0;
-        foreach ($configs as $config) {
+        foreach ($configs as &$config) {
             $formId = $this->getOrCreateForm($config, $entities_id);
             if ($formId > 0) {
                 $count++;
             }
         }
-        return $count;
+        unset($config);
+        return ['count' => $count, 'configs' => $configs];
     }
 
-    private function getOrCreateForm(array $config, int $entities_id): int
+    private function getOrCreateForm(array &$config, int $entities_id): int
     {
         $name = trim($config['name'] ?? '');
         $sourceId = (int)($config['copy_from'] ?? 0);
+        $generatedId = (int)($config['generated_id'] ?? 0);
 
         if (empty($name)) {
             return 0;
         }
 
         $form = new Form();
+
+        $description = trim($config['description'] ?? '');
+        $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
+
+        if ($generatedId > 0 && $form->getFromDB($generatedId)) {
+            $form->update([
+                 'id' => $generatedId,
+                 'name' => $name,
+                 'entities_id' => $entities_id,
+                 'description' => $description,
+                 'forms_categories_id' => $forms_categories_id
+            ]);
+            return $generatedId;
+        }
+
         if ($form->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
+            $config['generated_id'] = $form->getID();
             return (int) $form->getID();
         }
 
@@ -59,9 +77,6 @@ class FormBuilder
         if ($sourceId > 0 && $form->getFromDB($sourceId)) {
             $sourceData = $form->fields;
         }
-
-        $description = trim($config['description'] ?? '');
-        $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
 
         $insertData = [
             'name' => $name,
@@ -80,11 +95,14 @@ class FormBuilder
             }
         }
 
-        $formId = $form->add($insertData);
+        $formId = (int) $form->add($insertData);
 
         if (!$formId) {
             return 0;
         }
+
+        $config['generated_id'] = $formId;
+
         $form->getFromDB($formId);
 
         // Se NÃO copiou de um modelo existente, cria as perguntas padrão

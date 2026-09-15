@@ -15,13 +15,13 @@ class WaitReasonBuilder
     /**
      * @param int $entities_id
      * @param array $configs Dados vindos do formulário (JSON)
-     * @return int Number of pending reasons created/reused.
+     * @return array Array contendo 'count' e 'configs' atualizado.
      */
-    public function build(int $entities_id, array $configs = []): int
+    public function build(int $entities_id, array $configs = []): array
     {
         $count = 0;
 
-        foreach ($configs as $config) {
+        foreach ($configs as &$config) {
             $name = trim($config['name'] ?? '');
             if (empty($name)) {
                 continue;
@@ -30,16 +30,28 @@ class WaitReasonBuilder
             $this->getOrCreatePendingReason($config, $entities_id);
             $count++;
         }
+        unset($config);
 
-        return $count;
+        return ['count' => $count, 'configs' => $configs];
     }
 
-    private function getOrCreatePendingReason(array $config, int $entities_id): int
+    private function getOrCreatePendingReason(array &$config, int $entities_id): int
     {
         $name = trim($config['name'] ?? '');
+        $generatedId = (int)($config['generated_id'] ?? 0);
         $item = new PendingReason();
         
+        if ($generatedId > 0 && $item->getFromDB($generatedId)) {
+            $item->update([
+                 'id' => $generatedId,
+                 'name' => $name,
+                 'entities_id' => $entities_id
+            ]);
+            return $generatedId;
+        }
+
         if ($item->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
+            $config['generated_id'] = $item->getID();
             return (int) $item->getID();
         }
 
@@ -57,6 +69,8 @@ class WaitReasonBuilder
             'comment'                     => $config['comment'] ?? '',
         ];
 
-        return (int) $item->add($insertData);
+        $newId = (int) $item->add($insertData);
+        $config['generated_id'] = $newId;
+        return $newId;
     }
 }

@@ -2,10 +2,10 @@
 /**
  * -----------------------------------------------------------------------
  * GLPI New Entity — ajax/generate_configs.php
- * 
+ *
  * Este script é um endpoint AJAX acionado pelo botão "Aplicar Padronização".
- * Ele lê o rascunho salvo no banco de dados e repassa para as classes 
- * Builder corretas (TicketTemplateBuilder, WaitReasonBuilder, etc.), que 
+ * Ele lê o rascunho salvo no banco de dados e repassa para as classes
+ * Builder corretas (TicketTemplateBuilder, WaitReasonBuilder, etc.), que
  * farão a criação final dos modelos e registros na Entidade do sistema.
  * -----------------------------------------------------------------------
  */
@@ -69,13 +69,14 @@ if (!$sector->getFromDB($sector_id)) {
     exit;
 }
 
-$entities_id = (int)$sector->fields['entities_id'];
-if ($entities_id <= 0) {
+$meta = json_decode($sector->fields['metadata'] ?? '{}', true) ?: [];
+$new_entity_id = (int)($meta['entity_id'] ?? 0);
+
+if ($new_entity_id <= 0) {
     echo json_encode(['success' => false, 'error' => 'A entidade deste setor ainda não foi gerada ou está corrompida. Edite e salve os dados da entidade antes.']);
     exit;
 }
 
-$meta = json_decode($sector->fields['metadata'] ?? '{}', true) ?: [];
 $tabKey = 'tab_' . $tabnum;
 $savedConfigs = $meta['configs'][$tabKey] ?? [];
 
@@ -86,36 +87,47 @@ if (empty($savedConfigs)) {
 
 try {
     $count = 0;
-    
+    $updatedConfigs = [];
+
     switch ($tabnum) {
         case 1:
             $builder = new TicketTemplateBuilder();
-            $count = $builder->build($entities_id, $savedConfigs);
+            $result = $builder->build($new_entity_id, $savedConfigs);
             break;
         case 2:
             $builder = new FollowupLibraryBuilder();
-            $count = $builder->build($entities_id, $savedConfigs);
+            $result = $builder->build($new_entity_id, $savedConfigs);
             break;
         case 3:
             $builder = new SolutionLibraryBuilder();
-            $count = $builder->build($entities_id, $savedConfigs);
+            $result = $builder->build($new_entity_id, $savedConfigs);
             break;
         case 4:
             $builder = new WaitReasonBuilder();
-            $count = $builder->build($entities_id, $savedConfigs);
+            $result = $builder->build($new_entity_id, $savedConfigs);
             break;
         case 5:
             $builder = new NotificationBuilder();
-            $count = $builder->build($entities_id, $savedConfigs);
+            $result = $builder->build($new_entity_id, $savedConfigs);
             break;
         case 6:
             $builder = new FormBuilder();
-            $count = $builder->build($entities_id, $savedConfigs);
+            $result = $builder->build($new_entity_id, $savedConfigs);
             break;
         default:
             echo json_encode(['success' => false, 'error' => 'Aba desconhecida.']);
             exit;
     }
+
+    $count = $result['count'];
+    $updatedConfigs = $result['configs'];
+
+    $meta['configs'][$tabKey] = $updatedConfigs;
+    $sector->update([
+        'id'       => $sector_id,
+        'metadata' => json_encode($meta)
+    ]);
+
     Session::addMessageAfterRedirect('Configurações aplicadas com sucesso!', true, INFO);
 
     echo json_encode(['success' => true, 'count' => $count]);

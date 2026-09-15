@@ -602,6 +602,9 @@ class Sector extends CommonDBTM {
         function generateSectorConfigs(sectorId, tabnum) {
             if(confirm('Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?')) {
                 // Primeiro salva o rascunho, depois gera
+                if (typeof tinymce !== 'undefined') {
+                    tinymce.triggerSave();
+                }
                 let formData = $('#form_configs_tab_' + tabnum).serialize();
                 $.ajax({
                     url: '{$ajax_save_url}',
@@ -702,6 +705,7 @@ class Sector extends CommonDBTM {
         $descriptionRaw = $config['description'] ?? '';
         $description = \Html::cleanInputText($descriptionRaw);
         $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
+        $generated_id = (int)($config['generated_id'] ?? 0);
 
         $html = "<div class='{$class}' style='border: 1px solid #ccc; padding: 15px; margin-bottom: 15px;  {$display}'>";
         $html .= "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
@@ -710,6 +714,7 @@ class Sector extends CommonDBTM {
             $html .= "      <button type='button' class='btn btn-sm btn-danger btn-remove-config' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
         }
         $html .= "  </div>";
+        $html .= "  <input type='hidden' name='items_generated_id[]' class='input-generated-id' value='{$generated_id}'>";
         
         // Copiar de... (apenas visível se for template OU for um bloco único como no Tab 6)
         $showCopyFrom = ($isTemplate || $isSingleBlock) ? "block" : "none";

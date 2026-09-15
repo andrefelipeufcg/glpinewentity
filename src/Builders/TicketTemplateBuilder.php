@@ -23,15 +23,15 @@ class TicketTemplateBuilder
     /**
      * @param int $entities_id
      * @param array $configs Dados vindos do formulário (JSON)
-     * @return int Number of ticket templates created/reused.
+     * @return array Array contendo 'count' e 'configs' atualizado.
      */
-    public function build(int $entities_id, array $configs = []): int
+    public function build(int $entities_id, array $configs = []): array
     {
         $so = array_flip(\TicketTemplate::getAllowedFields(true));
         $count = 0;
         $firstTemplateId = 0;
 
-        foreach ($configs as $config) {
+        foreach ($configs as &$config) {
             $name = trim($config['name'] ?? '');
             if (empty($name)) {
                 continue;
@@ -42,25 +42,21 @@ class TicketTemplateBuilder
                 if ($firstTemplateId === 0) {
                     $firstTemplateId = $templateId;
                 }
-                
-                // Se não foi copiado de um modelo existente (que já teria os campos)
-                // ou se quisermos garantir os mínimos de urgencia, category e content, podemos adicionar.
-                // Para manter simples, só forçamos se for criação do zero.
-                if (empty($config['copy_from'])) {
-                    $this->setPredefinedField($templateId, $so['name'] ?? -1, $name);
-                    $this->setPredefinedField($templateId, $so['type'] ?? -1, $config['type'] ?? 1);
-                    $this->setPredefinedField($templateId, $so['itilcategories_id'] ?? -1, $config['itilcategories_id'] ?? 0);
-                    if (!empty($config['content'])) {
-                        $this->setPredefinedField($templateId, $so['content'] ?? -1, $config['content']);
-                    }
 
-                    foreach (self::MANDATORY_FIELDS as $key) {
-                        $this->ensureMandatory($templateId, $so[$key] ?? -1);
-                    }
+                // O título, conteúdo, tipo e categoria do chamado são campos
+                // predefinidos e precisam ser sincronizados também após a edição.
+                $this->setPredefinedField($templateId, $so['name'] ?? -1, $name);
+                $this->setPredefinedField($templateId, $so['type'] ?? -1, $config['type'] ?? 1);
+                $this->setPredefinedField($templateId, $so['itilcategories_id'] ?? -1, $config['itilcategories_id'] ?? 0);
+                $this->setPredefinedField($templateId, $so['content'] ?? -1, $config['content'] ?? '');
+
+                foreach (self::MANDATORY_FIELDS as $key) {
+                    $this->ensureMandatory($templateId, $so[$key] ?? -1);
                 }
                 $count++;
             }
         }
+        unset($config);
 
         // Definir o PRIMEIRO modelo criado/selecionado como o padrão da Entidade do setor
         if ($firstTemplateId > 0) {
@@ -73,15 +69,30 @@ class TicketTemplateBuilder
             }
         }
 
-        return $count;
+        return ['count' => $count, 'configs' => $configs];
     }
 
-    private function getOrCreateTemplate(array $config, int $entities_id): int
+    private function getOrCreateTemplate(array &$config, int $entities_id): int
     {
         $name = trim($config['name'] ?? '');
+        $generatedId = (int)($config['generated_id'] ?? 0);
         $template = new TicketTemplate();
-        
+
+        $so = array_flip(\TicketTemplate::getAllowedFields(true));
+
+        if ($generatedId > 0 && $template->getFromDB($generatedId)) {
+            // Update the name and fields if necessary
+            $template->update([
+                 'id' => $generatedId,
+                 'name' => $name,
+                 'entities_id' => $entities_id
+            ]);
+
+            return $generatedId;
+        }
+
         if ($template->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
+            $config['generated_id'] = $template->getID();
             return (int) $template->getID();
         }
 
@@ -106,6 +117,7 @@ class TicketTemplateBuilder
         }
 
         $newId = (int) $template->add($insertData);
+        $config['generated_id'] = $newId;
 
         // Clona os mandatory, hidden e predefined fields do template original se houver
         if ($newId > 0 && $sourceId > 0) {
@@ -151,7 +163,7 @@ class TicketTemplateBuilder
 
     private function setPredefinedField(int $templateId, int $num, $value): void
     {
-        if ($num < 0 || empty($value)) {
+        if ($num < 0 || $value === null || $value === '') {
             return;
         }
         $field = new \TicketTemplatePredefinedField();

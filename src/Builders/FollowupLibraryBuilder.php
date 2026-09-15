@@ -15,29 +15,43 @@ class FollowupLibraryBuilder
     /**
      * @param int $entities_id
      * @param array $configs Dados vindos do formulário (JSON)
-     * @return int Number of followup templates created/reused.
+     * @return array Array contendo 'count' e 'configs' atualizado.
      */
-    public function build(int $entities_id, array $configs = []): int
+    public function build(int $entities_id, array $configs = []): array
     {
         $count = 0;
-        foreach ($configs as $config) {
+        foreach ($configs as &$config) {
             $this->getOrCreateTemplate($config, $entities_id);
             $count++;
         }
-        return $count;
+        unset($config);
+        return ['count' => $count, 'configs' => $configs];
     }
 
-    private function getOrCreateTemplate(array $config, int $entities_id): int
+    private function getOrCreateTemplate(array &$config, int $entities_id): int
     {
         $name = trim($config['name'] ?? '');
         $content = trim($config['content'] ?? '');
+        $generatedId = (int)($config['generated_id'] ?? 0);
         
         if (empty($name)) {
             return 0;
         }
 
         $item = new ITILFollowupTemplate();
+
+        if ($generatedId > 0 && $item->getFromDB($generatedId)) {
+            $item->update([
+                 'id' => $generatedId,
+                 'name' => $name,
+                 'entities_id' => $entities_id,
+                 'content' => !empty($content) ? $content : $item->fields['content']
+            ]);
+            return $generatedId;
+        }
+
         if ($item->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
+            $config['generated_id'] = $item->getID();
             return (int) $item->getID();
         }
 
@@ -57,6 +71,8 @@ class FollowupLibraryBuilder
             'is_private' => $sourceData['is_private'] ?? 0,
         ];
 
-        return (int) $item->add($insertData);
+        $newId = (int) $item->add($insertData);
+        $config['generated_id'] = $newId;
+        return $newId;
     }
 }

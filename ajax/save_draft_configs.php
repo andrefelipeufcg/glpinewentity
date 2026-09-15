@@ -73,6 +73,8 @@ $exclusion_val = $_POST['items_exclusion'] ?? [];
 $descriptions = $_POST['items_description'] ?? [];
 $forms_categories_id = $_POST['items_forms_categories_id'] ?? [];
 
+$generated_ids = $_POST['items_generated_id'] ?? [];
+
 $configsToSave = [];
 foreach ($names as $i => $name) {
     if ($tabnum == 6 && empty($name) && empty($descriptions[$i])) {
@@ -88,6 +90,7 @@ foreach ($names as $i => $name) {
         'type'      => (int)($types[$i] ?? 1),
         'itilcategories_id' => (int)($categories[$i] ?? 0),
         'comment'   => $comments[$i] ?? '',
+        'generated_id' => (int)($generated_ids[$i] ?? 0),
     ];
 
     if ($tabnum == 4) {

@@ -21,22 +21,24 @@ class NotificationBuilder
     /**
      * @param int $entities_id
      * @param array $configs Dados vindos do formulário (JSON)
-     * @return int Number of notifications configured.
+     * @return array Array contendo 'count' e 'configs' atualizado.
      */
-    public function build(int $entities_id, array $configs = []): int
+    public function build(int $entities_id, array $configs = []): array
     {
         $count = 0;
-        foreach ($configs as $config) {
+        foreach ($configs as &$config) {
             $this->createNotification($config, $entities_id);
             $count++;
         }
-        return $count;
+        unset($config);
+        return ['count' => $count, 'configs' => $configs];
     }
 
-    private function createNotification(array $config, int $entities_id): void
+    private function createNotification(array &$config, int $entities_id): void
     {
         $name = trim($config['name'] ?? '');
         $sourceId = (int)($config['copy_from'] ?? 0);
+        $generatedId = (int)($config['generated_id'] ?? 0);
 
         if (empty($name)) {
             return;
@@ -45,7 +47,17 @@ class NotificationBuilder
         $notification = new Notification();
         
         // Verifica se já existe
+        if ($generatedId > 0 && $notification->getFromDB($generatedId)) {
+            $notification->update([
+                 'id' => $generatedId,
+                 'name' => $name,
+                 'entities_id' => $entities_id
+            ]);
+            return;
+        }
+
         if ($notification->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
+            $config['generated_id'] = $notification->getID();
             return;
         }
 
@@ -78,6 +90,8 @@ class NotificationBuilder
         if (!$notificationId) {
             return;
         }
+
+        $config['generated_id'] = $notificationId;
 
         // 2. Lida com o Template (apenas vincula o que foi selecionado na interface)
         $templateId = (int)($config['notificationtemplates_id'] ?? 0);
