@@ -387,6 +387,37 @@ class Sector extends CommonDBTM {
         $ajax_render_richtext_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/render_richtext.php';
 
         echo "<script>
+        function initRichTextEditor(wrapper) {
+            let textarea = wrapper.find('textarea').first();
+            if (!textarea.length || typeof tinymce === 'undefined') {
+                return;
+            }
+
+            let editorId = textarea.attr('id');
+            if (!editorId || tinymce.get(editorId)) {
+                return;
+            }
+
+            let baseConfig = (typeof tinymce_editor_configs !== 'undefined')
+                ? Object.values(tinymce_editor_configs)[0]
+                : null;
+            let config = Object.assign({}, baseConfig || {}, {
+                target: textarea[0],
+                selector: undefined,
+                license_key: 'gpl',
+                branding: false,
+                menubar: false,
+                toolbar: 'bold italic | bullist numlist | link | code',
+                plugins: 'lists link code',
+                height: 150,
+                entity_encoding: 'raw',
+                relative_urls: false
+            });
+
+            delete config.selector;
+            tinymce.init(config);
+        }
+
         function addConfigItem(tabnum) {
             let container = $('#items-container-tab-' + tabnum);
             let template = container.find('.config-block.template').clone();
@@ -424,10 +455,7 @@ class Sector extends CommonDBTM {
                         data: { name: 'items_content[]', value: '' },
                         success: function(html) {
                             wrapper.html(html);
-                            // Executa os scripts retornados pelo GLPI para inicializar o TinyMCE
-                            wrapper.find('script').each(function() {
-                                eval($(this).text());
-                            });
+                            initRichTextEditor(wrapper);
                         }
                     });
                 }
@@ -642,6 +670,29 @@ class Sector extends CommonDBTM {
                 });
             }
         }
+
+        // Inicializa Rich Text (TinyMCE) via AJAX para os blocos marcados como pendentes
+        // (evita o problema de DOMEval do jQuery ao carregar conteúdo de aba via AJAX)
+        $(function() {
+            $('.richtext-pending').each(function() {
+                let wrapper = $(this);
+                let fieldName = wrapper.data('field-name');
+                let encodedValue = wrapper.data('field-value') || '';
+                let decodedValue = '';
+                try { decodedValue = atob(encodedValue); } catch(e) { decodedValue = ''; }
+
+                $.ajax({
+                    url: '{$ajax_render_richtext_url}',
+                    type: 'POST',
+                    data: { name: fieldName, value: decodedValue },
+                    success: function(html) {
+                        wrapper.html(html);
+                        wrapper.removeClass('richtext-pending');
+                        initRichTextEditor(wrapper);
+                    }
+                });
+            });
+        });
         </script>";
 
         return true;
@@ -924,18 +975,10 @@ class Sector extends CommonDBTM {
             $html .= "  <div>";
             $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Configuração do catálogo de serviços - descrição</label>";
             
-            ob_start();
-            $rand = mt_rand();
-            \Html::textarea([
-                'name'            => 'items_description[]',
-                'value'           => $descriptionRaw,
-                'enable_richtext' => true,
-                'rand'            => $rand,
-                'rows'            => 4
-            ]);
-            $textareaHtml = ob_get_clean();
-            
-            $html .= "      <div class='input-description-wrapper'>{$textareaHtml}</div>";
+            $encodedDescription = base64_encode($descriptionRaw);
+            $html .= "      <div class='input-description-wrapper richtext-pending' data-field-name='items_description[]' data-field-value='{$encodedDescription}'>";
+            $html .= "          <textarea name='items_description[]' class='form-control input-description' style='width: 100%; height: 80px;'>{$description}</textarea>";
+            $html .= "      </div>";
             $html .= "  </div>";
         } else {
             $html .= "  <input type='hidden' name='items_type[]' class='input-type' value='1'>";
@@ -947,18 +990,13 @@ class Sector extends CommonDBTM {
             $html .= "  <div>";
             $html .= "      <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Conteúdo / Texto Base</label>";
             if (in_array($tabnum, [1, 2, 3]) && !$isTemplate) {
-                // Blocos visíveis: renderiza com Rich Text (TinyMCE) via Html::textarea
-                ob_start();
-                $rand = mt_rand();
-                \Html::textarea([
-                    'name'            => 'items_content[]',
-                    'value'           => $contentRaw,
-                    'enable_richtext' => true,
-                    'rand'            => $rand,
-                    'rows'            => 4
-                ]);
-                $textareaHtml = ob_get_clean();
-                $html .= "      <div class='input-content-wrapper'>{$textareaHtml}</div>";
+                // Blocos visíveis: renderiza textarea simples com marcador para inicialização AJAX do TinyMCE
+                // (Não podemos usar Html::textarea com enable_richtext aqui porque o script inline
+                //  do TinyMCE quebra quando o conteúdo da aba é carregado via AJAX/DOMEval do jQuery)
+                $encodedContent = base64_encode($contentRaw);
+                $html .= "      <div class='input-content-wrapper richtext-pending' data-field-name='items_content[]' data-field-value='{$encodedContent}'>";
+                $html .= "          <textarea name='items_content[]' class='form-control input-content' style='width: 100%; height: 80px;'>{$content}</textarea>";
+                $html .= "      </div>";
             } elseif (in_array($tabnum, [1, 2, 3]) && $isTemplate) {
                 // Template oculto: textarea simples (TinyMCE será inicializado via JS ao clonar)
                 $html .= "      <textarea name='items_content[]' class='form-control input-content' style='width: 100%; height: 80px;' placeholder='Texto padrão para este item.'>{$content}</textarea>";
@@ -1676,7 +1714,7 @@ echo "<style>
         function validateEmailsStr(str) {
             let cleanStr = str.trim();
             if (cleanStr === '') return false;
-            let emails = cleanStr.split(/[\n,]+/);
+            let emails = cleanStr.split(/[\\n,]+/);
             let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             for (let i = 0; i < emails.length; i++) {
                 let e = emails[i].trim();
