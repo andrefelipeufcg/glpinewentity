@@ -387,37 +387,6 @@ class Sector extends CommonDBTM {
         $ajax_render_richtext_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/render_richtext.php';
 
         echo "<script>
-        function initRichTextEditor(wrapper) {
-            let textarea = wrapper.find('textarea').first();
-            if (!textarea.length || typeof tinymce === 'undefined') {
-                return;
-            }
-
-            let editorId = textarea.attr('id');
-            if (!editorId || tinymce.get(editorId)) {
-                return;
-            }
-
-            let baseConfig = (typeof tinymce_editor_configs !== 'undefined')
-                ? Object.values(tinymce_editor_configs)[0]
-                : null;
-            let config = Object.assign({}, baseConfig || {}, {
-                target: textarea[0],
-                selector: undefined,
-                license_key: 'gpl',
-                branding: false,
-                menubar: false,
-                toolbar: 'bold italic | bullist numlist | link | code',
-                plugins: 'lists link code',
-                height: 150,
-                entity_encoding: 'raw',
-                relative_urls: false
-            });
-
-            delete config.selector;
-            tinymce.init(config);
-        }
-
         function addConfigItem(tabnum) {
             let container = $('#items-container-tab-' + tabnum);
             let template = container.find('.config-block.template').clone();
@@ -455,7 +424,6 @@ class Sector extends CommonDBTM {
                         data: { name: 'items_content[]', value: '' },
                         success: function(html) {
                             wrapper.html(html);
-                            initRichTextEditor(wrapper);
                         }
                     });
                 }
@@ -688,7 +656,6 @@ class Sector extends CommonDBTM {
                     success: function(html) {
                         wrapper.html(html);
                         wrapper.removeClass('richtext-pending');
-                        initRichTextEditor(wrapper);
                     }
                 });
             });

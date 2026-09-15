@@ -46,10 +46,16 @@ $name  = $_POST['name']  ?? 'items_content[]';
 $value = $_POST['value'] ?? '';
 
 $rand = mt_rand();
-$editorId = 'glpinewentity_richtext_' . $rand;
 
-echo '<textarea name="' . htmlescape($name) . '" id="' . htmlescape($editorId) . '"'
-    . ' class="form-control input-content" rows="4" style="width: 100%; height: 80px;">'
-    . htmlescape($value)
-    . '</textarea>';
+ob_start();
+$out = \Html::textarea([
+    'name'            => $name,
+    'value'           => $value,
+    'enable_richtext' => true,
+    'rand'            => $rand,
+    'rows'            => 4
+]);
+$buffered = ob_get_clean();
+
+echo !empty($buffered) ? $buffered : $out;
 
