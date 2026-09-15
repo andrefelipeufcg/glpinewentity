@@ -63,6 +63,21 @@ class Sector extends CommonDBTM {
         return 'ti ti-building-community';
     }
 
+    /**
+     * Usa as páginas públicas do plugin para evitar URLs inferidas diferentes no servidor.
+     */
+    public static function getSearchURL($full = true): string {
+        global $CFG_GLPI;
+        $path = '/plugins/glpinewentity/front/sector.php';
+        return $full ? $CFG_GLPI['root_doc'] . $path : $path;
+    }
+
+    public static function getFormURL($full = true): string {
+        global $CFG_GLPI;
+        $path = '/plugins/glpinewentity/front/sector.form.php';
+        return $full ? $CFG_GLPI['root_doc'] . $path : $path;
+    }
+
     static function getTypeName($nb = 0) {
         return _n('Infraestrutura da entidade', 'Infraestruturas da entidade', $nb, 'glpinewentity');
     }

@@ -11,6 +11,7 @@ if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/inc/inclu
 if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/../inc/includes.php'; }
 include $inc;
 
+use GlpiPlugin\Glpinewentity\Menu;
 use GlpiPlugin\Glpinewentity\Sector;
 
 // Verifica direito de acesso
@@ -39,12 +40,17 @@ if (isset($_POST["add"])) {
 // Renderiza o grid de listagem padrão do GLPI
 // -----------------------------------------------------------------------
 
-// Força a limpeza do cache de menu na sessão para garantir que as alterações no menu apareçam.
+// Reconstrói o menu para disponibilizar as ações nativas após atualizações do plugin.
 unset($_SESSION['glpimenu']);
+Html::generateMenuSession(true);
 
-use GlpiPlugin\Glpinewentity\Menu;
-
-Html::header(Sector::getTypeName(Session::getPluralNumber()), '', 'config', strtolower(Menu::class), 'sector');
+// Usa a entrada de menu do plugin para o GLPI construir breadcrumb e ações nativas.
+Html::header(
+    Sector::getTypeName(Session::getPluralNumber()),
+    '',
+    'config',
+    strtolower(Menu::class)
+);
 
 Search::show(Sector::class);
 

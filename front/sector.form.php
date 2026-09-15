@@ -11,6 +11,7 @@ if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/inc/inclu
 if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/../inc/includes.php'; }
 include $inc;
 
+use GlpiPlugin\Glpinewentity\Menu;
 use GlpiPlugin\Glpinewentity\Sector;
 use GlpiPlugin\Glpinewentity\Wizard;
 
@@ -106,7 +107,17 @@ if (isset($_POST['process_wizard'])) {
 // Carrega dados para edição
 // -----------------------------------------------------------------------
 
-Html::header(Sector::getTypeName(Session::getPluralNumber()), '', 'config', strtolower(\GlpiPlugin\Glpinewentity\Menu::class), 'sector');
+// Reconstrói o menu para disponibilizar as ações nativas após atualizações do plugin.
+unset($_SESSION['glpimenu']);
+Html::generateMenuSession(true);
+
+// Mantém o breadcrumb e as ações nativas do menu também no wizard.
+Html::header(
+    Sector::getTypeName(Session::getPluralNumber()),
+    '',
+    'config',
+    strtolower(Menu::class)
+);
 
 $options = ['id' => $sectorId];
 if ($sectorId > 0 && isset($sectorObj->fields['metadata'])) {

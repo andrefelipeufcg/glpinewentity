@@ -14,7 +14,7 @@
 
 use Glpi\Plugin\Hooks;
 
-define('PLUGIN_GLPINEWENTITY_VERSION', '1.0.3');
+define('PLUGIN_GLPINEWENTITY_VERSION', '1.1.0');
 define('PLUGIN_GLPINEWENTITY_MIN_GLPI', '11.0.0');
 
 function plugin_init_glpinewentity(): void {
@@ -23,6 +23,7 @@ function plugin_init_glpinewentity(): void {
     include_once __DIR__ . '/hook.php';
 
     $PLUGIN_HOOKS[Hooks::CSRF_COMPLIANT]['glpinewentity'] = true;
+    // A engrenagem do plugin inicia diretamente o wizard de inclusão.
     $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['glpinewentity'] = 'front/sector.form.php';
     $PLUGIN_HOOKS[Hooks::UNDISCLOSED_CONFIG_VALUE]['glpinewentity'] = 'plugin_glpinewentity_undisclosed_config_value';
     $PLUGIN_HOOKS[Hooks::PRE_ITEM_ADD]['glpinewentity'] = [
@@ -31,11 +32,16 @@ function plugin_init_glpinewentity(): void {
 
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Wizard');
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Sector');
+    Plugin::registerClass('GlpiPlugin\Glpinewentity\Menu');
 
     $plugin = new Plugin();
     if ($plugin->isActivated('glpinewentity')) {
         if (Session::haveRight('plugin_glpinewentity', READ)) {
-            $PLUGIN_HOOKS['menu_toadd']['glpinewentity'] = ['config' => 'GlpiPlugin\Glpinewentity\Menu'];
+            // O menu usa a classe própria para manter o título "GLPI New Entity"
+            // e abrir a listagem com o botão de inclusão.
+            $PLUGIN_HOOKS[Hooks::MENU_TOADD]['glpinewentity'] = [
+                'config' => 'GlpiPlugin\Glpinewentity\Menu',
+            ];
         }
     }
 }
