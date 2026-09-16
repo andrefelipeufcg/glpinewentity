@@ -107,6 +107,13 @@ class Wizard {
         }
         $result['entity_id'] = $entityId;
 
+        // Confirma a entidade antes de criar os demais objetos dependentes.
+        $createdEntity = new Entity();
+        if (!$createdEntity->getFromDB($entityId)) {
+            $result['errors'][] = __('A entidade criada não pôde ser recarregada. Nenhuma configuração dependente foi criada.', 'glpinewentity');
+            return $result;
+        }
+
 
 
         // =================================================================
@@ -189,6 +196,11 @@ class Wizard {
                 $userId = self::findUserByEmail($userEmail);
                 if (!$userId) {
                     $result['errors'][] = sprintf(__('Usuário \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $userEmail);
+                    continue;
+                }
+
+                if (!self::canAssignProfile($userId, $newProfileId, $entityId)) {
+                    $result['errors'][] = sprintf(__('Não foi possível atribuir o perfil \'%1$s\' ao usuário \'%2$s\': referência inválida.', 'glpinewentity'), $assignment['new_name'], $userEmail);
                     continue;
                 }
                 
@@ -405,15 +417,44 @@ class Wizard {
         // =================================================================
         // 1. Atualizar Entidade
         // =================================================================
+        if ($entityId <= 0) {
+            $result['errors'][] = __('A infraestrutura não possui uma entidade gerenciada vinculada.', 'glpinewentity');
+            return $result;
+        }
+
+        $entity = new Entity();
+        if (!$entity->getFromDB($entityId)) {
+            $result['errors'][] = __('A entidade gerenciada não foi encontrada. A edição foi cancelada para evitar vínculos inconsistentes.', 'glpinewentity');
+            return $result;
+        }
+
         if ($entityId > 0) {
-            $entity = new Entity();
-            if ($entity->getFromDB($entityId)) {
-                $entity->update([
-                    'id' => $entityId,
-                    'name' => strtoupper($sectorAbbr),
-                    'entities_id' => $parentEntity
-                ]);
+            global $DB;
+            $entityName = strtoupper($sectorAbbr);
+            $duplicateEntity = $DB->request([
+                'SELECT' => 'id',
+                'FROM'   => 'glpi_entities',
+                'WHERE'  => [
+                    'name'        => $entityName,
+                    'entities_id' => $parentEntity,
+                    'id'          => ['<>', $entityId],
+                ],
+                'LIMIT' => 1,
+            ]);
+
+            if (count($duplicateEntity) > 0) {
+                $result['errors'][] = sprintf(
+                    __('Não foi possível alterar a entidade pai: já existe uma entidade chamada "%s" nesse nível.', 'glpinewentity'),
+                    $entityName
+                );
+                return $result;
             }
+
+            $entity->update([
+                'id' => $entityId,
+                'name' => $entityName,
+                'entities_id' => $parentEntity
+            ]);
         }
         
         // =================================================================
@@ -527,7 +568,31 @@ class Wizard {
                 'name' => $newName,
             ];
 
-            // Sincronizar usuários: remover os antigos da entidade e adicionar os novos
+            // Separa e-mails válidos para não descartar os demais por um erro isolado.
+            $usersToAssign = [];
+            if (!empty($assignment['users'])) {
+                $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
+                $usersList = array_slice($usersList, 0, 100); // Previne exaustão
+                foreach ($usersList as $userEmail) {
+                    if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
+                        $result['errors'][] = sprintf(__('E-mail de usuário inválido para perfil %s: %s.', 'glpinewentity'), $assignment['label'], $userEmail);
+                        continue;
+                    }
+
+                    $userId = self::findUserByEmail($userEmail);
+                    if (!$userId || !self::canAssignProfile($userId, $profileId, $entityId)) {
+                        $result['errors'][] = sprintf(__('Não foi possível atribuir o perfil \'%1$s\' ao usuário \'%2$s\': referência inválida.', 'glpinewentity'), $assignment['new_name'], $userEmail);
+                        continue;
+                    }
+
+                    $usersToAssign[] = [
+                        'id' => $userId,
+                        'email' => $userEmail,
+                    ];
+                }
+            }
+
+            // Sincronizar usuários: remover os antigos da entidade e adicionar os novos.
             global $DB;
             $iterator = $DB->request([
                 'SELECT' => 'id',
@@ -542,27 +607,16 @@ class Wizard {
                 $profileUser->delete(['id' => $row['id']]);
             }
 
-            // Adicionar os novos
-            if (!empty($assignment['users'])) {
-                $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
-                $usersList = array_slice($usersList, 0, 100); // Previne exaustão
-                foreach ($usersList as $userEmail) {
-                    if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) continue;
-                    $userId = self::findUserByEmail($userEmail);
-                    if (!$userId) {
-                        $result['errors'][] = sprintf(__('Usuário \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $userEmail);
-                        continue;
-                    }
-                    $profileUser = new Profile_User();
-                    $puId = $profileUser->add([
-                        'users_id'     => $userId,
-                        'profiles_id'  => $profileId,
-                        'entities_id'  => $entityId,
-                        'is_recursive' => 1,
-                    ]);
-                    if (!$puId) {
-                        $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), $assignment['new_name'], $userEmail);
-                    }
+            foreach ($usersToAssign as $userToAssign) {
+                $profileUser = new Profile_User();
+                $puId = $profileUser->add([
+                    'users_id'     => $userToAssign['id'],
+                    'profiles_id'  => $profileId,
+                    'entities_id'  => $entityId,
+                    'is_recursive' => 1,
+                ]);
+                if (!$puId) {
+                    $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), $assignment['new_name'], $userToAssign['email']);
                 }
             }
         }
@@ -721,6 +775,15 @@ class Wizard {
 
         // Não encontrou
         return false;
+    }
+
+    /**
+     * Confirma as referências usadas pelo GLPI antes de criar uma autorização.
+     */
+    private static function canAssignProfile(int $userId, int $profileId, int $entityId): bool {
+        return User::getById($userId) instanceof User
+            && Profile::getById($profileId) instanceof Profile
+            && Entity::getById($entityId) instanceof Entity;
     }
 
     /**

@@ -15,7 +15,7 @@ use GlpiPlugin\Glpinewentity\Menu;
 use GlpiPlugin\Glpinewentity\Sector;
 use GlpiPlugin\Glpinewentity\Wizard;
 
-// Permissão genérica de criação de entidade
+// READ permite acessar o wizard; CREATE é validado pelo GLPI na inclusão.
 Session::checkRight("plugin_glpinewentity", READ);
 
 // -----------------------------------------------------------------------
@@ -46,14 +46,16 @@ if (isset($_POST['process_wizard'])) {
     Session::checkValidSessionId();
     if ($isEdit) {
         $result = Wizard::processUpdate($_POST, $sectorObj->fields);
-        // Atualiza metadata independentemente de ter erro, pois os dados no banco já foram alterados
+
+        // Mantém o formulário e o metadata alinhados aos dados já processados.
         $sectorObj->update([
             'id' => $sectorId,
+            'entities_id' => (int) $_POST['parent_entity'],
             'sector_name' => $_POST['sector_name'],
             'sector_abbr' => $_POST['sector_abbr'],
             'metadata' => json_encode($result)
         ]);
-        
+
         if (empty($result['errors'])) {
             Session::addMessageAfterRedirect(__('Infraestrutura atualizada com sucesso!', 'glpinewentity'), true, INFO);
         } else {
