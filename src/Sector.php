@@ -22,8 +22,8 @@ if (!defined('GLPI_ROOT')) {
 class Sector extends CommonDBTM {
     
     public static $rightname = 'plugin_glpinewentity';
-    // O wizard controla seu acesso no front; abas novas não representam um registro DBTM criado.
-    public $get_item_to_display_tab = false;
+    // Permite que o endpoint nativo das abas carregue o registro durante a edição.
+    public $get_item_to_display_tab = true;
 
     public static function canCreate(): bool {
         return Session::haveRight('plugin_glpinewentity', CREATE);

@@ -32,8 +32,8 @@ class Menu extends CommonGLPI {
         ];
 
         if (Session::haveRight('plugin_glpinewentity', READ)) {
-            // O wizard autoriza o acesso com READ; a ação deve seguir a mesma regra.
-            if (Session::haveRight('plugin_glpinewentity', READ)) {
+            // A inclusão exige o direito CREATE atribuído ao Super-Admin na instalação.
+            if (Sector::canCreate()) {
                 $menu['links']['add'] = Sector::getFormURL(false);
             }
 
