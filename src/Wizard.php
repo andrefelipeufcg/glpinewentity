@@ -401,9 +401,15 @@ class Wizard {
         $sectorName   = trim($input['sector_name'] ?? '');
         $sectorAbbr   = trim($input['sector_abbr'] ?? '');
         $parentEntity = (int)($input['parent_entity'] ?? 0);
+        $categoryNames = trim($input['category_names'] ?? '');
         
         if (empty($sectorName) || empty($sectorAbbr)) {
             $result['errors'][] = __('O nome do setor e a sigla são obrigatórios.', 'glpinewentity');
+            return $result;
+        }
+
+        if (empty($categoryNames)) {
+            $result['errors'][] = __('Informe pelo menos uma Categoria de Serviço.', 'glpinewentity');
             return $result;
         }
         
@@ -739,6 +745,79 @@ class Wizard {
                     $subgToDelete->delete(['id' => $idToDelete], 1); // purge force para limpar
                 }
             }
+        }
+
+        // =================================================================
+        // 5. Sincronizar Categorias ITIL
+        // =================================================================
+        $childrenByParent = [];
+        $categoryIterator = $DB->request([
+            'SELECT' => ['id', 'itilcategories_id'],
+            'FROM'   => 'glpi_itilcategories',
+            'WHERE'  => ['entities_id' => $entityId],
+        ]);
+        foreach ($categoryIterator as $categoryRow) {
+            $childrenByParent[(int) $categoryRow['itilcategories_id']][] = (int) $categoryRow['id'];
+        }
+
+        // Remove primeiro as folhas para preservar a integridade da hierarquia.
+        $categoryIdsToDelete = [];
+        $collectCategoriesToDelete = function (int $parentId) use (&$collectCategoriesToDelete, &$childrenByParent, &$categoryIdsToDelete): void {
+            foreach ($childrenByParent[$parentId] ?? [] as $childId) {
+                $collectCategoriesToDelete($childId);
+                $categoryIdsToDelete[] = $childId;
+            }
+        };
+        $collectCategoriesToDelete(0);
+
+        $category = new ITILCategory();
+        foreach ($categoryIdsToDelete as $categoryIdToDelete) {
+            $category->delete(['id' => $categoryIdToDelete], 1);
+        }
+
+        $result['categories'] = [];
+        $lastIdAtDepth = [];
+        $catList = array_filter(array_map('trim', preg_split('/[\n]+/', $categoryNames)));
+        foreach ($catList as $line) {
+            preg_match('/^-+/', $line, $matches);
+            $hyphensCount = !empty($matches[0]) ? strlen($matches[0]) : 0;
+            $cleanName = trim(substr($line, $hyphensCount));
+            if (empty($cleanName)) {
+                continue;
+            }
+
+            $parentId = 0;
+            for ($depth = $hyphensCount - 1; $depth >= 0; $depth--) {
+                if (isset($lastIdAtDepth[$depth])) {
+                    $parentId = $lastIdAtDepth[$depth];
+                    break;
+                }
+            }
+
+            $category = new ITILCategory();
+            $categoryId = $category->add([
+                'name'              => $cleanName,
+                'entities_id'       => $entityId,
+                'itilcategories_id' => $parentId,
+                'is_recursive'      => 1,
+                'is_incident'       => 1,
+                'is_request'        => 1,
+            ]);
+            if (!$categoryId) {
+                $result['errors'][] = sprintf(__('Falha ao criar categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($cleanName, ENT_QUOTES));
+                continue;
+            }
+
+            $lastIdAtDepth[$hyphensCount] = $categoryId;
+            foreach (array_keys($lastIdAtDepth) as $depth) {
+                if ($depth > $hyphensCount) {
+                    unset($lastIdAtDepth[$depth]);
+                }
+            }
+            $result['categories'][] = [
+                'id'   => $categoryId,
+                'name' => $cleanName,
+            ];
         }
 
         return $result;
