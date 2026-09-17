@@ -13,6 +13,9 @@ use Glpi\Form\Destination\CommonITILField\TitleField;
 use Glpi\Form\Destination\CommonITILField\SimpleValueConfig;
 use Glpi\Form\Destination\FormDestination;
 use Glpi\Form\Destination\FormDestinationTicket;
+use Glpi\Form\Category;
+use Glpi\Form\Export\Context\DatabaseMapper;
+use Glpi\Form\Export\Serializer\FormSerializer;
 use Glpi\Form\Form;
 use Glpi\Form\Question;
 use Glpi\Form\QuestionType\QuestionTypeLongText;
@@ -58,14 +61,43 @@ class FormBuilder
         $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
         $illustration = $config['illustration'] ?? $config['icon'] ?? 'request-service';
 
+        $sourceData = [];
+        $sourceForm = null;
+        if ($sourceId > 0) {
+            $sourceForm = new Form();
+            if ($sourceForm->getFromDB($sourceId)) {
+                $sourceData = $sourceForm->fields;
+            } else {
+                $sourceForm = null;
+            }
+        }
+
         if ($generatedId > 0 && $form->getFromDB($generatedId)) {
+            // Como o objetivo do plugin é sempre refletir o que foi copiado (e sobrescrever eventuais edições no GLPI),
+            // se o usuário selecionou uma origem (Copiar de...), nós recriamos o formulário.
+            if ($sourceForm !== null) {
+                $importedId = $this->importCompleteForm(
+                    $sourceForm,
+                    $entities_id,
+                    $name,
+                    $description,
+                    $forms_categories_id,
+                    $illustration
+                );
+                if ($importedId > 0) {
+                    $form->delete(['id' => $generatedId], true);
+                    $config['generated_id'] = $importedId;
+                    return $importedId;
+                }
+            }
+
             $form->update([
-                 'id' => $generatedId,
-                 'name' => $name,
-                 'entities_id' => $entities_id,
-                 'description' => $description,
-                 'forms_categories_id' => $forms_categories_id,
-                 'illustration' => $illustration,
+                'id' => $generatedId,
+                'name' => $name,
+                'entities_id' => $entities_id,
+                'description' => $description,
+                'forms_categories_id' => $forms_categories_id,
+                'illustration' => $illustration,
             ]);
             return $generatedId;
         }
@@ -75,22 +107,16 @@ class FormBuilder
             return (int) $form->getID();
         }
 
-        $sourceData = [];
-        if ($sourceId > 0 && $form->getFromDB($sourceId)) {
-            $sourceData = $form->fields;
-        }
-
         $insertData = [
             'name' => $name,
             'entities_id' => $entities_id,
             'is_recursive' => 1,
-            'is_active' => 1, // forçado para ativo conforme solicitação do usuário
+            'is_active' => 1,
             'description' => $description ?: ($sourceData['description'] ?? __('Formulário padrão gerado automaticamente para a entidade.', 'glpinewentity')),
             'forms_categories_id' => $forms_categories_id ?: ($sourceData['forms_categories_id'] ?? 0),
             'illustration' => $illustration,
         ];
 
-        // Copiar outros campos se existirem
         $fieldsToCopy = ['color', 'content', 'help'];
         foreach ($fieldsToCopy as $field) {
             if (isset($sourceData[$field])) {
@@ -105,23 +131,54 @@ class FormBuilder
         }
 
         $config['generated_id'] = $formId;
-
         $form->getFromDB($formId);
 
-        // Se NÃO copiou de um modelo existente, cria as perguntas padrão
-        if ($sourceId == 0) {
+        if ($sourceForm !== null) {
+            $form->delete(['id' => $formId], true);
+            $importedId = $this->importCompleteForm(
+                $sourceForm,
+                $entities_id,
+                $name,
+                $description,
+                $forms_categories_id,
+                $illustration
+            );
+            if ($importedId > 0) {
+                $config['generated_id'] = $importedId;
+                return $importedId;
+            }
+            return 0;
+        } else {
             $questions = $this->addQuestions($form);
             if ($questions !== null) {
                 $this->configureDestination($form, $questions);
             }
-        } else {
-            // Nota: Clonar as seções, perguntas e destinos de um Formulário já existente 
-            // exige uma lógica profunda nas tabelas relacionadas (glpi_forms_sections, glpi_forms_questions, etc).
-            // Para GLPI 11 Form nativo, isso exigiria percorrer todas as tabelas. 
-            // Como é um MVP para a aba de Form, copiamos a "casca" do formulário.
         }
 
         return $formId;
+    }
+
+    private function importCompleteForm(
+        Form $source,
+        int $entitiesId,
+        string $name,
+        string $description,
+        int $categoryId,
+        string $illustration
+    ): int
+    {
+        $override_input = [
+            'name'                => $name,
+            'entities_id'         => $entitiesId,
+            'description'         => $description,
+            'forms_categories_id' => $categoryId,
+            'illustration'        => $illustration,
+            'is_active'           => 1,
+            'is_recursive'        => 1
+        ];
+
+        $newId = $source->clone($override_input);
+        return (int)$newId;
     }
 
     private function addQuestions(Form $form): ?array

@@ -352,33 +352,32 @@ class Sector extends CommonDBTM {
         echo "Crie ou edite os itens abaixo. Você pode selecionar um modelo existente do GLPI em <strong>'Copiar de...'</strong> para que a padronização use as mesmas configurações (campos, descrições, etc). Se não selecionar, será criado um item básico com o Nome (e Conteúdo, se aplicável) informados.";
         echo "</div>";
 
+        echo "<style>
+            .glpinewentity-form-category .select2-container, 
+            .glpinewentity-form-category .select2-selection--single {
+                max-width: none !important;
+            }
+        </style>";
+
         echo "<div id='items-container-tab-{$tabnum}'>";
 
-        if ($tabnum == 6) {
-            // Para o tab 6 (Formulário Padrão), teremos apenas 1 bloco fixo
-            $config = empty($savedConfigs) ? ['name' => '', 'content' => '', 'copy_from' => 0, 'description' => '', 'forms_categories_id' => 0] : $savedConfigs[0];
-            echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, 0, $extraOptions, false, true);
-        } else {
-            // Template oculto para adicionar novos
-            echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $extraOptions);
+        // Template oculto para adicionar novos
+        echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $extraOptions);
 
-            // Renderiza existentes (salvos no rascunho) ou padrão se for vazio
-            if (empty($savedConfigs)) {
-                // Valores padrão iniciais para mostrar algo
-                $savedConfigs = self::getDefaultConfigsForTab($tabnum);
-            }
+        // Renderiza existentes (salvos no rascunho) ou padrão se for vazio
+        if (empty($savedConfigs)) {
+            // Valores padrão iniciais para mostrar algo
+            $savedConfigs = self::getDefaultConfigsForTab($tabnum);
+        }
 
-            foreach ($savedConfigs as $idx => $config) {
-                echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions);
-            }
+        foreach ($savedConfigs as $idx => $config) {
+            echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions);
         }
         echo "</div>";
 
-        if ($tabnum != 6) {
-            echo "<div style='text-align: left; padding: 10px 0;'>";
-            echo "<button type='button' class='btn btn-success btn-sm' style='color: white !important;' onclick='addConfigItem({$tabnum})'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar Item</button>";
-            echo "</div>";
-        }
+        echo "<div style='text-align: left; padding: 10px 0;'>";
+        echo "<button type='button' class='btn btn-success btn-sm' style='color: white !important;' onclick='addConfigItem({$tabnum})'><i class='fas fa-plus' style='margin-right: 5px;'></i> Adicionar Item</button>";
+        echo "</div>";
 
         echo "</td></tr>";
 
@@ -402,6 +401,7 @@ class Sector extends CommonDBTM {
         // JavaScript
         $ajax_get_template_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/get_template_data.php';
         $ajax_render_richtext_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/render_richtext.php';
+        $ajax_render_form_category_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/render_form_category.php';
         $default_illustration_preview = json_encode((new \Glpi\UI\IllustrationManager())->renderIcon('request-service', 100));
 
         echo "<script>
@@ -450,6 +450,37 @@ class Sector extends CommonDBTM {
                         data: { name: 'items_content[]', value: '' },
                         success: function(html) {
                             wrapper.html(html);
+                        }
+                    });
+                }
+            }
+            
+            // Buscar categoria de form via AJAX para tab 6 (mantém macro/botões nativos do GLPI)
+            if (tabnum == 6) {
+                let categoryWrapper = template.find('.form-category-wrapper');
+                if (categoryWrapper.length > 0) {
+                    $.ajax({
+                        url: '{$ajax_render_form_category_url}',
+                        type: 'POST',
+                        data: { category_id: 0 },
+                        success: function(html) {
+                            categoryWrapper.html(html);
+                        }
+                    });
+                }
+                
+                // Inicializa Rich Text para a descrição
+                let plainDesc = template.find('textarea.input-description');
+                if (plainDesc.length > 0) {
+                    let descWrapper = $('<div class=\"input-description-wrapper\"></div>');
+                    plainDesc.replaceWith(descWrapper);
+                    
+                    $.ajax({
+                        url: '{$ajax_render_richtext_url}',
+                        type: 'POST',
+                        data: { name: 'items_description[]', value: '' },
+                        success: function(html) {
+                            descWrapper.html(html);
                         }
                     });
                 }
@@ -733,13 +764,6 @@ class Sector extends CommonDBTM {
             $('.select2-event').select2({ width: '100%' });
             $('.select2-tpl').select2({ width: '100%' });
             $('.select2-target').select2({ width: '100%' });
-            $('.select2-exclusion').select2({ width: '100%' });
-
-            // A aba é carregada por AJAX; aplica ao Select2 já criado a mesma
-            // remoção de max-width que o formulário normal recebe fora da tabela.
-            $('.glpinewentity-form-category .select2-container, .glpinewentity-form-category .select2-selection--single').each(function() {
-                this.style.setProperty('max-width', 'none', 'important');
-            });
         });
         </script>";
 
@@ -1009,27 +1033,37 @@ class Sector extends CommonDBTM {
         } elseif ($tabnum == 6) {
             $html .= "  <input type='hidden' name='items_is_active[]' class='input-is-active' value='1'>";
 
-            // Renderiza o mesmo macro usado pelo formulário padrão do GLPI.
-            $twig = \Glpi\Application\View\TemplateRenderer::getInstance()->getEnvironment();
-            $categoryTemplate = $twig->createTemplate(<<<'TWIG'
+            $html .= "  <div style='margin-bottom: 10px;'>";
+            if (!$isTemplate) {
+                // Renderiza o macro usado pelo formulário padrão do GLPI.
+                $twig = \Glpi\Application\View\TemplateRenderer::getInstance()->getEnvironment();
+                $categoryTemplate = $twig->createTemplate(<<<'TWIG'
 {% import 'components/form/fields_macros.html.twig' as fields %}
 {{ fields.dropdownField('Glpi\\Form\\Category', 'items_forms_categories_id[]', category_id, 'Configuração do catálogo de serviços - categoria', {'is_horizontal': false, 'full_width': true, 'add_field_class': 'glpinewentity-form-category'}) }}
 TWIG);
-            $categoryDropdownHtml = $categoryTemplate->render(['category_id' => $forms_categories_id]);
-
-            $html .= "  <div style='margin-bottom: 10px;'>";
-            $html .= "          <div style='margin-bottom: 10px;'>" . $categoryDropdownHtml . "</div>";
+                $categoryDropdownHtml = $categoryTemplate->render(['category_id' => $forms_categories_id]);
+                $html .= "          <div class='form-category-wrapper' style='margin-bottom: 10px;'>" . $categoryDropdownHtml . "</div>";
+            } else {
+                $html .= "          <div class='form-category-wrapper' style='margin-bottom: 10px;'>";
+                $html .= "              <input type='hidden' name='items_forms_categories_id[]' value='0'>";
+                $html .= "          </div>";
+            }
             $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Configuração do catálogo de serviços - descrição</label>";
 
             $encodedDescription = base64_encode($descriptionRaw);
-            $html .= "          <div class='input-description-wrapper richtext-pending' data-field-name='items_description[]' data-field-value='{$encodedDescription}'>";
-            $html .= "              <textarea name='items_description[]' class='form-control input-description' style='width: 100%; height: 80px;'>{$description}</textarea>";
-            $html .= "          </div>";
+            if (!$isTemplate) {
+                $html .= "          <div class='input-description-wrapper richtext-pending' data-field-name='items_description[]' data-field-value='{$encodedDescription}'>";
+                $html .= "              <textarea name='items_description[]' class='form-control input-description' style='width: 100%; height: 80px;'>{$description}</textarea>";
+                $html .= "          </div>";
+            } else {
+                $html .= "          <textarea name='items_description[]' class='form-control input-description' style='width: 100%; height: 80px;'>{$description}</textarea>";
+            }
             $html .= "      </div>";
 
             $illustration = \Html::cleanInputText($config['illustration'] ?? $config['icon'] ?? 'request-service');
 
             $twig_code = "{% import 'components/form/fields_macros.html.twig' as fields %}{{ fields.illustrationField('items_illustration[]', illustration_value, 'Ilustração', {'is_horizontal': false, 'full_width': true}) }}";
+            $twig = \Glpi\Application\View\TemplateRenderer::getInstance()->getEnvironment();
             $template = $twig->createTemplate($twig_code);
             $illustrationHtml = $template->render(['illustration_value' => $illustration]);
 

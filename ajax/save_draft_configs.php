@@ -78,9 +78,7 @@ $generated_ids = $_POST['items_generated_id'] ?? [];
 
 $configsToSave = [];
 foreach ($names as $i => $name) {
-    if ($tabnum == 6 && empty($name) && empty($descriptions[$i])) {
-        // Permitir bloco vazio para a aba 6 se não for modificado, ou apenas salvamos de qualquer forma para o usuário poder retornar
-    } else if (empty($name) && empty($copyFrom[$i]) && $tabnum != 6) {
+    if (empty($name) && empty($copyFrom[$i])) {
         continue;
     }
 
