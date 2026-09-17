@@ -3,7 +3,6 @@
  * -----------------------------------------------------------------------
  * GLPI New Entity — hook.php
  * Rotinas de instalação e desinstalação do plugin.
- * V1 não cria tabelas próprias (usa apenas tabelas nativas do GLPI).
  * -----------------------------------------------------------------------
  */
 
@@ -91,9 +90,41 @@ function plugin_glpinewentity_uninstall(): bool {
         }
     }
 
-    ProfileRight::deleteByPlugin('glpinewentity');
-    $DB->delete('glpi_profilerights', ['name' => 'plugin_glpinewentity']);
+    ProfileRight::deleteProfileRights(['plugin_glpinewentity']);
 
     return true;
+}
+
+/**
+ * Mantém os chamados criados a partir de um modelo na entidade do modelo.
+ *
+ * A pré-visualização central do GLPI usa a entidade ativa da sessão, mas o
+ * próprio modelo determina a entidade do chamado criado.
+ */
+function plugin_glpinewentity_pre_item_add(CommonDBTM $item): void {
+    if (!$item instanceof Ticket || !is_array($item->input ?? null)) {
+        return;
+    }
+
+    $templateId = 0;
+    foreach ($item->input as $key => $value) {
+        if (
+            is_string($key)
+            && preg_match('/^(?:tickettemplates?_id(?:_(?:incident|demand))?|tickettemplate(?:_(?:incident|demand))?)$/', $key)
+            && (int)$value > 0
+        ) {
+            $templateId = (int)$value;
+            break;
+        }
+    }
+
+    if ($templateId <= 0) {
+        return;
+    }
+
+    $template = new TicketTemplate();
+    if ($template->getFromDB($templateId) && (int)$template->fields['entities_id'] > 0) {
+        $item->input['entities_id'] = (int)$template->fields['entities_id'];
+    }
 }
 

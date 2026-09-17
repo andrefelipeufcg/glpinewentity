@@ -1,4 +1,10 @@
 <?php
+/**
+ * -----------------------------------------------------------------------
+ * GLPI New Entity — src/Menu.php
+ * Define a entrada do menu no GLPI para o plugin e gerencia os links de navegação.
+ * -----------------------------------------------------------------------
+ */
 
 namespace GlpiPlugin\Glpinewentity;
 
@@ -17,11 +23,20 @@ class Menu extends CommonGLPI {
     public static function getMenuContent() {
         $menu = [
             'title' => self::getMenuName(),
-            'page'  => Toolbox::getItemTypeSearchUrl(Sector::class, false),
+            'page'  => Sector::getSearchURL(false),
             'icon'  => 'ti ti-building-community',
+            // Os links da entrada raiz alimentam as ações nativas do breadcrumb.
+            'links' => [
+                'search' => Sector::getSearchURL(false),
+            ],
         ];
 
         if (Session::haveRight('plugin_glpinewentity', READ)) {
+            // A inclusão exige o direito CREATE atribuído ao Super-Admin na instalação.
+            if (Sector::canCreate()) {
+                $menu['links']['add'] = Sector::getFormURL(false);
+            }
+
             $menu['options'] = [
                 'sector' => [
                     'icon'  => Sector::getIcon(),
@@ -31,13 +46,10 @@ class Menu extends CommonGLPI {
 
             if (Session::haveRight('plugin_glpinewentity', READ)) {
                 $menu['options']['sector']['title'] = Sector::getTypeName(Session::getPluralNumber());
-                $menu['options']['sector']['page'] = Toolbox::getItemTypeSearchUrl(Sector::class, false);
-                $menu['options']['sector']['links']['search'] = Toolbox::getItemTypeSearchUrl(Sector::class, false);
+                $menu['options']['sector']['page'] = Sector::getSearchURL(false);
+                $menu['options']['sector']['links']['search'] = Sector::getSearchURL(false);
             }
 
-            if (Sector::canCreate()) {
-                $menu['options']['sector']['links']['add'] = Sector::getFormURL(false);
-            }
         }
 
         return $menu;
