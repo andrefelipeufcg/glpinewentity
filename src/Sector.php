@@ -384,11 +384,11 @@ class Sector extends CommonDBTM {
         // Botões de Ação
         echo "<tr class='tab_bg_2'><td class='center' colspan='2' style='padding: 20px;'>";
 
-        echo "<button type='button' class='btn btn-primary' onclick='saveDraftConfigs({$tabnum})' style='margin-right: 15px;'>";
+        echo "<button type='button' id='btn_save_draft_{$tabnum}' class='btn btn-primary' onclick='saveDraftConfigs({$tabnum})' style='margin-right: 15px;'>";
         echo "<i class='fas fa-save' style='margin-right: 5px;'></i> Salvar Rascunho";
         echo "</button>";
 
-        echo "<button type='button' class='btn btn-success' style='color: white !important;' onclick='generateSectorConfigs({$item->getID()}, {$tabnum})'>";
+        echo "<button type='button' id='btn_generate_{$tabnum}' class='btn btn-success' style='color: white !important;' onclick='generateSectorConfigs({$item->getID()}, {$tabnum})'>";
         echo "<i class='fas fa-magic' style='margin-right: 5px;'></i> Aplicar Padronização para esta Entidade";
         echo "</button>";
 
@@ -669,6 +669,11 @@ class Sector extends CommonDBTM {
         });
 
         function saveDraftConfigs(tabnum) {
+            let btn = $('#btn_save_draft_' + tabnum);
+            let originalHtml = btn.html();
+            btn.prop('disabled', true);
+            btn.html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Salvando...');
+
             if (typeof tinymce !== 'undefined') {
                 tinymce.triggerSave();
             }
@@ -681,10 +686,12 @@ class Sector extends CommonDBTM {
                     if(response.success) {
                         window.location.reload();
                     } else {
+                        btn.prop('disabled', false).html(originalHtml);
                         alert('Erro ao salvar rascunho: ' + (response.error || 'Erro desconhecido'));
                     }
                 },
                 error: function() {
+                    btn.prop('disabled', false).html(originalHtml);
                     alert('Erro na requisição.');
                 }
             });
@@ -692,6 +699,12 @@ class Sector extends CommonDBTM {
 
         function generateSectorConfigs(sectorId, tabnum) {
             if(confirm('Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?')) {
+                
+                let btn = $('#btn_generate_' + tabnum);
+                let originalHtml = btn.html();
+                btn.prop('disabled', true);
+                btn.html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Aplicando...');
+
                 // Primeiro salva o rascunho, depois gera
                 if (typeof tinymce !== 'undefined') {
                     tinymce.triggerSave();
@@ -715,18 +728,22 @@ class Sector extends CommonDBTM {
                                     if(genResp.success) {
                                         window.location.reload();
                                     } else {
+                                        btn.prop('disabled', false).html(originalHtml);
                                         alert('Erro ao gerar configurações: ' + (genResp.error || 'Erro desconhecido'));
                                     }
                                 },
                                 error: function() {
+                                    btn.prop('disabled', false).html(originalHtml);
                                     alert('Erro na requisição de geração.');
                                 }
                             });
                         } else {
+                            btn.prop('disabled', false).html(originalHtml);
                             alert('Erro ao salvar rascunho antes de aplicar.');
                         }
                     },
                     error: function() {
+                        btn.prop('disabled', false).html(originalHtml);
                         alert('Erro na requisição de salvamento.');
                     }
                 });
