@@ -16,6 +16,13 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 *   **Construção Automática de Árvore de Categorias ITIL:**
     *   Aceita listas hierárquicas em formato de texto usando hífens (ex: `- Hardware`, `-- Manutenção`, `--- Reparos`).
     *   Cria categorias de incidentes e requisições perfeitamente aninhadas com apenas um clique.
+*   **Aba de Configurações Dinâmicas:** Centraliza a personalização do fluxo de trabalho e templates para o novo setor, permitindo criar, editar e aplicar múltiplas padronizações exclusivas para a entidade:
+    *   **Modelos de Chamado**
+    *   **Respostas Básicas**
+    *   **Soluções Básicas**
+    *   **Motivos de Pendências**
+    *   **Notificações**
+    *   **Formulários Padrões**
 *   **Controle de Acesso Super-Admin:** A interface do plugin é 100% restrita ao perfil Super-Admin nativo do GLPI (ID 4), ocultando-se completamente para qualquer outro usuário, não gerando poluição visual nos menus de quem não possui privilégios para criar infraestruturas.
 *   **Edição e Atualização Sincronizada:** Em caso de ajustes futuros, o sistema armazena os metadados e permite reeditar os grupos, vínculos de e-mails ou nomes do setor a partir de um registro central.
 
@@ -55,10 +62,11 @@ O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descrit
 
 *   `setup.php`: Inicialização, ganchos (hooks) e registro no núcleo do GLPI.
 *   `front/sector.php`: Interface principal (Listagem).
-*   `front/sector.form.php`: View principal (Formulário do Wizard e lógica de captura HTML/JavaScript).
-*   `inc/menu.class.php`: Lógica exclusiva para inserção e restrição (Super-Admin) no menu superior nativo de "Configurar" do GLPI.
-*   `inc/sector.class.php`: Classe CRUD básica para persistência de dados do andamento no banco, extendendo `CommonDBTM`.
-*   `inc/wizard.class.php`: Coração do plugin. Contém toda a lógica estrutural, manipulação do banco via `PDO`, criação de cópias de perfis (`cloneProfile`) e validação de e-mails (`findUserByEmail`).
+*   `front/sector.form.php`: View principal (Formulário do Wizard e abas de configuração).
+*   `src/Menu.php`: Lógica exclusiva para inserção e restrição (Super-Admin) no menu superior nativo de "Configurar" do GLPI.
+*   `src/Sector.php`: Classe CRUD básica e motor central de renderização de abas dinâmicas, estendendo `CommonDBTM`.
+*   `src/Wizard.php`: Coração da criação inicial. Contém a lógica estrutural, manipulação do banco, criação de cópias de perfis e validação de e-mails.
+*   `src/Builders/`: Classes especializadas (`TicketTemplateBuilder`, `NotificationBuilder`, `FormBuilder`, etc.) responsáveis por aplicar individualmente cada padronização gerada nas abas.
 
 ## 📜 Licença
 
