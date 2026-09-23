@@ -14,7 +14,7 @@
 
 use Glpi\Plugin\Hooks;
 
-define('PLUGIN_GLPINEWENTITY_VERSION', '1.1.0');
+define('PLUGIN_GLPINEWENTITY_VERSION', '1.1.1');
 define('PLUGIN_GLPINEWENTITY_MIN_GLPI', '11.0.0');
 
 function plugin_init_glpinewentity(): void {
@@ -26,9 +26,6 @@ function plugin_init_glpinewentity(): void {
     // A engrenagem do plugin inicia diretamente o wizard de inclusão.
     $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['glpinewentity'] = 'front/sector.form.php';
     $PLUGIN_HOOKS[Hooks::UNDISCLOSED_CONFIG_VALUE]['glpinewentity'] = 'plugin_glpinewentity_undisclosed_config_value';
-    $PLUGIN_HOOKS[Hooks::PRE_ITEM_ADD]['glpinewentity'] = [
-        'Ticket' => 'plugin_glpinewentity_pre_item_add',
-    ];
 
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Wizard');
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Sector');
