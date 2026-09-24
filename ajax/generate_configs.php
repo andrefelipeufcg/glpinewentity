@@ -123,6 +123,27 @@ if ($itemClass && class_exists($itemClass)) {
                 }
             }
         }
+        // Outras chaves estrangeiras que podem vir no rascunho
+        $fkMap = [
+            'itilcategories_id'        => \ITILCategory::class,
+            'calendars_id'             => \Calendar::class,
+            'itilfollowuptemplates_id' => \ITILFollowupTemplate::class,
+            'solutiontemplates_id'     => \SolutionTemplate::class,
+            'notificationtemplates_id' => \NotificationTemplate::class,
+            'forms_categories_id'      => \Glpi\Form\Category::class,
+        ];
+        foreach ($fkMap as $field => $fkClass) {
+            $fkId = (int)($config[$field] ?? 0);
+            if ($fkId > 0 && class_exists($fkClass)) {
+                $fkItem = new $fkClass();
+                if ($fkItem->getFromDB($fkId)) {
+                    if (isset($fkItem->fields['entities_id']) && !\Session::haveAccessToEntity($fkItem->fields['entities_id'])) {
+                        echo json_encode(['success' => false, 'error' => "Sem permissão para referenciar $field #$fkId (acesso negado à entidade)."]);
+                        exit;
+                    }
+                }
+            }
+        }
     }
 }
 
