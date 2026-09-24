@@ -24,9 +24,14 @@ class Wizard {
      */
     private static function isSuperAdminProfile(int $profileId): bool
     {
-        global $DB;
-        
         try {
+            // Método nativo do GLPI (disponível a partir do GLPI 10)
+            if (method_exists('\Profile', 'getSuperAdminProfilesId')) {
+                return in_array($profileId, \Profile::getSuperAdminProfilesId());
+            }
+
+            // Fallback dinâmico para versões antigas: verifica direito de config
+            global $DB;
             $iter = $DB->request([
                 'SELECT' => 'rights',
                 'FROM'   => 'glpi_profilerights',
@@ -35,16 +40,13 @@ class Wizard {
                     'name'        => 'config'
                 ]
             ]);
-            
             if ($iter->count() > 0) {
                 $row = $iter->current();
                 return ($row['rights'] & UPDATE) === UPDATE;
             }
         } catch (\Throwable $e) {
-            // Fallback nativo em caso de erro no banco (tabela inexistente em versões antigas/futuras)
-            if ($profileId == 4) {
-                return true;
-            }
+            // Se qualquer chamada falhar, recorre ao ID padrão do GLPI
+            return ($profileId == 4);
         }
 
         return false;
