@@ -1219,7 +1219,8 @@ TWIG);
                         'FROM'   => 'glpi_groups',
                         'WHERE'  => [
                             'entities_id' => $meta['entity_id'],
-                            'id' => ['<>', $parentGroupId]
+                            'id' => ['<>', $parentGroupId],
+                            'is_assign' => 1
                         ],
                         'ORDER'  => 'id ASC'
                     ]);
@@ -1329,7 +1330,10 @@ TWIG);
                 $cat_iterator = $DB->request([
                     'SELECT' => ['id', 'name', 'itilcategories_id'],
                     'FROM'   => 'glpi_itilcategories',
-                    'WHERE'  => ['entities_id' => $meta['entity_id']]
+                    'WHERE'  => [
+                        'entities_id' => $meta['entity_id'],
+                        'is_helpdeskvisible' => 1
+                    ]
                 ]);
 
                 $cats = [];

@@ -824,7 +824,17 @@ class Wizard {
                 }
             }
 
-            // Não deletamos os subgrupos órfãos que sobraram em $currentSubgroups para preservar o histórico de chamados.
+            // Inativamos os subgrupos órfãos (para não aparecerem mais no plugin nem em novas atribuições)
+            // sem deletá-los, preservando o histórico de chamados.
+            $groupObj = new \Group();
+            foreach ($currentSubgroups as $sgId) {
+                $groupObj->update([
+                    'id'           => $sgId,
+                    'is_assign'    => 0,
+                    'is_requester' => 0,
+                    'is_watcher'   => 0
+                ]);
+            }
         }
 
         // =================================================================
@@ -899,6 +909,19 @@ class Wizard {
                 'id'   => $categoryId,
                 'name' => $cleanName,
             ];
+        }
+
+        // Inativar as categorias órfãs (não deletamos para manter histórico)
+        $catObj = new \ITILCategory();
+        foreach ($currentCategories as $name => $ids) {
+            foreach ($ids as $cId) {
+                $catObj->update([
+                    'id'                 => $cId,
+                    'is_helpdeskvisible' => 0,
+                    'is_incident'        => 0,
+                    'is_request'         => 0
+                ]);
+            }
         }
 
         return $result;
