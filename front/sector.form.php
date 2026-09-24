@@ -46,6 +46,22 @@ if (isset($_POST['process_wizard'])) {
     Session::checkValidSessionId();
     if ($isEdit) {
         Session::checkRight("plugin_glpinewentity", UPDATE);
+
+        $newParent = (int)($_POST['parent_entity'] ?? 0);
+        if (!Session::haveAccessToEntity($newParent)) {
+            Session::addMessageAfterRedirect(__('Acesso negado à nova entidade pai escolhida.', 'glpinewentity'), false, ERROR);
+            global $CFG_GLPI;
+            Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $sectorId);
+        }
+
+        $meta = json_decode($sectorObj->fields['metadata'] ?? '{}', true);
+        $managedEntity = (int)($meta['entity_id'] ?? 0);
+        if ($managedEntity > 0 && !Session::haveAccessToEntity($managedEntity)) {
+            Session::addMessageAfterRedirect(__('Acesso negado à entidade gerenciada por este setor.', 'glpinewentity'), false, ERROR);
+            global $CFG_GLPI;
+            Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $sectorId);
+        }
+
         $result = Wizard::processUpdate($_POST, $sectorObj->fields);
 
         // Mantém o formulário e o metadata alinhados aos dados já processados.
