@@ -1841,7 +1841,7 @@ TWIG);
                     function validateEmailsStr(str) {
                         let cleanStr = str.trim();
                         if (cleanStr === '') return false;
-                        let emails = cleanStr.split(/[\\n,]+/);
+                        let emails = cleanStr.split(/[\\n,;]+/);
                         let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                         for (let i = 0; i < emails.length; i++) {
                             let e = emails[i].trim();
@@ -1934,6 +1934,7 @@ TWIG);
                         
                         // Validação: verifica se os blocos atuais estão preenchidos
                         let allFilled = true;
+                        let emailsValid = true;
                         let isSiglaEmpty = getSigla() === '';
                         
                         container.find('.subgroup-block').each(function() {
@@ -1944,17 +1945,21 @@ TWIG);
                             if (isFirst) {
                                 if (isSiglaEmpty || techsVal === '') {
                                     allFilled = false;
+                                } else if (!validateEmailsStr(techsVal)) {
+                                    emailsValid = false;
                                 }
                             } else {
                                 const parentVal = $(this).find('select.sg-parent-select, input[name$=\"[parent]\"]').val();
                                 if (nameVal === '' || parentVal === null || parentVal === '' || isSiglaEmpty || techsVal === '') {
                                     allFilled = false;
+                                } else if (!validateEmailsStr(techsVal)) {
+                                    emailsValid = false;
                                 }
                             }
                         });
                         
-                        if (!allFilled) {
-                            alert('Por favor, preencha o Nome do Subgrupo, Grupo Pai e os E-mails dos técnicos em todos os blocos atuais antes de adicionar um novo.');
+                        if (!allFilled || !emailsValid) {
+                            alert('Por favor, preencha o Nome do Subgrupo, Grupo Pai e certifique-se de que todos os e-mails dos técnicos são válidos (ex: nome@dominio.com) em todos os blocos atuais antes de adicionar um novo.');
                             return;
                         }
 
@@ -2101,6 +2106,37 @@ TWIG);
                         if (!customFilled || !customEmailsValid) {
                             e.preventDefault();
                             alert('Por favor, preencha o nome do perfil, selecione de qual perfil copiar e certifique-se de que todos os e-mails informados são válidos (ex: nome@dominio.com) para todos os Perfis Adicionais.');
+                            return false;
+                        }
+                        
+                        let subgroupsFilled = true;
+                        let subgroupsEmailsValid = true;
+                        let isSiglaEmpty = getSigla() === '';
+                        
+                        $('#subgroups-container .subgroup-block').each(function() {
+                            const nameVal = $(this).find('input.sg-name-input').val().trim();
+                            const techsVal = $(this).find('textarea').val().trim();
+                            const isFirst = $(this).index() === 0;
+                            
+                            if (isFirst) {
+                                if (isSiglaEmpty || techsVal === '') {
+                                    subgroupsFilled = false;
+                                } else if (!validateEmailsStr(techsVal)) {
+                                    subgroupsEmailsValid = false;
+                                }
+                            } else {
+                                const parentVal = $(this).find('select.sg-parent-select, input[name$=\"[parent]\"]').val();
+                                if (nameVal === '' || parentVal === null || parentVal === '' || isSiglaEmpty || techsVal === '') {
+                                    subgroupsFilled = false;
+                                } else if (!validateEmailsStr(techsVal)) {
+                                    subgroupsEmailsValid = false;
+                                }
+                            }
+                        });
+                        
+                        if (!subgroupsFilled || !subgroupsEmailsValid) {
+                            e.preventDefault();
+                            alert('Por favor, preencha o Nome do Subgrupo, Grupo Pai e certifique-se de que todos os e-mails dos técnicos são válidos (ex: nome@dominio.com) em todos os Grupos/Subgrupos.');
                             return false;
                         }
                         
