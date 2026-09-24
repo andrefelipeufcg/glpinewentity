@@ -21,9 +21,9 @@ if (!defined('GLPI_ROOT')) {
 
 class Sector extends CommonDBTM {
     
-    public static $rightname = 'plugin_glpinewentity';
+    public static string $rightname = 'plugin_glpinewentity';
     // Permite que o endpoint nativo das abas carregue o registro durante a edição.
-    public $get_item_to_display_tab = true;
+    public bool $get_item_to_display_tab = true;
 
     public static function canCreate(): bool {
         return Session::haveRight('plugin_glpinewentity', CREATE);
@@ -70,13 +70,13 @@ class Sector extends CommonDBTM {
      */
     public static function getSearchURL($full = true): string {
         global $CFG_GLPI;
-        $path = '/plugins/glpinewentity/front/sector.php';
+        $path = \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php';
         return $full ? $CFG_GLPI['root_doc'] . $path : $path;
     }
 
     public static function getFormURL($full = true): string {
         global $CFG_GLPI;
-        $path = '/plugins/glpinewentity/front/sector.form.php';
+        $path = \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php';
         return $full ? $CFG_GLPI['root_doc'] . $path : $path;
     }
 
@@ -237,19 +237,19 @@ class Sector extends CommonDBTM {
         if ($tabnum == 4) {
             $extraOptions['calendars'] = [];
             if ($DB->tableExists('glpi_calendars')) {
-                foreach ($DB->request('glpi_calendars') as $row) {
+                foreach ($DB->request(['FROM' => 'glpi_calendars']) as $row) {
                     $extraOptions['calendars'][$row['id']] = $row['name'];
                 }
             }
             $extraOptions['itilfollowuptemplates'] = [];
             if ($DB->tableExists('glpi_itilfollowuptemplates')) {
-                foreach ($DB->request('glpi_itilfollowuptemplates') as $row) {
+                foreach ($DB->request(['FROM' => 'glpi_itilfollowuptemplates']) as $row) {
                     $extraOptions['itilfollowuptemplates'][$row['id']] = $row['name'];
                 }
             }
             $extraOptions['solutiontemplates'] = [];
             if ($DB->tableExists('glpi_solutiontemplates')) {
-                foreach ($DB->request('glpi_solutiontemplates') as $row) {
+                foreach ($DB->request(['FROM' => 'glpi_solutiontemplates']) as $row) {
                     $extraOptions['solutiontemplates'][$row['id']] = $row['name'];
                 }
             }
@@ -262,7 +262,7 @@ class Sector extends CommonDBTM {
         if ($tabnum == 5) {
             $extraOptions['templates'] = [];
             if ($DB->tableExists('glpi_notificationtemplates')) {
-                foreach ($DB->request('glpi_notificationtemplates') as $row) {
+                foreach ($DB->request(['FROM' => 'glpi_notificationtemplates']) as $row) {
                     $extraOptions['templates'][$row['id']] = $row['name'];
                 }
             }
@@ -335,8 +335,8 @@ class Sector extends CommonDBTM {
             }
         }
 
-        $ajax_save_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/save_draft_configs.php';
-        $ajax_generate_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/generate_configs.php';
+        $ajax_save_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/save_draft_configs.php';
+        $ajax_generate_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/generate_configs.php';
 
         echo "<div class='center' style='margin-top: 20px;'>";
         echo "<form id='form_configs_tab_{$tabnum}'>";
@@ -353,8 +353,8 @@ class Sector extends CommonDBTM {
         echo "</div>";
 
         echo "<style>
-            .glpinewentity-form-category .select2-container, 
-            .glpinewentity-form-category .select2-selection--single {
+            .config-block .select2-container, 
+            .config-block .select2-selection--single {
                 max-width: none !important;
             }
         </style>";
@@ -399,9 +399,9 @@ class Sector extends CommonDBTM {
         echo "</div>";
 
         // JavaScript
-        $ajax_get_template_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/get_template_data.php';
-        $ajax_render_richtext_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/render_richtext.php';
-        $ajax_render_form_category_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/ajax/render_form_category.php';
+        $ajax_get_template_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/get_template_data.php';
+        $ajax_render_richtext_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_richtext.php';
+        $ajax_render_form_category_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_form_category.php';
         $default_illustration_preview = json_encode((new \Glpi\UI\IllustrationManager())->renderIcon('request-service', 100));
 
         echo "<script>
@@ -795,9 +795,9 @@ class Sector extends CommonDBTM {
         $display = $isTemplate ? "display: none;" : "";
         $class = "config-block" . ($isTemplate ? " template" : "");
 
-        $name = \Html::cleanInputText($config['name'] ?? '');
+        $name = htmlspecialchars($config['name'] ?? '');
         $contentRaw = $config['content'] ?? '';
-        $content = \Html::cleanInputText($contentRaw);
+        $content = htmlspecialchars($contentRaw);
         $copyFrom = (int)($config['copy_from'] ?? 0);
         $type = (int)($config['type'] ?? 1); // 1 = Incidente, 2 = Requisição
         $itilcategoryId = (int)($config['itilcategories_id'] ?? 0);
@@ -808,21 +808,21 @@ class Sector extends CommonDBTM {
         $itilfollowuptemplates_id = (int)($config['itilfollowuptemplates_id'] ?? 0);
         $followups_before_resolution = (int)($config['followups_before_resolution'] ?? 0);
         $solutiontemplates_id = (int)($config['solutiontemplates_id'] ?? 0);
-        $comment = \Html::cleanInputText($config['comment'] ?? '');
+        $comment = htmlspecialchars($config['comment'] ?? '');
 
         // Variáveis da aba 5
         $is_active = (int)($config['is_active'] ?? 1);
-        $itemtype = \Html::cleanInputText($config['itemtype'] ?? 'Ticket');
-        $event = \Html::cleanInputText($config['event'] ?? 'new');
+        $itemtype = htmlspecialchars($config['itemtype'] ?? 'Ticket');
+        $event = htmlspecialchars($config['event'] ?? 'new');
         $attach_documents = (int)($config['attach_documents'] ?? -2);
         $allow_response = (int)($config['allow_response'] ?? 1);
         $notificationtemplates_id = (int)($config['notificationtemplates_id'] ?? 0);
-        $target_val = \Html::cleanInputText($config['target'] ?? '');
-        $exclusion_val = \Html::cleanInputText($config['exclusion'] ?? '');
+        $target_val = htmlspecialchars($config['target'] ?? '');
+        $exclusion_val = htmlspecialchars($config['exclusion'] ?? '');
 
         // Variáveis da aba 6
         $descriptionRaw = $config['description'] ?? '';
-        $description = \Html::cleanInputText($descriptionRaw);
+        $description = htmlspecialchars($descriptionRaw);
         $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
         $generated_id = (int)($config['generated_id'] ?? 0);
 
@@ -843,7 +843,7 @@ class Sector extends CommonDBTM {
         $html .= "        <option value='0'>--- Nenhum (Criar Básico) ---</option>";
         foreach ($existingModels as $id => $mName) {
             $selected = ($id == $copyFrom) ? 'selected' : '';
-            $html .= "        <option value='{$id}' {$selected}>" . \Html::cleanInputText(ltrim($mName, '- ')) . "</option>";
+            $html .= "        <option value='{$id}' {$selected}>" . htmlspecialchars(ltrim($mName, '- ')) . "</option>";
         }
         $html .= "      </select>";
         $html .= "  </div>";
@@ -870,7 +870,7 @@ class Sector extends CommonDBTM {
             $html .= "            <option value='0'>--- Nenhuma ---</option>";
             foreach (($extraOptions['categories'] ?? []) as $id => $cName) {
                 $selected = ($id == $itilcategoryId) ? 'selected' : '';
-                $html .= "            <option value='{$id}' {$selected}>" . \Html::cleanInputText($cName) . "</option>";
+                $html .= "            <option value='{$id}' {$selected}>" . htmlspecialchars($cName) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -896,12 +896,12 @@ class Sector extends CommonDBTM {
 
             $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
             $html .= "      <div style='flex: 1;'>";
-            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Calendário</label>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>&nbsp;<br>Calendário</label>";
             $html .= "          <select name='items_calendars_id[]' class='form-select select2-calendar input-calendars-id' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhum ---</option>";
             foreach (($extraOptions['calendars'] ?? []) as $cid => $cname) {
                 $sel = ($cid == $calendars_id) ? 'selected' : '';
-                $html .= "            <option value='{$cid}' {$sel}>" . \Html::cleanInputText($cname) . "</option>";
+                $html .= "            <option value='{$cid}' {$sel}>" . htmlspecialchars($cname) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -911,7 +911,7 @@ class Sector extends CommonDBTM {
             $html .= "            <option value='0'>Desabilitado</option>";
             foreach (($extraOptions['frequencies'] ?? []) as $fid => $fname) {
                 $sel = ($fid == $followup_frequency) ? 'selected' : '';
-                $html .= "            <option value='{$fid}' {$sel}>" . \Html::cleanInputText($fname) . "</option>";
+                $html .= "            <option value='{$fid}' {$sel}>" . htmlspecialchars($fname) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -919,12 +919,12 @@ class Sector extends CommonDBTM {
 
             $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
             $html .= "      <div style='flex: 1;'>";
-            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Modelo de acompanhamento</label>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>&nbsp;<br>Modelo de acompanhamento</label>";
             $html .= "          <select name='items_itilfollowuptemplates_id[]' class='form-select select2-foltpl input-itilfollowuptemplates-id' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhum ---</option>";
             foreach (($extraOptions['itilfollowuptemplates'] ?? []) as $fid => $fname) {
                 $sel = ($fid == $itilfollowuptemplates_id) ? 'selected' : '';
-                $html .= "            <option value='{$fid}' {$sel}>" . \Html::cleanInputText($fname) . "</option>";
+                $html .= "            <option value='{$fid}' {$sel}>" . htmlspecialchars($fname) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -934,7 +934,7 @@ class Sector extends CommonDBTM {
             $html .= "            <option value='0'>Desabilitado</option>";
             foreach (($extraOptions['res_limits'] ?? []) as $rid => $rname) {
                 $sel = ($rid == $followups_before_resolution) ? 'selected' : '';
-                $html .= "            <option value='{$rid}' {$sel}>" . \Html::cleanInputText($rname) . "</option>";
+                $html .= "            <option value='{$rid}' {$sel}>" . htmlspecialchars($rname) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -947,7 +947,7 @@ class Sector extends CommonDBTM {
             $html .= "            <option value='0'>--- Nenhum ---</option>";
             foreach (($extraOptions['solutiontemplates'] ?? []) as $sid => $sname) {
                 $sel = ($sid == $solutiontemplates_id) ? 'selected' : '';
-                $html .= "            <option value='{$sid}' {$sel}>" . \Html::cleanInputText($sname) . "</option>";
+                $html .= "            <option value='{$sid}' {$sel}>" . htmlspecialchars($sname) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -973,7 +973,7 @@ class Sector extends CommonDBTM {
             $html .= "          <select name='items_itemtype[]' class='form-select select2-itemtype input-itemtype' style='width: 100%;'>";
             foreach (($extraOptions['itemtypes'] ?? []) as $it => $itname) {
                 $sel = ($it == $itemtype) ? 'selected' : '';
-                $html .= "            <option value='{$it}' {$sel}>" . \Html::cleanInputText($itname) . "</option>";
+                $html .= "            <option value='{$it}' {$sel}>" . htmlspecialchars($itname) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -985,7 +985,7 @@ class Sector extends CommonDBTM {
             $html .= "          <select name='items_event[]' class='form-select select2-event input-event' style='width: 100%;'>";
             foreach (($extraOptions['events'] ?? []) as $ev => $evname) {
                 $sel = ($ev == $event) ? 'selected' : '';
-                $html .= "            <option value='{$ev}' {$sel}>" . \Html::cleanInputText($evname) . "</option>";
+                $html .= "            <option value='{$ev}' {$sel}>" . htmlspecialchars($evname) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -995,7 +995,7 @@ class Sector extends CommonDBTM {
             $html .= "            <option value='0'>--- Padrão da Origem ---</option>";
             foreach (($extraOptions['templates'] ?? []) as $tid => $tname) {
                 $sel = ($tid == $notificationtemplates_id) ? 'selected' : '';
-                $html .= "            <option value='{$tid}' {$sel}>" . \Html::cleanInputText($tname) . "</option>";
+                $html .= "            <option value='{$tid}' {$sel}>" . htmlspecialchars($tname) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -1026,7 +1026,7 @@ class Sector extends CommonDBTM {
             $html .= "            <option value=''>--- Nenhum ---</option>";
             foreach (($extraOptions['all_targets'] ?? []) as $tkey => $tname) {
                 $sel = ($tkey == $target_val) ? 'selected' : '';
-                $html .= "            <option value='{$tkey}' {$sel}>" . \Html::cleanInputText($tname) . "</option>";
+                $html .= "            <option value='{$tkey}' {$sel}>" . htmlspecialchars($tname) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -1036,7 +1036,7 @@ class Sector extends CommonDBTM {
             $html .= "            <option value=''>--- Nenhuma ---</option>";
             foreach (($extraOptions['all_exclusions'] ?? []) as $ekey => $ename) {
                 $sel = ($ekey == $exclusion_val) ? 'selected' : '';
-                $html .= "            <option value='{$ekey}' {$sel}>" . \Html::cleanInputText($ename) . "</option>";
+                $html .= "            <option value='{$ekey}' {$sel}>" . htmlspecialchars($ename) . "</option>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -1077,7 +1077,7 @@ TWIG);
             }
             $html .= "      </div>";
 
-            $illustration = \Html::cleanInputText($config['illustration'] ?? $config['icon'] ?? 'request-service');
+            $illustration = htmlspecialchars($config['illustration'] ?? $config['icon'] ?? 'request-service');
 
             $twig_code = "{% import 'components/form/fields_macros.html.twig' as fields %}{{ fields.illustrationField('items_illustration[]', illustration_value, 'Ilustração', {'is_horizontal': false, 'full_width': true}) }}";
             $twig = \Glpi\Application\View\TemplateRenderer::getInstance()->getEnvironment();
@@ -1429,7 +1429,7 @@ TWIG);
 
 
         global $CFG_GLPI;
-        $form_url = $CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php';
+        $form_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php';
 
         echo "<div class='center' style='margin-top: 20px;'>";
         echo "<style>
@@ -1440,8 +1440,9 @@ TWIG);
             padding-top: 15px !important;
             padding-bottom: 15px !important;
         }
-        /* Remove apenas o limite legado que corta a categoria nesta aba. */
-        .tab_cadre_fixe .glpinewentity-form-category .select2-container .select2-selection.select2-selection--single {
+        /* Remove o limite legado do GLPI que corta as combos (Select2) do wizard. */
+        .tab_cadre_fixe .select2-container .select2-selection.select2-selection--single,
+        .tab_cadre_fixe .select2-container {
             max-width: none !important;
         }
         /* Afastar texto da aba da borda direita */
@@ -1481,6 +1482,7 @@ TWIG);
         Entity::dropdown([
             'name'  => 'parent_entity',
             'value' => $def_parent_entity,
+            'width' => '100%',
         ]);
         echo "          <br><small class='text-muted'>Selecione sob qual entidade o novo setor será criado.</small>";
         echo "      </td>";
@@ -1490,7 +1492,7 @@ TWIG);
         echo "<tr class='tab_bg_1'>";
         echo "<td>Nome do Setor <span style='color:red;'>*</span></td>";
         echo "<td>";
-        echo "<input type='text' name='sector_name' class='form-control' style='width: 100%;' placeholder='Ex: Departamento de Computação' value='" . Html::cleanInputText($def_sector_name) . "' required>";
+        echo "<input type='text' name='sector_name' class='form-control' style='width: 100%;' placeholder='Ex: Departamento de Computação' value='" . htmlspecialchars($def_sector_name) . "' required>";
         echo "</td>";
         echo "</tr>";
 
@@ -1498,7 +1500,7 @@ TWIG);
         echo "<tr class='tab_bg_1'>";
         echo "<td>Sigla <span style='color:red;'>*</span></td>";
         echo "<td>";
-        echo "<input type='text' name='sector_abbr' class='form-control' style='width: 100%;' placeholder='Ex: DC' value='" . Html::cleanInputText($def_sector_abbr) . "' maxlength='20' required>";
+        echo "<input type='text' name='sector_abbr' class='form-control' style='width: 100%;' placeholder='Ex: DC' value='" . htmlspecialchars($def_sector_abbr) . "' maxlength='20' required>";
         echo "<br><small class='text-muted'>A entidade será criada com o mesmo nome da sigla.</small>";
         echo "</td>";
         echo "</tr>";
@@ -1530,7 +1532,7 @@ TWIG);
         echo "  <div style='display: flex; gap: 10px;'>";
         echo "    <div style='flex: 1;'>";
         echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
-        $adminVal = $def_sector_abbr ? Html::cleanInputText($def_sector_abbr) . ' - Admin' : '';
+        $adminVal = $def_sector_abbr ? htmlspecialchars($def_sector_abbr) . ' - Admin' : '';
         echo "      <input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$adminVal}'>";
         echo "    </div>";
         echo "    <div style='flex: 1;'>";
@@ -1544,14 +1546,14 @@ TWIG);
             } else {
                 $selected = (strpos($pname, '[Padrão] Admin') !== false) ? 'selected' : '';
             }
-            echo "        <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
+            echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
         }
         echo "      </select>";
         echo "    </div>";
         echo "  </div>";
         echo "  <div>";
         echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-        $adminEmails = Html::cleanInputText(implode("\n", $def_profiles['admin']['emails'] ?? []));
+        $adminEmails = htmlspecialchars(implode("\n", $def_profiles['admin']['emails'] ?? []));
         echo "    <textarea name='users_profile_admin' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$adminEmails}</textarea>";
         echo "  </div>";
         echo "</div>";
@@ -1561,7 +1563,7 @@ TWIG);
         echo "  <div style='display: flex; gap: 10px;'>";
         echo "    <div style='flex: 1;'>";
         echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
-        $supportVal = $def_sector_abbr ? Html::cleanInputText($def_sector_abbr) . ' - Atendimento' : '';
+        $supportVal = $def_sector_abbr ? htmlspecialchars($def_sector_abbr) . ' - Atendimento' : '';
         echo "      <input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$supportVal}'>";
         echo "    </div>";
         echo "    <div style='flex: 1;'>";
@@ -1575,14 +1577,14 @@ TWIG);
             } else {
                 $selected = (strpos($pname, '[Padrão] Atendimento') !== false) ? 'selected' : '';
             }
-            echo "        <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
+            echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
         }
         echo "      </select>";
         echo "    </div>";
         echo "  </div>";
         echo "  <div>";
         echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-        $supportEmails = Html::cleanInputText(implode("\n", $def_profiles['support']['emails'] ?? []));
+        $supportEmails = htmlspecialchars(implode("\n", $def_profiles['support']['emails'] ?? []));
         echo "    <textarea name='users_profile_support' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$supportEmails}</textarea>";
         echo "  </div>";
         echo "</div>";
@@ -1592,7 +1594,7 @@ TWIG);
         echo "  <div style='display: flex; gap: 10px;'>";
         echo "    <div style='flex: 1;'>";
         echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
-        $transferVal = $def_sector_abbr ? Html::cleanInputText($def_sector_abbr) . ' - Transferência de Chamados' : '';
+        $transferVal = $def_sector_abbr ? htmlspecialchars($def_sector_abbr) . ' - Transferência de Chamados' : '';
         echo "      <input type='text' id='profile_transfer' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$transferVal}'>";
         echo "    </div>";
         echo "    <div style='flex: 1;'>";
@@ -1606,14 +1608,14 @@ TWIG);
             } else {
                 $selected = (strpos($pname, '[Padrão] Transferência de Chamados') !== false) ? 'selected' : '';
             }
-            echo "        <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
+            echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
         }
         echo "      </select>";
         echo "    </div>";
         echo "  </div>";
         echo "  <div>";
         echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-        $transferEmails = Html::cleanInputText(implode("\n", $def_profiles['transfer']['emails'] ?? []));
+        $transferEmails = htmlspecialchars(implode("\n", $def_profiles['transfer']['emails'] ?? []));
         echo "    <textarea name='users_profile_transfer' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$transferEmails}</textarea>";
         echo "  </div>";
         echo "</div>";
@@ -1644,7 +1646,7 @@ TWIG);
         echo "          <select name='copy_profile_custom[]' class='form-select profile-select2' style='width: 100%;'>";
         echo "            <option value='0'>-----</option>";
         foreach ($profiles as $pid => $pname) {
-            echo "            <option value='{$pid}'>" . Html::cleanInputText($pname) . "</option>";
+            echo "            <option value='{$pid}'>" . htmlspecialchars($pname) . "</option>";
         }
         echo "          </select>";
         echo "      </div>";
@@ -1658,7 +1660,7 @@ TWIG);
         // Renderiza perfis customizados existentes na edição
         if (!empty($def_profiles['custom'])) {
             foreach ($def_profiles['custom'] as $cProf) {
-                $cEmails = Html::cleanInputText(implode("\n", $cProf['emails'] ?? []));
+                $cEmails = htmlspecialchars(implode("\n", $cProf['emails'] ?? []));
                 $cId = $cProf['id'];
 
                 echo "<div class='profile-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
@@ -1669,7 +1671,7 @@ TWIG);
                 echo "  <div style='display: flex; gap: 10px; align-items: flex-start;'>";
                 echo "      <div style='flex: 1;'>";
                 echo "          <label style='display: block; margin-bottom: 5px; '>Nome do Perfil</label>";
-                echo "          <input type='text' class='form-control profile-input' name='name_profile_custom[]' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' value='" . Html::cleanInputText($cProf['name']) . "'>";
+                echo "          <input type='text' class='form-control profile-input' name='name_profile_custom[]' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' value='" . htmlspecialchars($cProf['name']) . "'>";
                 echo "          <small class='text-muted'>O nome original não é carregado na edição, preencha novamente se desejar salvar outro.</small>";
                 echo "      </div>";
                 echo "      <div style='flex: 1;'>";
@@ -1678,7 +1680,7 @@ TWIG);
                 echo "            <option value='0'>-----</option>";
                 foreach ($profiles as $pid => $pname) {
                     $selected = ($pid == $cId) ? 'selected' : '';
-                    echo "            <option value='{$pid}' {$selected}>" . Html::cleanInputText($pname) . "</option>";
+                    echo "            <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
                 }
                 echo "          </select>";
                 echo "      </div>";
@@ -1713,8 +1715,8 @@ TWIG);
 
         if (empty($def_subgroups) || count($def_subgroups) <= 1) {
             // Se não tem subgrupos, ou só tem o pai (índice 0), renderiza 1 bloco vazio
-            $sg0Name = Html::cleanInputText($def_subgroups[0]['name'] ?? '');
-            $sg0Techs = Html::cleanInputText($def_subgroups[0]['techs'] ?? '');
+            $sg0Name = htmlspecialchars($def_subgroups[0]['name'] ?? '');
+            $sg0Techs = htmlspecialchars($def_subgroups[0]['techs'] ?? '');
 
             echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
             echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
@@ -1747,8 +1749,8 @@ TWIG);
                     continue;
                 } // Pula o grupo pai que só foi salvo no metadata, mas não no form
 
-                $sgName = Html::cleanInputText($sg['name']);
-                $sgTechs = Html::cleanInputText($sg['techs'] ?? '');
+                $sgName = htmlspecialchars($sg['name']);
+                $sgTechs = htmlspecialchars($sg['techs'] ?? '');
 
                 echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
                 echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
@@ -1765,7 +1767,7 @@ TWIG);
                 echo "          <select name='subgroups[{$i}][parent]' class='form-select sg-parent-select' style='width: 100%;'>";
                 echo "              <option value='-1' " . (($sg['parent'] ?? '-1') == '-1' ? 'selected' : '') . ">(SIGLA)</option>";
                 for ($prevFormIdx = 0; $prevFormIdx < $i; $prevFormIdx++) {
-                    $prevName = Html::cleanInputText($def_subgroups[$prevFormIdx + 1]['name'] ?? '');
+                    $prevName = htmlspecialchars($def_subgroups[$prevFormIdx + 1]['name'] ?? '');
                     if (!empty($prevName)) {
                         $selected = (($sg['parent'] ?? '') == (string)$prevFormIdx) ? 'selected' : '';
                         echo "              <option value='{$prevFormIdx}' {$selected}>{$prevName}</option>";
@@ -1804,7 +1806,7 @@ TWIG);
         echo "<tr class='tab_bg_1'>";
         echo "<td style='width: 35%;'>Categorias de Serviço <span style='color:red;'>*</span></td>";
         echo "<td>";
-        echo "<textarea name='category_names' class='form-control' style='width: 100%; height: 160px; overflow-y: scroll;' placeholder='Uma categoria por linha. Use hífen (-) para subcategorias.&#10;Ex:&#10;Hardware&#10;- Manutenção de Hardware&#10;-- Troca de Peças&#10;Software&#10;- Instalação de Software' required>" . Html::cleanInputText($def_category_names) . "</textarea>";
+        echo "<textarea name='category_names' class='form-control' style='width: 100%; height: 160px; overflow-y: scroll;' placeholder='Uma categoria por linha. Use hífen (-) para subcategorias.&#10;Ex:&#10;Hardware&#10;- Manutenção de Hardware&#10;-- Troca de Peças&#10;Software&#10;- Instalação de Software' required>" . htmlspecialchars($def_category_names) . "</textarea>";
         echo "<br><small class='text-muted'>Cada categoria será vinculada exclusivamente à nova entidade, habilitada para Incidentes e Requisições.<br><strong>Importante:</strong> O sistema só identificará a hierarquia (Categorias Pai e Filha) se você usar o hífen (-) no início da linha correspondente.</small>";
         echo "</td>";
         echo "</tr>";

@@ -214,6 +214,15 @@ class Wizard {
 
                 if (!$puId) {
                     $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), $assignment['new_name'], $userEmail);
+                } else {
+                    // Define a nova entidade e o perfil atrelado como os padrões do usuário nas preferências.
+                    // Se o usuário passar por várias atribuições em diferentes blocos (Admin, Atendimento, etc.), o último será o padrão definitivo.
+                    $userObj = new User();
+                    $userObj->update([
+                        'id'          => $userId,
+                        'entities_id' => $entityId,
+                        'profiles_id' => $newProfileId
+                    ]);
                 }
             }
         }
@@ -380,12 +389,6 @@ class Wizard {
             }
         }
 
-        // =================================================================
-        // PASSO 5 — Roteamento e E-mail (stub V2)
-        // =================================================================
-        // Funcionalidade de RuleTicket e MailCollector será implementada na V2.
-        // Reservado para: processRouting($input, $entityId, $result);
-
         return $result;
     }
 
@@ -421,7 +424,7 @@ class Wizard {
         $entityId = $result['entity_id'] ?? 0;
 
         // =================================================================
-        // 1. Atualizar Entidade
+        // Atualizar Entidade
         // =================================================================
         if ($entityId <= 0) {
             $result['errors'][] = __('A infraestrutura não possui uma entidade gerenciada vinculada.', 'glpinewentity');
@@ -464,7 +467,7 @@ class Wizard {
         }
         
         // =================================================================
-        // 2. Atualizar Grupo Pai
+        // Atualizar Grupo Pai
         // =================================================================
         global $DB;
         $parentGroupId = 0;
@@ -493,7 +496,7 @@ class Wizard {
         }
 
         // =================================================================
-        // 3. Sincronizar Perfis
+        // Sincronizar Perfis
         // =================================================================
         $profileNames = $input['profiles_default'] ?? [];
         $profileAssignments = [];
@@ -623,12 +626,21 @@ class Wizard {
                 ]);
                 if (!$puId) {
                     $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), $assignment['new_name'], $userToAssign['email']);
+                } else {
+                    // Define a nova entidade e o perfil atrelado como os padrões do usuário nas preferências.
+                    // Se o usuário passar por várias atribuições em diferentes blocos (Admin, Atendimento, etc.), o último será o padrão definitivo.
+                    $userObj = new User();
+                    $userObj->update([
+                        'id'          => $userToAssign['id'],
+                        'entities_id' => $entityId,
+                        'profiles_id' => $profileId
+                    ]);
                 }
             }
         }
 
         // =================================================================
-        // 4. Sincronizar Subgrupos e Técnicos
+        // Sincronizar Subgrupos e Técnicos
         // =================================================================
         $subgroupsData = is_array($input['subgroups'] ?? null) ? $input['subgroups'] : [];
         
@@ -748,7 +760,7 @@ class Wizard {
         }
 
         // =================================================================
-        // 5. Sincronizar Categorias ITIL
+        // Sincronizar Categorias ITIL
         // =================================================================
         $childrenByParent = [];
         $categoryIterator = $DB->request([

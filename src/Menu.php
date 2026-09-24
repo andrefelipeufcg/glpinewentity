@@ -14,7 +14,7 @@ use Toolbox;
 
 class Menu extends CommonGLPI {
 
-    public static $rightname = 'entity';
+    public static string $rightname = 'entity';
 
     public static function getMenuName() {
         return __('GLPI New Entity', 'glpinewentity');
