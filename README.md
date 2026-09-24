@@ -1,10 +1,10 @@
 # GLPI New Entity Plugin - Criação de toda a estrutura de uma nova entidade em uma única tela
+[![GLPI 11](https://img.shields.io/badge/GLPI-11-blue.svg)](https://glpi-project.org/)
+[![GLPI 12](https://img.shields.io/badge/GLPI-12-FFD700.svg)](https://glpi-project.org/)
+[![License: GPL v3+](https://img.shields.io/badge/License-GPL%20v3%2B-green.svg)](https://www.gnu.org/licenses/gpl-3.0.html)
 
 <p align="center">
   <img src="./docs/images/logo.svg" alt="GLPI New Entity Logo" width="150"><br><br>
-  <img src="https://img.shields.io/badge/GLPI-11-blue.svg" alt="GLPI 11">
-  <img src="https://img.shields.io/badge/GLPI-12-FFD700.svg" alt="GLPI 12">
-  <img src="https://img.shields.io/badge/License-GPLv3%2B-green.svg" alt="License GPL v3+">
 </p>
 
 O **GLPI New Entity Plugin** é um plugin de "onboarding" rápido e otimizado desenvolvido para o GLPI 11/12. Ele tem o propósito de automatizar a configuração estrutural completa de um novo Setor / Departamento em um único formulário unificado ("Wizard"). 
