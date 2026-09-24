@@ -859,18 +859,13 @@ class Wizard {
                 }
             }
 
-            // Inativamos os subgrupos órfãos (para não aparecerem mais no plugin nem em novas atribuições)
-            // sem deletá-los, preservando o histórico de chamados.
+            // Deleta completamente os subgrupos órfãos (removidos do plugin),
+            // apagando-os da tela e da árvore de grupos do GLPI (purge).
             $groupObj = new \Group();
             foreach ($currentSubgroups as $sgName => $ids) {
                 foreach ($ids as $sgId) {
-                    if (!$groupObj->update([
-                        'id'           => $sgId,
-                        'is_assign'    => 0,
-                        'is_requester' => 0,
-                        'is_watcher'   => 0
-                    ])) {
-                        $result['errors'][] = sprintf(__('Falha ao inativar subgrupo órfão \'%s\'.', 'glpinewentity'), htmlspecialchars($sgName, ENT_QUOTES));
+                    if (!$groupObj->delete(['id' => $sgId], 1)) {
+                        $result['errors'][] = sprintf(__('Falha ao deletar o subgrupo órfão \'%s\'.', 'glpinewentity'), htmlspecialchars($sgName, ENT_QUOTES));
                     }
                 }
             }
@@ -879,55 +874,67 @@ class Wizard {
         // =================================================================
         // Sincronizar Categorias ITIL
         // =================================================================
-        $currentCategories = [];
-        $categoryIterator = $DB->request([
-            'SELECT' => ['id', 'name'],
+        $cat_iterator = $DB->request([
+            'SELECT' => ['id', 'name', 'itilcategories_id'],
             'FROM'   => 'glpi_itilcategories',
             'WHERE'  => ['entities_id' => $entityId],
+            'ORDER'  => 'completename ASC'
         ]);
-        foreach ($categoryIterator as $categoryRow) {
-            $currentCategories[$categoryRow['name']][] = $categoryRow['id'];
+        
+        $cats = [];
+        $children = [];
+        $allCatIds = [];
+        foreach ($cat_iterator as $row) {
+            $cats[$row['id']] = $row;
+            $children[$row['itilcategories_id']][] = $row['id'];
+            $allCatIds[] = $row['id'];
         }
 
-        $result['categories'] = [];
-        $lastIdAtDepth = [];
-        $catList = array_filter(array_map('trim', preg_split('/[\n]+/', $categoryNames)));
-        foreach ($catList as $line) {
-            preg_match('/^-+/', $line, $matches);
-            $hyphensCount = !empty($matches[0]) ? strlen($matches[0]) : 0;
-            $cleanName = trim(substr($line, $hyphensCount));
-            if (empty($cleanName)) {
-                continue;
-            }
-
-            $parentId = 0;
-            for ($depth = $hyphensCount - 1; $depth >= 0; $depth--) {
-                if (isset($lastIdAtDepth[$depth])) {
-                    $parentId = $lastIdAtDepth[$depth];
-                    break;
+        $oldCatList = [];
+        $buildTree = function ($parentId, $depth) use (&$buildTree, &$oldCatList, &$cats, &$children) {
+            if (isset($children[$parentId])) {
+                foreach ($children[$parentId] as $childId) {
+                    $prefix = str_repeat('-', $depth);
+                    $oldCatList[] = $prefix . $cats[$childId]['name'];
+                    $buildTree($childId, $depth + 1);
                 }
             }
+        };
+        $buildTree(0, 0);
+        
+        // Compara a árvore atual salva no banco (que já volta em ordem alfabética de completename)
+        // com o que foi submetido.
+        $oldCatString = trim(str_replace("\r", "", implode("\n", $oldCatList)));
+        $newCatString = trim(str_replace("\r", "", $categoryNames));
 
-            $categoryId = 0;
-            if (!empty($currentCategories[$cleanName])) {
-                // Reutiliza a categoria existente
-                $categoryId = array_shift($currentCategories[$cleanName]);
-                
-                // Atualiza o pai caso tenha mudado e restaura as flags de visibilidade
-                $category = new ITILCategory();
-                if (!$category->update([
-                    'id'                 => $categoryId,
-                    'itilcategories_id'  => $parentId,
-                    'is_helpdeskvisible' => 1,
-                    'is_incident'        => 1,
-                    'is_request'         => 1
-                ])) {
-                    $result['errors'][] = sprintf(__('Falha ao atualizar categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($cleanName, ENT_QUOTES));
+        if ($oldCatString !== $newCatString) {
+            // Houve alteração! O comportamento desejado é deletar TODAS as categorias da entidade e recriar.
+            $catObj = new \ITILCategory();
+            foreach (array_reverse($allCatIds) as $catId) {
+                // Deleta a partir do fim (filhos primeiro) para evitar problemas de restrição
+                $catObj->delete(['id' => $catId], 1);
+            }
+            
+            $result['categories'] = [];
+            $lastIdAtDepth = [];
+            $catList = array_filter(array_map('trim', explode("\n", $newCatString)));
+            foreach ($catList as $line) {
+                preg_match('/^-+/', $line, $matches);
+                $hyphensCount = !empty($matches[0]) ? strlen($matches[0]) : 0;
+                $cleanName = trim(substr($line, $hyphensCount));
+                if (empty($cleanName)) {
                     continue;
                 }
-            } else {
-                $category = new ITILCategory();
-                $categoryId = $category->add([
+
+                $parentId = 0;
+                for ($depth = $hyphensCount - 1; $depth >= 0; $depth--) {
+                    if (isset($lastIdAtDepth[$depth])) {
+                        $parentId = $lastIdAtDepth[$depth];
+                        break;
+                    }
+                }
+
+                $categoryId = $catObj->add([
                     'name'              => $cleanName,
                     'entities_id'       => $entityId,
                     'itilcategories_id' => $parentId,
@@ -935,36 +942,26 @@ class Wizard {
                     'is_incident'       => 1,
                     'is_request'        => 1,
                 ]);
+                
                 if (!$categoryId) {
                     $result['errors'][] = sprintf(__('Falha ao criar categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($cleanName, ENT_QUOTES));
                     continue;
                 }
-            }
 
-            $lastIdAtDepth[$hyphensCount] = $categoryId;
-            foreach (array_keys($lastIdAtDepth) as $depth) {
-                if ($depth > $hyphensCount) {
-                    unset($lastIdAtDepth[$depth]);
+                $lastIdAtDepth[$hyphensCount] = $categoryId;
+                foreach (array_keys($lastIdAtDepth) as $depth) {
+                    if ($depth > $hyphensCount) {
+                        unset($lastIdAtDepth[$depth]);
+                    }
                 }
-            }
-            $result['categories'][] = [
-                'id'   => $categoryId,
-                'name' => $cleanName,
-            ];
-        }
-
-        // Inativar as categorias órfãs (não deletamos para manter histórico)
-        $catObj = new \ITILCategory();
-        foreach ($currentCategories as $name => $ids) {
-            foreach ($ids as $cId) {
-                $catObj->update([
-                    'id'                 => $cId,
-                    'is_helpdeskvisible' => 0,
-                    'is_incident'        => 0,
-                    'is_request'         => 0
-                ]);
+                $result['categories'][] = [
+                    'id'   => $categoryId,
+                    'name' => $cleanName,
+                ];
             }
         }
+        // Se as strings forem exatamente iguais, não faz nada no banco 
+        // e preserva os metadados existentes intactos.
 
         return $result;
     }
