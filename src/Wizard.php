@@ -201,7 +201,7 @@ class Wizard {
         $result['profiles'] = [];
 
         foreach ($profileAssignments as $assignment) {
-            if (!\Profile::currentUserHaveMoreRightThan($assignment['source_profile_id'])) {
+            if (!\Profile::currentUserHaveMoreRightThan([$assignment['source_profile_id']])) {
                 $result['errors'][] = sprintf(__('Sem permissão para clonar o perfil #%d.', 'glpinewentity'), $assignment['source_profile_id']);
                 continue;
             }
@@ -599,7 +599,7 @@ class Wizard {
             $newName = $assignment['new_name'];
 
             // Checagem de segurança (Impede escalar privilégios via edição)
-            if (!\Profile::currentUserHaveMoreRightThan($assignment['source_profile_id'])) {
+            if (!\Profile::currentUserHaveMoreRightThan([$assignment['source_profile_id']])) {
                 $result['errors'][] = sprintf(__('Sem permissão para clonar o perfil #%d.', 'glpinewentity'), $assignment['source_profile_id']);
                 continue;
             }
@@ -625,8 +625,14 @@ class Wizard {
                 
                 // Checagem de segurança: O usuário não pode se apropriar de um perfil existente 
                 // mais alto que ele (ex: submeter o nome 'Super-Admin' maliciosamente)
-                if (!\Profile::currentUserHaveMoreRightThan($profileId)) {
+                if (!\Profile::currentUserHaveMoreRightThan([$profileId])) {
                     $result['errors'][] = sprintf(__('Sem permissão para reutilizar e atribuir o perfil \'%s\'.', 'glpinewentity'), htmlspecialchars($newName, ENT_QUOTES));
+                    continue;
+                }
+                
+                // Regra de Negócio extra: Garante que o perfil reutilizado também não seja Super-Admin
+                if (self::isSuperAdminProfile($profileId)) {
+                    $result['errors'][] = sprintf(__('O perfil \'%s\' é Super-Admin e não pode ser atribuído por este assistente.', 'glpinewentity'), htmlspecialchars($newName, ENT_QUOTES));
                     continue;
                 }
             } else {
