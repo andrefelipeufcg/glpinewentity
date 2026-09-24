@@ -846,13 +846,15 @@ class Wizard {
             // Inativamos os subgrupos órfãos (para não aparecerem mais no plugin nem em novas atribuições)
             // sem deletá-los, preservando o histórico de chamados.
             $groupObj = new \Group();
-            foreach ($currentSubgroups as $sgId) {
-                $groupObj->update([
-                    'id'           => $sgId,
-                    'is_assign'    => 0,
-                    'is_requester' => 0,
-                    'is_watcher'   => 0
-                ]);
+            foreach ($currentSubgroups as $sgName => $ids) {
+                foreach ($ids as $sgId) {
+                    $groupObj->update([
+                        'id'           => $sgId,
+                        'is_assign'    => 0,
+                        'is_requester' => 0,
+                        'is_watcher'   => 0
+                    ]);
+                }
             }
         }
 
