@@ -802,10 +802,13 @@ class Wizard {
                 
                 // Atualiza o pai caso tenha mudado
                 $category = new ITILCategory();
-                $category->update([
+                if (!$category->update([
                     'id'                => $categoryId,
                     'itilcategories_id' => $parentId
-                ]);
+                ])) {
+                    $result['errors'][] = sprintf(__('Falha ao atualizar categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($cleanName, ENT_QUOTES));
+                    continue;
+                }
             } else {
                 $category = new ITILCategory();
                 $categoryId = $category->add([
