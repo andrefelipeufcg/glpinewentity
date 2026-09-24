@@ -230,7 +230,7 @@ class Wizard {
             ];
 
             // Associar usuários ao NOVO perfil na entidade criada
-            $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
+            $usersList = array_filter(array_map('trim', preg_split('/[\n,;]+/', $assignment['users'])));
             $usersList = array_slice($usersList, 0, 100); // Previne exaustão
             foreach ($usersList as $userEmail) {
                 if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
@@ -309,7 +309,7 @@ class Wizard {
                 // Processa técnicos deste bloco
                 $techUserIds = [];
                 if (!empty($sgTechs)) {
-                    $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $sgTechs)));
+                    $techList = array_filter(array_map('trim', preg_split('/[\n,;]+/', $sgTechs)));
                     $techList = array_slice($techList, 0, 100); // Previne exaustão
                     foreach ($techList as $techEmail) {
                         if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
@@ -671,7 +671,7 @@ class Wizard {
             // Separa e-mails válidos para não descartar os demais por um erro isolado.
             $usersToAssign = [];
             if (!empty($assignment['users'])) {
-                $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
+                $usersList = array_filter(array_map('trim', preg_split('/[\n,;]+/', $assignment['users'])));
                 $usersList = array_slice($usersList, 0, 100); // Previne exaustão
                 foreach ($usersList as $userEmail) {
                     if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
@@ -830,7 +830,7 @@ class Wizard {
                 }
 
                 if (!empty($sgTechs)) {
-                    $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $sgTechs)));
+                    $techList = array_filter(array_map('trim', preg_split('/[\n,;]+/', $sgTechs)));
                     $techList = array_slice($techList, 0, 100); // Previne exaustão
                     foreach ($techList as $techEmail) {
                         if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
