@@ -35,6 +35,18 @@ if ($sectorId > 0) {
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');
         }
+
+        // Prevenção de Information Disclosure: Checar acesso à entidade gerenciada (filha)
+        // Se o usuário não tem acesso à entidade gerada, ele não pode ver o formulário
+        // porque o showForm() fará queries na entidade filha para popular a tela.
+        $meta = json_decode($sectorObj->fields['metadata'] ?? '{}', true);
+        $managedEntity = (int)($meta['entity_id'] ?? 0);
+        if ($managedEntity > 0 && !Session::haveAccessToEntity($managedEntity)) {
+            Session::addMessageAfterRedirect(__('Acesso negado à entidade gerenciada por este setor.', 'glpinewentity'), false, ERROR);
+            global $CFG_GLPI;
+            Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');
+        }
+
         $isEdit = true;
     } else {
         global $CFG_GLPI;
@@ -50,14 +62,6 @@ if (isset($_POST['process_wizard'])) {
         $newParent = (int)($_POST['parent_entity'] ?? 0);
         if (!Session::haveAccessToEntity($newParent)) {
             Session::addMessageAfterRedirect(__('Acesso negado à nova entidade pai escolhida.', 'glpinewentity'), false, ERROR);
-            global $CFG_GLPI;
-            Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $sectorId);
-        }
-
-        $meta = json_decode($sectorObj->fields['metadata'] ?? '{}', true);
-        $managedEntity = (int)($meta['entity_id'] ?? 0);
-        if ($managedEntity > 0 && !Session::haveAccessToEntity($managedEntity)) {
-            Session::addMessageAfterRedirect(__('Acesso negado à entidade gerenciada por este setor.', 'glpinewentity'), false, ERROR);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $sectorId);
         }
