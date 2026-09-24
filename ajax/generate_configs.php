@@ -77,6 +77,11 @@ if ($new_entity_id <= 0) {
     exit;
 }
 
+if (!\Session::haveAccessToEntity($new_entity_id)) {
+    echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste setor.', 'glpinewentity')]);
+    exit;
+}
+
 $tabKey = 'tab_' . $tabnum;
 $savedConfigs = $meta['configs'][$tabKey] ?? [];
 

@@ -167,6 +167,11 @@ class Wizard {
         $result['profiles'] = [];
 
         foreach ($profileAssignments as $assignment) {
+            if (!\Profile::currentUserHaveMoreRightThan($assignment['source_profile_id'])) {
+                $result['errors'][] = sprintf(__('Sem permissão para clonar o perfil #%d.', 'glpinewentity'), $assignment['source_profile_id']);
+                continue;
+            }
+
             // 1. Clonar o perfil (criar novo Profile com os mesmos direitos)
             $newProfileId = self::cloneProfile(
                 $assignment['source_profile_id'],
