@@ -45,6 +45,7 @@ if ($sectorId > 0) {
 if (isset($_POST['process_wizard'])) {
     Session::checkValidSessionId();
     if ($isEdit) {
+        Session::checkRight("plugin_glpinewentity", UPDATE);
         $result = Wizard::processUpdate($_POST, $sectorObj->fields);
 
         // Mantém o formulário e o metadata alinhados aos dados já processados.
@@ -66,6 +67,7 @@ if (isset($_POST['process_wizard'])) {
         global $CFG_GLPI;
         Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $sectorId);
     } else {
+        Session::checkRight("plugin_glpinewentity", CREATE);
         $result = Wizard::processCreation($_POST);
         
         if (empty($result['errors']) && !empty($result['entity_id'])) {
