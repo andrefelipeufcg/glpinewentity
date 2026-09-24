@@ -1,3 +1,7 @@
+<div align="right">
+  🇧🇷 <a href="./README.md">Português</a> | 🇬🇧 <a href="./docs/readme/README.en.md">English</a> 
+</div>
+
 # GLPI New Entity Plugin - Criação de toda a estrutura de uma nova entidade em uma única tela
 [![GLPI 11](https://img.shields.io/badge/GLPI-11-blue.svg)](https://glpi-project.org/)
 [![GLPI 12](https://img.shields.io/badge/GLPI-12-FFD700.svg)](https://glpi-project.org/)
