@@ -129,6 +129,11 @@ class Wizard {
         $entityName = strtoupper($sectorAbbr);
 
         $entity = new Entity();
+        if (!$entity->can(-1, CREATE, ['entities_id' => $parentEntity])) {
+            $result['errors'][] = __('Você não tem permissão para criar uma entidade sob a entidade pai selecionada.', 'glpinewentity');
+            return $result;
+        }
+
         $entityId = $entity->add([
             'name'        => $entityName,
             'entities_id' => $parentEntity,
@@ -249,13 +254,20 @@ class Wizard {
                     continue;
                 }
                 
-                $profileUser = new Profile_User();
-                $puId = $profileUser->add([
+                $puInput = [
                     'users_id'     => $userId,
                     'profiles_id'  => $newProfileId,
                     'entities_id'  => $entityId,
                     'is_recursive' => 1,
-                ]);
+                ];
+
+                $profileUser = new Profile_User();
+                if (!$profileUser->can(-1, CREATE, $puInput)) {
+                    $result['errors'][] = sprintf(__('Você não tem permissão para atribuir o perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
+                    continue;
+                }
+
+                $puId = $profileUser->add($puInput);
 
                 if (!$puId) {
                     $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
@@ -1048,6 +1060,11 @@ class Wizard {
         // Carrega o perfil-fonte
         $sourceProfile = new Profile();
         if (!$sourceProfile->getFromDB($sourceProfileId)) {
+            return false;
+        }
+
+        if (!\Profile::currentUserHaveMoreRightThan($sourceProfileId)) {
+            \Session::addMessageAfterRedirect(__('Você não tem permissão para clonar um perfil com direitos superiores aos seus.', 'glpinewentity'), false, ERROR);
             return false;
         }
 
