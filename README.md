@@ -1,6 +1,8 @@
 # GLPI New Entity Plugin - Criação de toda a estrutura de uma nova entidade em uma única tela
 
-![GLPI New Entity Logo](./docs/images/logo.svg)
+<p align="center">
+  <img src="./docs/images/logo.svg" alt="GLPI New Entity Logo" width="150">
+</p>
 
 O **GLPI New Entity Plugin** é um plugin de "onboarding" rápido e otimizado desenvolvido especificamente para o GLPI 11. Ele tem o propósito de automatizar a configuração estrutural completa de um novo Setor / Departamento em um único formulário unificado ("Wizard"). 
 
@@ -67,6 +69,9 @@ O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descrit
 ![Lista de Setores](./docs/images/screenshot5.png)
 
 7. **Ajustes e Configurações Avançadas:** Após salvar, retorne à lista e clique no nome do setor que acabou de criar para editá-lo. Você notará que agora estão disponíveis novas abas de configuração, permitindo personalizar toda a operação de forma exclusiva para esta entidade:
+
+![Abas de Configuração](./docs/images/screenshot6.png)
+
    *   **Infraestrutura da entidade:** Retorna ao formulário do Wizard para edição de membros, grupos e categorias.
    *   **Modelos de Chamado:** Crie e associe templates de chamados específicos.
    *   **Respostas Básicas:** Configure textos padronizados para os atendimentos.
