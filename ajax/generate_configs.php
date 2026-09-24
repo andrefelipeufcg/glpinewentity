@@ -90,6 +90,42 @@ if (empty($savedConfigs)) {
     exit;
 }
 
+// Prevenção de IDOR: Valida todos os IDs referenciados no rascunho antes de processar
+$classMap = [
+    1 => \TicketTemplate::class,
+    2 => \ITILFollowupTemplate::class,
+    3 => \SolutionTemplate::class,
+    4 => \PendingReason::class,
+    5 => \Notification::class,
+    6 => \Glpi\Form\Form::class,
+];
+$itemClass = $classMap[$tabnum] ?? null;
+
+if ($itemClass && class_exists($itemClass)) {
+    foreach ($savedConfigs as $config) {
+        $generatedId = (int)($config['generated_id'] ?? 0);
+        if ($generatedId > 0) {
+            $item = new $itemClass();
+            if ($item->getFromDB($generatedId)) {
+                if ($item->fields['entities_id'] != $new_entity_id) {
+                    echo json_encode(['success' => false, 'error' => "Violação de segurança: O item gerado #$generatedId não pertence à entidade gerenciada."]);
+                    exit;
+                }
+            }
+        }
+        $sourceId = (int)($config['copy_from'] ?? 0);
+        if ($sourceId > 0) {
+            $item = new $itemClass();
+            if ($item->getFromDB($sourceId)) {
+                if (!\Session::haveAccessToEntity($item->fields['entities_id'])) {
+                    echo json_encode(['success' => false, 'error' => "Sem permissão para clonar o item #$sourceId (acesso negado à entidade de origem)."]);
+                    exit;
+                }
+            }
+        }
+    }
+}
+
 try {
     $count = 0;
     $updatedConfigs = [];
