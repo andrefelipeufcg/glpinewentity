@@ -1,10 +1,13 @@
 # GLPI New Entity Plugin - Criação de toda a estrutura de uma nova entidade em uma única tela
 
 <p align="center">
-  <img src="./docs/images/logo.svg" alt="GLPI New Entity Logo" width="150">
+  <img src="./docs/images/logo.svg" alt="GLPI New Entity Logo" width="150"><br><br>
+  <img src="https://img.shields.io/badge/GLPI-11-blue.svg" alt="GLPI 11">
+  <img src="https://img.shields.io/badge/GLPI-12-FFD700.svg" alt="GLPI 12">
+  <img src="https://img.shields.io/badge/License-GPLv3%2B-green.svg" alt="License GPL v3+">
 </p>
 
-O **GLPI New Entity Plugin** é um plugin de "onboarding" rápido e otimizado desenvolvido especificamente para o GLPI 11. Ele tem o propósito de automatizar a configuração estrutural completa de um novo Setor / Departamento em um único formulário unificado ("Wizard"). 
+O **GLPI New Entity Plugin** é um plugin de "onboarding" rápido e otimizado desenvolvido para o GLPI 11/12. Ele tem o propósito de automatizar a configuração estrutural completa de um novo Setor / Departamento em um único formulário unificado ("Wizard"). 
 
 Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades, configurar perfis, vincular usuários, criar grupos, associar técnicos e montar catálogos de serviços (categorias), este plugin resolve todo o processo em uma única tela, garantindo extrema agilidade, organização padronizada e minimizando erros humanos.
 
@@ -33,7 +36,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 ## 🛠️ Requisitos
 
 *   **GLPI:** Versão 11.0.0 ou superior.
-*   **PHP:** Versões suportadas pelo GLPI 11 (8.1, 8.2, 8.3, 8.4).
+*   **PHP:** Versões suportadas pelo GLPI 11 ou superior (8.1, 8.2, 8.3, 8.4).
 
 ## 🚀 Instalação
 
