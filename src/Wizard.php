@@ -194,18 +194,18 @@ class Wizard {
             $usersList = array_slice($usersList, 0, 100); // Previne exaustão
             foreach ($usersList as $userEmail) {
                 if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
-                    $result['errors'][] = sprintf(__('E-mail de usuário inválido para perfil %s: %s. Ignorado.', 'glpinewentity'), $assignment['label'], $userEmail);
+                    $result['errors'][] = sprintf(__('E-mail de usuário inválido para perfil %s: %s. Ignorado.', 'glpinewentity'), htmlspecialchars($assignment['label'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
                     continue;
                 }
                 
                 $userId = self::findUserByEmail($userEmail);
                 if (!$userId) {
-                    $result['errors'][] = sprintf(__('Usuário \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $userEmail);
+                    $result['errors'][] = sprintf(__('Usuário \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), htmlspecialchars($userEmail, ENT_QUOTES));
                     continue;
                 }
 
                 if (!self::canAssignProfile($userId, $newProfileId, $entityId)) {
-                    $result['errors'][] = sprintf(__('Não foi possível atribuir o perfil \'%1$s\' ao usuário \'%2$s\': referência inválida.', 'glpinewentity'), $assignment['new_name'], $userEmail);
+                    $result['errors'][] = sprintf(__('Não foi possível atribuir o perfil \'%1$s\' ao usuário \'%2$s\': referência inválida.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
                     continue;
                 }
                 
@@ -218,7 +218,7 @@ class Wizard {
                 ]);
 
                 if (!$puId) {
-                    $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), $assignment['new_name'], $userEmail);
+                    $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
                 } else {
                     // Define a nova entidade e o perfil atrelado como os padrões do usuário nas preferências.
                     // Se o usuário passar por várias atribuições em diferentes blocos (Admin, Atendimento, etc.), o último será o padrão definitivo.
@@ -273,7 +273,7 @@ class Wizard {
                     $techList = array_slice($techList, 0, 100); // Previne exaustão
                     foreach ($techList as $techEmail) {
                         if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
-                            $result['errors'][] = sprintf(__('E-mail de técnico atendente inválido: %s. Ignorado.', 'glpinewentity'), $techEmail);
+                            $result['errors'][] = sprintf(__('E-mail de técnico atendente inválido: %s. Ignorado.', 'glpinewentity'), htmlspecialchars($techEmail, ENT_QUOTES));
                             continue;
                         }
                         $techUserId = self::findUserByEmail($techEmail);
@@ -284,7 +284,7 @@ class Wizard {
                                 'email' => $techEmail . ($sgName ? " -> {$sgName}" : " -> Pai"),
                             ];
                         } else {
-                            $result['errors'][] = sprintf(__('Técnico atendente \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $techEmail);
+                            $result['errors'][] = sprintf(__('Técnico atendente \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), htmlspecialchars($techEmail, ENT_QUOTES));
                         }
                     }
                 }
@@ -589,13 +589,13 @@ class Wizard {
                 $usersList = array_slice($usersList, 0, 100); // Previne exaustão
                 foreach ($usersList as $userEmail) {
                     if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
-                        $result['errors'][] = sprintf(__('E-mail de usuário inválido para perfil %s: %s.', 'glpinewentity'), $assignment['label'], $userEmail);
+                        $result['errors'][] = sprintf(__('E-mail de usuário inválido para perfil %s: %s.', 'glpinewentity'), htmlspecialchars($assignment['label'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
                         continue;
                     }
 
                     $userId = self::findUserByEmail($userEmail);
                     if (!$userId || !self::canAssignProfile($userId, $profileId, $entityId)) {
-                        $result['errors'][] = sprintf(__('Não foi possível atribuir o perfil \'%1$s\' ao usuário \'%2$s\': referência inválida.', 'glpinewentity'), $assignment['new_name'], $userEmail);
+                        $result['errors'][] = sprintf(__('Não foi possível atribuir o perfil \'%1$s\' ao usuário \'%2$s\': referência inválida.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
                         continue;
                     }
 
@@ -630,7 +630,7 @@ class Wizard {
                     'is_recursive' => 1,
                 ]);
                 if (!$puId) {
-                    $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), $assignment['new_name'], $userToAssign['email']);
+                    $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userToAssign['email'], ENT_QUOTES));
                 } else {
                     // Define a nova entidade e o perfil atrelado como os padrões do usuário nas preferências.
                     // Se o usuário passar por várias atribuições em diferentes blocos (Admin, Atendimento, etc.), o último será o padrão definitivo.
@@ -729,7 +729,7 @@ class Wizard {
                     $techList = array_slice($techList, 0, 100); // Previne exaustão
                     foreach ($techList as $techEmail) {
                         if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
-                            $result['errors'][] = sprintf(__('E-mail de técnico inválido: %s. Ignorado.', 'glpinewentity'), $techEmail);
+                            $result['errors'][] = sprintf(__('E-mail de técnico inválido: %s. Ignorado.', 'glpinewentity'), htmlspecialchars($techEmail, ENT_QUOTES));
                             continue;
                         }
                         $techUserId = self::findUserByEmail($techEmail);
@@ -740,7 +740,7 @@ class Wizard {
                                 'groups_id' => $targetGroupId,
                             ]);
                             if (!$guId) {
-                                $result['errors'][] = sprintf(__('Falha ao associar técnico \'%s\' ao subgrupo.', 'glpinewentity'), $techEmail);
+                                $result['errors'][] = sprintf(__('Falha ao associar técnico \'%s\' ao subgrupo.', 'glpinewentity'), htmlspecialchars($techEmail, ENT_QUOTES));
                             } else {
                                 $result['technicians'][] = [
                                     'id'    => $techUserId,
@@ -748,7 +748,7 @@ class Wizard {
                                 ];
                             }
                         } else {
-                            $result['errors'][] = sprintf(__('Técnico \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $techEmail);
+                            $result['errors'][] = sprintf(__('Técnico \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), htmlspecialchars($techEmail, ENT_QUOTES));
                         }
                     }
                 }
