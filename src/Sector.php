@@ -1887,7 +1887,10 @@ TWIG);
                             if (!match) return;
                             let currentBlockIndex = match[0];
                             
-                            let selectHtml = '<option value=\"-1\">' + siglaText + '</option>';
+                            select.empty();
+                            let defaultOption = $('<option>').val('-1').text(siglaText);
+                            select.append(defaultOption);
+                            
                             let hasCurrentValue = false;
                             if (currentValue === '-1') hasCurrentValue = true;
                             
@@ -1895,11 +1898,10 @@ TWIG);
                                 let parentInfo = availableParents[i];
                                 if (parentInfo.index === currentBlockIndex) break;
                                 
-                                selectHtml += '<option value=\"' + parentInfo.index + '\">' + parentInfo.name + '</option>';
+                                let opt = $('<option>').val(parentInfo.index).text(parentInfo.name);
+                                select.append(opt);
                                 if (currentValue === parentInfo.index) hasCurrentValue = true;
                             }
-                            
-                            select.html(selectHtml);
                             
                             if (hasCurrentValue) {
                                 select.val(currentValue);
