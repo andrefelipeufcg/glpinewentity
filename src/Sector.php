@@ -523,15 +523,15 @@ class Sector extends CommonDBTM {
                             }
                             
                             if (response.data.type) {
-                                block.find('.input-type').val(response.data.type);
+                                block.find('.input-type').val(response.data.type).trigger('change');
                             } else {
-                                block.find('.input-type').val('1');
+                                block.find('.input-type').val('1').trigger('change');
                             }
                             
                             if (response.data.itilcategories_id !== undefined) {
-                                block.find('.input-category').val(response.data.itilcategories_id);
+                                block.find('.input-category').val(response.data.itilcategories_id).trigger('change');
                             } else {
-                                block.find('.input-category').val('0');
+                                block.find('.input-category').val('0').trigger('change');
                             }
 
                             if (tabnum == 4) {
@@ -617,7 +617,7 @@ class Sector extends CommonDBTM {
                 }
 
                 block.find('.input-type').val('1');
-                block.find('.input-category').val('0');
+                block.find('.input-category').val('0').trigger('change');
                 
                 if (tabnum == 4) {
                     block.find('.input-is-default').val('0');
