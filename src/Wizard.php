@@ -848,12 +848,14 @@ class Wizard {
             $groupObj = new \Group();
             foreach ($currentSubgroups as $sgName => $ids) {
                 foreach ($ids as $sgId) {
-                    $groupObj->update([
+                    if (!$groupObj->update([
                         'id'           => $sgId,
                         'is_assign'    => 0,
                         'is_requester' => 0,
                         'is_watcher'   => 0
-                    ]);
+                    ])) {
+                        $result['errors'][] = sprintf(__('Falha ao inativar subgrupo órfão \'%s\'.', 'glpinewentity'), htmlspecialchars($sgName, ENT_QUOTES));
+                    }
                 }
             }
         }
