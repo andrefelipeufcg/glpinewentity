@@ -436,6 +436,11 @@ class Wizard {
             return $result;
         }
 
+        if (!\Session::haveAccessToEntity($entityId)) {
+            $result['errors'][] = __('Acesso negado à entidade gerenciada por este setor.', 'glpinewentity');
+            return $result;
+        }
+
         $entity = new Entity();
         if (!$entity->getFromDB($entityId)) {
             $result['errors'][] = __('A entidade gerenciada não foi encontrada. A edição foi cancelada para evitar vínculos inconsistentes.', 'glpinewentity');
