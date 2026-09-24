@@ -776,11 +776,14 @@ class Wizard {
                         // Consome um dos IDs disponíveis (para resolver duplicatas)
                         $targetGroupId = array_shift($currentSubgroups[$sgName]);
                         
-                        // Atualiza o pai caso tenha mudado
+                        // Atualiza o pai caso tenha mudado e restaura as flags caso estivesse inativo
                         $subg = new Group();
                         $subg->update([
-                            'id'        => $targetGroupId,
-                            'groups_id' => $mappedParentId
+                            'id'           => $targetGroupId,
+                            'groups_id'    => $mappedParentId,
+                            'is_assign'    => 1,
+                            'is_requester' => 1,
+                            'is_watcher'   => 1
                         ]);
                     } else {
                         // Criar subgrupo novo
