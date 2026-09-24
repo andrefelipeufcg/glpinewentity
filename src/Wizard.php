@@ -754,42 +754,20 @@ class Wizard {
                 }
             }
 
-            // Subgrupos que sobraram (foram removidos no form ou são duplicados rejeitados)
-            // Agora os deletamos para limpar a base de dados
-            $subgToDelete = new Group();
-            foreach ($currentSubgroups as $sgName => $idsArray) {
-                foreach ($idsArray as $idToDelete) {
-                    $subgToDelete->delete(['id' => $idToDelete], 1); // purge force para limpar
-                }
-            }
+            // Não deletamos os subgrupos órfãos que sobraram em $currentSubgroups para preservar o histórico de chamados.
         }
 
         // =================================================================
         // Sincronizar Categorias ITIL
         // =================================================================
-        $childrenByParent = [];
+        $currentCategories = [];
         $categoryIterator = $DB->request([
-            'SELECT' => ['id', 'itilcategories_id'],
+            'SELECT' => ['id', 'name'],
             'FROM'   => 'glpi_itilcategories',
             'WHERE'  => ['entities_id' => $entityId],
         ]);
         foreach ($categoryIterator as $categoryRow) {
-            $childrenByParent[(int) $categoryRow['itilcategories_id']][] = (int) $categoryRow['id'];
-        }
-
-        // Remove primeiro as folhas para preservar a integridade da hierarquia.
-        $categoryIdsToDelete = [];
-        $collectCategoriesToDelete = function (int $parentId) use (&$collectCategoriesToDelete, &$childrenByParent, &$categoryIdsToDelete): void {
-            foreach ($childrenByParent[$parentId] ?? [] as $childId) {
-                $collectCategoriesToDelete($childId);
-                $categoryIdsToDelete[] = $childId;
-            }
-        };
-        $collectCategoriesToDelete(0);
-
-        $category = new ITILCategory();
-        foreach ($categoryIdsToDelete as $categoryIdToDelete) {
-            $category->delete(['id' => $categoryIdToDelete], 1);
+            $currentCategories[$categoryRow['name']][] = $categoryRow['id'];
         }
 
         $result['categories'] = [];
@@ -811,18 +789,31 @@ class Wizard {
                 }
             }
 
-            $category = new ITILCategory();
-            $categoryId = $category->add([
-                'name'              => $cleanName,
-                'entities_id'       => $entityId,
-                'itilcategories_id' => $parentId,
-                'is_recursive'      => 1,
-                'is_incident'       => 1,
-                'is_request'        => 1,
-            ]);
-            if (!$categoryId) {
-                $result['errors'][] = sprintf(__('Falha ao criar categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($cleanName, ENT_QUOTES));
-                continue;
+            $categoryId = 0;
+            if (!empty($currentCategories[$cleanName])) {
+                // Reutiliza a categoria existente
+                $categoryId = array_shift($currentCategories[$cleanName]);
+                
+                // Atualiza o pai caso tenha mudado
+                $category = new ITILCategory();
+                $category->update([
+                    'id'                => $categoryId,
+                    'itilcategories_id' => $parentId
+                ]);
+            } else {
+                $category = new ITILCategory();
+                $categoryId = $category->add([
+                    'name'              => $cleanName,
+                    'entities_id'       => $entityId,
+                    'itilcategories_id' => $parentId,
+                    'is_recursive'      => 1,
+                    'is_incident'       => 1,
+                    'is_request'        => 1,
+                ]);
+                if (!$categoryId) {
+                    $result['errors'][] = sprintf(__('Falha ao criar categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($cleanName, ENT_QUOTES));
+                    continue;
+                }
             }
 
             $lastIdAtDepth[$hyphensCount] = $categoryId;
