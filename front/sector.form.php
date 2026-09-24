@@ -33,12 +33,12 @@ if ($sectorId > 0) {
         if (!Session::haveAccessToEntity($sectorObj->fields['entities_id'])) {
             Session::addMessageAfterRedirect(__('Acesso negado à entidade.', 'glpinewentity'), false, ERROR);
             global $CFG_GLPI;
-            Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
+            Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');
         }
         $isEdit = true;
     } else {
         global $CFG_GLPI;
-        Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
+        Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');
     }
 }
 
@@ -64,7 +64,7 @@ if (isset($_POST['process_wizard'])) {
             }
         }
         global $CFG_GLPI;
-        Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php?id=' . $sectorId);
+        Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $sectorId);
     } else {
         $result = Wizard::processCreation($_POST);
         
@@ -77,7 +77,7 @@ if (isset($_POST['process_wizard'])) {
             ]);
             Session::addMessageAfterRedirect(__('Infraestrutura criada com sucesso!', 'glpinewentity'), true, INFO);
             global $CFG_GLPI;
-            Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.php');
+            Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');
         } else {
             // Se houve erro durante a criação, mas a entidade foi criada, salvamos o que deu e redirecionamos para EDIÇÃO
             if (!empty($result['entity_id'])) {
@@ -92,14 +92,14 @@ if (isset($_POST['process_wizard'])) {
                 }
                 Session::addMessageAfterRedirect(__('Infraestrutura criada parcialmente. Verifique os erros.', 'glpinewentity'), false, WARNING);
                 global $CFG_GLPI;
-                Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php?id=' . $newSectorId);
+                Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $newSectorId);
             } else {
                 // Erro fatal logo no inicio. Volta para adicionar
                 foreach ($result['errors'] as $err) {
                     Session::addMessageAfterRedirect($err, false, ERROR);
                 }
                 global $CFG_GLPI;
-                Html::redirect($CFG_GLPI['root_doc'] . '/plugins/glpinewentity/front/sector.form.php');
+                Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php');
             }
         }
     }
