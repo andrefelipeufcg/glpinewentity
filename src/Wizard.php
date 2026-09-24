@@ -566,6 +566,12 @@ class Wizard {
                 $row = $existingProfile->current();
                 $profileId = (int)$row['id'];
             } else {
+                // Checagem de segurança (Impede escalar privilégios via edição)
+                if (!\Profile::currentUserHaveMoreRightThan($assignment['source_profile_id'])) {
+                    $result['errors'][] = sprintf(__('Sem permissão para clonar o perfil #%d.', 'glpinewentity'), $assignment['source_profile_id']);
+                    continue;
+                }
+
                 // Criar perfil novo (clonar do fonte)
                 $profileId = self::cloneProfile(
                     $assignment['source_profile_id'],
