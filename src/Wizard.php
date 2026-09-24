@@ -552,6 +552,12 @@ class Wizard {
         $result['profiles'] = [];
         foreach ($profileAssignments as $assignment) {
             $newName = $assignment['new_name'];
+
+            // Checagem de segurança (Impede escalar privilégios via edição)
+            if (!\Profile::currentUserHaveMoreRightThan($assignment['source_profile_id'])) {
+                $result['errors'][] = sprintf(__('Sem permissão para clonar o perfil #%d.', 'glpinewentity'), $assignment['source_profile_id']);
+                continue;
+            }
             
             // Verificar se o perfil já existe por nome
             $existingProfile = $DB->request([
@@ -566,19 +572,13 @@ class Wizard {
                 $row = $existingProfile->current();
                 $profileId = (int)$row['id'];
             } else {
-                // Checagem de segurança (Impede escalar privilégios via edição)
-                if (!\Profile::currentUserHaveMoreRightThan($assignment['source_profile_id'])) {
-                    $result['errors'][] = sprintf(__('Sem permissão para clonar o perfil #%d.', 'glpinewentity'), $assignment['source_profile_id']);
-                    continue;
-                }
-
                 // Criar perfil novo (clonar do fonte)
                 $profileId = self::cloneProfile(
                     $assignment['source_profile_id'],
                     $newName
                 );
                 if (!$profileId) {
-                    $result['errors'][] = sprintf(__('Falha ao criar o perfil \'%s\'.', 'glpinewentity'), $newName);
+                    $result['errors'][] = sprintf(__('Falha ao criar o perfil \'%s\'.', 'glpinewentity'), htmlspecialchars($newName, ENT_QUOTES));
                     continue;
                 }
             }
