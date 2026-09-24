@@ -82,6 +82,13 @@ if (!\Session::haveAccessToEntity($new_entity_id)) {
     exit;
 }
 
+// Prevenção de Escalada de Privilégio: Valida acesso à entidade pai do setor
+$parent_entity_id = (int)($sector->fields['entities_id'] ?? 0);
+if (!\Session::haveAccessToEntity($parent_entity_id)) {
+    echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade raiz deste setor.', 'glpinewentity')]);
+    exit;
+}
+
 $tabKey = 'tab_' . $tabnum;
 $savedConfigs = $meta['configs'][$tabKey] ?? [];
 
