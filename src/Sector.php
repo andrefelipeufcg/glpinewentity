@@ -353,8 +353,8 @@ class Sector extends CommonDBTM {
         echo "</div>";
 
         echo "<style>
-            .glpinewentity-form-category .select2-container, 
-            .glpinewentity-form-category .select2-selection--single {
+            .config-block .select2-container, 
+            .config-block .select2-selection--single {
                 max-width: none !important;
             }
         </style>";
@@ -896,7 +896,7 @@ class Sector extends CommonDBTM {
 
             $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
             $html .= "      <div style='flex: 1;'>";
-            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Calendário</label>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>&nbsp;<br>Calendário</label>";
             $html .= "          <select name='items_calendars_id[]' class='form-select select2-calendar input-calendars-id' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhum ---</option>";
             foreach (($extraOptions['calendars'] ?? []) as $cid => $cname) {
@@ -919,7 +919,7 @@ class Sector extends CommonDBTM {
 
             $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
             $html .= "      <div style='flex: 1;'>";
-            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Modelo de acompanhamento</label>";
+            $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>&nbsp;<br>Modelo de acompanhamento</label>";
             $html .= "          <select name='items_itilfollowuptemplates_id[]' class='form-select select2-foltpl input-itilfollowuptemplates-id' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhum ---</option>";
             foreach (($extraOptions['itilfollowuptemplates'] ?? []) as $fid => $fname) {
@@ -1440,8 +1440,9 @@ TWIG);
             padding-top: 15px !important;
             padding-bottom: 15px !important;
         }
-        /* Remove apenas o limite legado que corta a categoria nesta aba. */
-        .tab_cadre_fixe .glpinewentity-form-category .select2-container .select2-selection.select2-selection--single {
+        /* Remove o limite legado do GLPI que corta as combos (Select2) do wizard. */
+        .tab_cadre_fixe .select2-container .select2-selection.select2-selection--single,
+        .tab_cadre_fixe .select2-container {
             max-width: none !important;
         }
         /* Afastar texto da aba da borda direita */
@@ -1481,6 +1482,7 @@ TWIG);
         Entity::dropdown([
             'name'  => 'parent_entity',
             'value' => $def_parent_entity,
+            'width' => '100%',
         ]);
         echo "          <br><small class='text-muted'>Selecione sob qual entidade o novo setor será criado.</small>";
         echo "      </td>";
