@@ -27,9 +27,6 @@ if (!Session::haveRight('plugin_glpinewentity', UPDATE)) {
     exit;
 }
 
-// Validação de CSRF Token
-Session::checkCSRF();
-
 $action   = $_POST['action'] ?? '';
 $sectorId = (int)($_POST['sector_id'] ?? 0);
 $tabnum   = (int)($_POST['tabnum'] ?? 0);

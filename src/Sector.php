@@ -343,7 +343,6 @@ class Sector extends CommonDBTM {
         echo "<input type='hidden' name='action' value='save_draft'>";
         echo "<input type='hidden' name='sector_id' value='{$item->getID()}'>";
         echo "<input type='hidden' name='tabnum' value='{$tabnum}'>";
-        echo "<input type='hidden' name='_glpi_csrf_token' value='" . \Session::getNewCSRFToken() . "'>";
 
         echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
         echo "<tr><th colspan='2' style='font-size: 1.2em;'>Configuração de {$title}</th></tr>";
@@ -723,8 +722,7 @@ class Sector extends CommonDBTM {
                                 data: {
                                     action: 'generate',
                                     sector_id: sectorId,
-                                    tabnum: tabnum,
-                                    _glpi_csrf_token: $('input[name=\"_glpi_csrf_token\"]').val()
+                                    tabnum: tabnum
                                 },
                                 success: function(genResp) {
                                     if(genResp.success) {
