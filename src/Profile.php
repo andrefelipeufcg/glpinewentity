@@ -2,7 +2,7 @@
 namespace GlpiPlugin\Glpinewentity;
 
 class Profile extends \CommonDBTM {
-    static $rightname = 'plugin_glpinewentity';
+    public static string $rightname = 'plugin_glpinewentity';
 
     public static function getTypeName($nb = 0) {
         return __('GLPI New Entity', 'glpinewentity');
@@ -21,7 +21,7 @@ class Profile extends \CommonDBTM {
         ];
     }
 
-    public static function getTabNameForItem(\CommonGLPI $item, $withtemplate = 0) {
+    public function getTabNameForItem(\CommonGLPI $item, $withtemplate = 0) {
         if ($item->getType() == 'Profile') {
             return self::getTypeName(2);
         }
