@@ -522,17 +522,33 @@ class Wizard {
         global $DB;
         $parentGroupId = 0;
         
-        // Buscar grupo pai na entidade
+        // Identificação determinística do Grupo Raiz do Setor.
+        // Anteriormente, o código procurava o primeiro grupo com groups_id = 0.
+        // No entanto, se um subgrupo perdesse seu pai (deletado manualmente por um admin), 
+        // ele assumiria groups_id = 0 e se tornaria um "falso raiz", corrompendo toda a sincronização.
+        // A regra de negócio invariante é: o grupo raiz sempre terá o nome exato "({$oldSectorAbbr})".
+        $oldSectorAbbr = trim($existingFields['sector_abbr'] ?? '');
+        $expectedGroupName = "({$oldSectorAbbr})";
+        
+        // Buscar grupo pai na entidade estritamente pelo nome (invariante)
         $pgIter = $DB->request([
-            'SELECT' => ['id', 'groups_id'],
+            'SELECT' => ['id'],
             'FROM'   => 'glpi_groups',
-            'WHERE'  => ['entities_id' => $entityId]
+            'WHERE'  => [
+                'entities_id' => $entityId,
+                'name'        => $expectedGroupName
+            ],
+            'LIMIT'  => 1
         ]);
+        
         foreach ($pgIter as $row) {
-            if (empty($row['groups_id'])) {
-                $parentGroupId = $row['id'];
-                break;
-            }
+            $parentGroupId = $row['id'];
+        }
+        
+        // [FALLBACK] Se por algum motivo não for encontrado pelo nome (ex: renomeado manualmente por fora),
+        // busca o ID armazenado no metadata original salvo durante a criação do setor.
+        if ($parentGroupId <= 0) {
+            $parentGroupId = (int)($result['groups'][0]['id'] ?? 0);
         }
         
         if ($parentGroupId > 0) {
