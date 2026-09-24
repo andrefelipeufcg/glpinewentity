@@ -17,6 +17,38 @@ use ITILCategory;
 use User;
 
 class Wizard {
+    
+    /**
+     * Verifica dinamicamente se um perfil possui poderes de configuração globais (Super-Admin)
+     * independentemente do seu ID no banco de dados.
+     */
+    private static function isSuperAdminProfile(int $profileId): bool
+    {
+        global $DB;
+        
+        try {
+            $iter = $DB->request([
+                'SELECT' => 'rights',
+                'FROM'   => 'glpi_profilerights',
+                'WHERE'  => [
+                    'profiles_id' => $profileId,
+                    'name'        => 'config'
+                ]
+            ]);
+            
+            if ($iter->count() > 0) {
+                $row = $iter->current();
+                return ($row['rights'] & UPDATE) === UPDATE;
+            }
+        } catch (\Throwable $e) {
+            // Fallback nativo em caso de erro no banco (tabela inexistente em versões antigas/futuras)
+            if ($profileId == 4) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /**
      * Processa a criação de toda a infraestrutura do novo setor.
@@ -172,7 +204,13 @@ class Wizard {
                 continue;
             }
 
-            // 1. Clonar o perfil (criar novo Profile com os mesmos direitos)
+            // Regra de Negócio: Proíbe explicitamente a clonagem ou atribuição do Super-Admin (ID 4)
+            if (self::isSuperAdminProfile($assignment['source_profile_id'])) {
+                $result['errors'][] = __('Por motivos de segurança, não é permitido clonar ou atribuir o perfil Super-Admin através deste assistente.', 'glpinewentity');
+                continue;
+            }
+
+            // Clonar o perfil (criar novo Profile com os mesmos direitos)
             $newProfileId = self::cloneProfile(
                 $assignment['source_profile_id'],
                 $assignment['new_name']
@@ -189,7 +227,7 @@ class Wizard {
                 'name' => $assignment['new_name'],
             ];
 
-            // 2. Associar usuários ao NOVO perfil na entidade criada
+            // Associar usuários ao NOVO perfil na entidade criada
             $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
             $usersList = array_slice($usersList, 0, 100); // Previne exaustão
             foreach ($usersList as $userEmail) {
@@ -564,6 +602,12 @@ class Wizard {
                 continue;
             }
             
+            // Regra de Negócio: Proíbe explicitamente a clonagem ou atribuição do Super-Admin (ID 4)
+            if (self::isSuperAdminProfile($assignment['source_profile_id'])) {
+                $result['errors'][] = __('Por motivos de segurança, não é permitido clonar ou atribuir o perfil Super-Admin através deste assistente.', 'glpinewentity');
+                continue;
+            }
+            
             // Verificar se o perfil já existe por nome
             $existingProfile = $DB->request([
                 'SELECT' => 'id',
@@ -576,6 +620,13 @@ class Wizard {
             if (count($existingProfile) > 0) {
                 $row = $existingProfile->current();
                 $profileId = (int)$row['id'];
+                
+                // Checagem de segurança: O usuário não pode se apropriar de um perfil existente 
+                // mais alto que ele (ex: submeter o nome 'Super-Admin' maliciosamente)
+                if (!\Profile::currentUserHaveMoreRightThan($profileId)) {
+                    $result['errors'][] = sprintf(__('Sem permissão para reutilizar e atribuir o perfil \'%s\'.', 'glpinewentity'), htmlspecialchars($newName, ENT_QUOTES));
+                    continue;
+                }
             } else {
                 // Criar perfil novo (clonar do fonte)
                 $profileId = self::cloneProfile(
