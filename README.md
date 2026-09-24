@@ -30,7 +30,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
     *   **Motivos de Pendências**
     *   **Notificações**
     *   **Formulários Padrões**
-*   **Controle de Acesso Super-Admin:** A interface do plugin é 100% restrita ao perfil Super-Admin nativo do GLPI (ID 4), ocultando-se completamente para qualquer outro usuário, não gerando poluição visual nos menus de quem não possui privilégios para criar infraestruturas.
+*   **Controle de Acesso e Segurança Nativos:** Desenvolvido seguindo os padrões mais rígidos de desenvolvimento seguro do GLPI. A interface e todos os fluxos de criação (endpoints) são protegidos pela matriz dinâmica de direitos do sistema (ACL). A instalação concede acesso de forma inteligente a todos os perfis com nível de Super-Admin de forma nativa e agnóstica, não dependendo de IDs engessados e não gerando poluição visual para os demais usuários.
 *   **Edição e Atualização Sincronizada:** Em caso de ajustes futuros, o sistema armazena os metadados e permite reeditar os grupos, vínculos de e-mails ou nomes do setor a partir de um registro central.
 
 ## 🛠️ Requisitos
