@@ -720,16 +720,32 @@ class Wizard {
         $subgroupsData = is_array($input['subgroups'] ?? null) ? $input['subgroups'] : [];
         
         if ($parentGroupId > 0) {
-            // Buscar todos os subgrupos atuais na entidade
+            // Buscar todos os subgrupos atuais na entidade que pertençam à hierarquia do setor
             $currentSubgroups = [];
-            $sgIter = $DB->request([
-                'SELECT' => ['id', 'name'],
+            $allGroupsIter = $DB->request([
+                'SELECT' => ['id', 'name', 'groups_id'],
                 'FROM'   => 'glpi_groups',
                 'WHERE'  => ['entities_id' => $entityId]
             ]);
-            foreach ($sgIter as $row) {
-                if ($row['id'] != $parentGroupId) {
-                    $currentSubgroups[$row['name']][] = $row['id'];
+            $groupParents = [];
+            $groupNames = [];
+            foreach ($allGroupsIter as $row) {
+                $groupParents[$row['id']] = $row['groups_id'];
+                $groupNames[$row['id']] = $row['name'];
+            }
+            
+            // Função para verificar se um grupo descende do parentGroupId
+            $isDescendant = function($gId) use (&$groupParents, &$isDescendant, $parentGroupId) {
+                if (!isset($groupParents[$gId])) return false;
+                $pId = $groupParents[$gId];
+                if ($pId == $parentGroupId) return true;
+                if ($pId == 0) return false;
+                return $isDescendant($pId);
+            };
+            
+            foreach ($groupParents as $gId => $pId) {
+                if ($gId != $parentGroupId && $isDescendant($gId)) {
+                    $currentSubgroups[$groupNames[$gId]][] = $gId;
                 }
             }
 
@@ -874,11 +890,14 @@ class Wizard {
                 // Reutiliza a categoria existente
                 $categoryId = array_shift($currentCategories[$cleanName]);
                 
-                // Atualiza o pai caso tenha mudado
+                // Atualiza o pai caso tenha mudado e restaura as flags de visibilidade
                 $category = new ITILCategory();
                 if (!$category->update([
-                    'id'                => $categoryId,
-                    'itilcategories_id' => $parentId
+                    'id'                 => $categoryId,
+                    'itilcategories_id'  => $parentId,
+                    'is_helpdeskvisible' => 1,
+                    'is_incident'        => 1,
+                    'is_request'         => 1
                 ])) {
                     $result['errors'][] = sprintf(__('Falha ao atualizar categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($cleanName, ENT_QUOTES));
                     continue;
