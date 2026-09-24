@@ -208,8 +208,14 @@ switch ($tabnum) {
     case 6: // Form
         global $DB;
         if (class_exists('Glpi\\Plugin\\Formcreator\\Form') || class_exists('PluginFormcreatorForm') || $DB->tableExists('glpi_forms_forms')) {
+            // Verifica se está usando GLPI 12 nativo (glpi_forms_forms) ou Plugin Formcreator (glpi_plugin_formcreator_forms).
             $tableName = $DB->tableExists('glpi_forms_forms') ? 'glpi_forms_forms' : 'glpi_plugin_formcreator_forms';
+            
+            // O GLPI 12 removeu suporte ao método $DB->request('tabela', ['id' => $id]) (que passava o critério como 2º parâmetro).
+            // Passar o formato antigo gera um TypeError fatal "Argument #1 ($criteria) must be of type array, string given".
+            // Para ser compatível com GLPI 10 e 12, deve-se usar um array único com FROM e WHERE.
             $iter = $DB->request(['FROM' => $tableName, 'WHERE' => ['id' => $id]]);
+            
             if ($iter->count() > 0) {
                 $row = $iter->current();
                 if (!Session::haveAccessToEntity($row['entities_id'] ?? 0)) {
@@ -218,6 +224,8 @@ switch ($tabnum) {
                 }
                 $data['name'] = $row['name'] ?? '';
                 $data['description'] = $row['description'] ?? '';
+                
+                // Mapeia também a coluna antiga do Formcreator caso seja versão legada do plugin no GLPI 10
                 $data['forms_categories_id'] = $row['forms_categories_id'] ?? $row['plugin_formcreator_categories_id'] ?? 0;
 
                 // A ilustração pertence ao formulário, não à categoria selecionada.
