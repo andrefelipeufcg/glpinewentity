@@ -208,8 +208,8 @@ switch ($tabnum) {
     case 6: // Form
         global $DB;
         if (class_exists('Glpi\\Plugin\\Formcreator\\Form') || class_exists('PluginFormcreatorForm') || $DB->tableExists('glpi_forms_forms')) {
-            // Usando DB diretamente para segurança caso a classe não seja facilmente instanciável
-            $iter = $DB->request('glpi_forms_forms', ['id' => $id]);
+            $tableName = $DB->tableExists('glpi_forms_forms') ? 'glpi_forms_forms' : 'glpi_plugin_formcreator_forms';
+            $iter = $DB->request(['FROM' => $tableName, 'WHERE' => ['id' => $id]]);
             if ($iter->count() > 0) {
                 $row = $iter->current();
                 if (!Session::haveAccessToEntity($row['entities_id'] ?? 0)) {
@@ -218,7 +218,7 @@ switch ($tabnum) {
                 }
                 $data['name'] = $row['name'] ?? '';
                 $data['description'] = $row['description'] ?? '';
-                $data['forms_categories_id'] = $row['forms_categories_id'] ?? 0;
+                $data['forms_categories_id'] = $row['forms_categories_id'] ?? $row['plugin_formcreator_categories_id'] ?? 0;
 
                 // A ilustração pertence ao formulário, não à categoria selecionada.
                 $data['illustration'] = $row['illustration'] ?: 'request-service';
