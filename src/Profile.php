@@ -1,9 +1,17 @@
 <?php
 namespace GlpiPlugin\Glpinewentity;
 
-class Profile extends \CommonDBTM {
-    public static string $rightname = 'plugin_glpinewentity';
+if ((new \ReflectionProperty('\CommonDBTM', 'rightname'))->hasType()) {
+    class ProfileBase extends \CommonDBTM {
+        public static string $rightname = 'plugin_glpinewentity';
+    }
+} else {
+    class ProfileBase extends \CommonDBTM {
+        public static $rightname = 'plugin_glpinewentity';
+    }
+}
 
+class Profile extends ProfileBase {
     public static function getTypeName($nb = 0) {
         return __('GLPI New Entity', 'glpinewentity');
     }

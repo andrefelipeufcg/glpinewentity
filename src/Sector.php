@@ -19,11 +19,23 @@ if (!defined('GLPI_ROOT')) {
     die("Sorry. You can't access this file directly");
 }
 
-class Sector extends CommonDBTM {
+// GLPI 12 exige tipagem forte em $rightname (string), enquanto GLPI 10/11 proíbe.
+if ((new \ReflectionProperty('\CommonDBTM', 'rightname'))->hasType()) {
+    abstract class SectorBase extends CommonDBTM {
+        public static string $rightname = 'plugin_glpinewentity';
+    }
+} else {
+    abstract class SectorBase extends CommonDBTM {
+        public static $rightname = 'plugin_glpinewentity';
+    }
+}
+
+class Sector extends SectorBase {
     
-    public static string $rightname = 'plugin_glpinewentity';
-    // Permite que o endpoint nativo das abas carregue o registro durante a edição.
-    public bool $get_item_to_display_tab = true;
+    public function __construct() {
+        $this->get_item_to_display_tab = true;
+        parent::__construct();
+    }
 
     public static function canCreate(): bool {
         return Session::haveRight('plugin_glpinewentity', CREATE);
