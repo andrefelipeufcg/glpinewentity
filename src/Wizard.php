@@ -129,7 +129,14 @@ class Wizard {
         $entityName = strtoupper($sectorAbbr);
 
         $entity = new Entity();
-        if (!$entity->can(-1, CREATE, ['entities_id' => $parentEntity])) {
+
+        if ($entity->getFromDBByCrit(['name' => $entityName, 'entities_id' => $parentEntity])) {
+            $result['errors'][] = sprintf(__('Já existe uma entidade com a sigla \'%s\' sob a entidade pai selecionada. Escolha outra sigla ou exclua a entidade existente.', 'glpinewentity'), htmlspecialchars($entityName, ENT_QUOTES));
+            return $result;
+        }
+
+        $entityInput = ['entities_id' => $parentEntity];
+        if (!$entity->can(-1, CREATE, $entityInput)) {
             $result['errors'][] = __('Você não tem permissão para criar uma entidade sob a entidade pai selecionada.', 'glpinewentity');
             return $result;
         }
@@ -1063,7 +1070,7 @@ class Wizard {
             return false;
         }
 
-        if (!\Profile::currentUserHaveMoreRightThan($sourceProfileId)) {
+        if (!\Profile::currentUserHaveMoreRightThan([$sourceProfileId])) {
             \Session::addMessageAfterRedirect(__('Você não tem permissão para clonar um perfil com direitos superiores aos seus.', 'glpinewentity'), false, ERROR);
             return false;
         }
