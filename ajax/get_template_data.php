@@ -41,6 +41,10 @@ switch ($tabnum) {
     case 1: // TicketTemplate
         $item = new TicketTemplate();
         if ($item->getFromDB($id)) {
+            if (!Session::haveAccessToEntity($item->fields['entities_id'])) {
+                echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste modelo.', 'glpinewentity')]);
+                exit;
+            }
             $data['name'] = $item->fields['name'] ?? '';
             // Campos pré-definidos
             global $DB;
@@ -74,6 +78,10 @@ switch ($tabnum) {
     case 2: // ITILFollowupTemplate
         $item = new ITILFollowupTemplate();
         if ($item->getFromDB($id)) {
+            if (!Session::haveAccessToEntity($item->fields['entities_id'])) {
+                echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste modelo.', 'glpinewentity')]);
+                exit;
+            }
             $data['name'] = $item->fields['name'] ?? '';
             $data['content'] = $item->fields['content'] ?? '';
         }
@@ -81,6 +89,10 @@ switch ($tabnum) {
     case 3: // SolutionTemplate
         $item = new SolutionTemplate();
         if ($item->getFromDB($id)) {
+            if (!Session::haveAccessToEntity($item->fields['entities_id'])) {
+                echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste modelo.', 'glpinewentity')]);
+                exit;
+            }
             $data['name'] = $item->fields['name'] ?? '';
             $data['content'] = $item->fields['content'] ?? '';
         }
@@ -88,6 +100,10 @@ switch ($tabnum) {
     case 4: // PendingReason
         $item = new PendingReason();
         if ($item->getFromDB($id)) {
+            if (!Session::haveAccessToEntity($item->fields['entities_id'])) {
+                echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste modelo.', 'glpinewentity')]);
+                exit;
+            }
             $data['name'] = $item->fields['name'] ?? '';
             $data['comment'] = $item->fields['comment'] ?? '';
             $data['is_default'] = $item->fields['is_default'] ?? 0;
@@ -102,6 +118,10 @@ switch ($tabnum) {
     case 5: // Notification
         $item = new Notification();
         if ($item->getFromDB($id)) {
+            if (!Session::haveAccessToEntity($item->fields['entities_id'])) {
+                echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste modelo.', 'glpinewentity')]);
+                exit;
+            }
             $data['name'] = $item->fields['name'] ?? '';
             $data['is_active'] = $item->fields['is_active'] ?? 0;
             $data['itemtype'] = $item->fields['itemtype'] ?? 'Ticket';
@@ -188,13 +208,25 @@ switch ($tabnum) {
     case 6: // Form
         global $DB;
         if (class_exists('Glpi\\Plugin\\Formcreator\\Form') || class_exists('PluginFormcreatorForm') || $DB->tableExists('glpi_forms_forms')) {
-            // Usando DB diretamente para segurança caso a classe não seja facilmente instanciável
-            $iter = $DB->request('glpi_forms_forms', ['id' => $id]);
+            // Verifica se está usando GLPI 12 nativo (glpi_forms_forms) ou Plugin Formcreator (glpi_plugin_formcreator_forms).
+            $tableName = $DB->tableExists('glpi_forms_forms') ? 'glpi_forms_forms' : 'glpi_plugin_formcreator_forms';
+            
+            // O GLPI 12 removeu suporte ao método $DB->request('tabela', ['id' => $id]) (que passava o critério como 2º parâmetro).
+            // Passar o formato antigo gera um TypeError fatal "Argument #1 ($criteria) must be of type array, string given".
+            // Para ser compatível com GLPI 10 e 12, deve-se usar um array único com FROM e WHERE.
+            $iter = $DB->request(['FROM' => $tableName, 'WHERE' => ['id' => $id]]);
+            
             if ($iter->count() > 0) {
                 $row = $iter->current();
+                if (!Session::haveAccessToEntity($row['entities_id'] ?? 0)) {
+                    echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste formulário.', 'glpinewentity')]);
+                    exit;
+                }
                 $data['name'] = $row['name'] ?? '';
                 $data['description'] = $row['description'] ?? '';
-                $data['forms_categories_id'] = $row['forms_categories_id'] ?? 0;
+                
+                // Mapeia também a coluna antiga do Formcreator caso seja versão legada do plugin no GLPI 10
+                $data['forms_categories_id'] = $row['forms_categories_id'] ?? $row['plugin_formcreator_categories_id'] ?? 0;
 
                 // A ilustração pertence ao formulário, não à categoria selecionada.
                 $data['illustration'] = $row['illustration'] ?: 'request-service';

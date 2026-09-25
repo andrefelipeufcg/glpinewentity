@@ -17,6 +17,40 @@ use ITILCategory;
 use User;
 
 class Wizard {
+    
+    /**
+     * Verifica dinamicamente se um perfil possui poderes de configuração globais (Super-Admin)
+     * independentemente do seu ID no banco de dados.
+     */
+    private static function isSuperAdminProfile(int $profileId): bool
+    {
+        try {
+            // Método nativo do GLPI (disponível a partir do GLPI 10)
+            if (method_exists('\Profile', 'getSuperAdminProfilesId')) {
+                return in_array($profileId, \Profile::getSuperAdminProfilesId());
+            }
+
+            // Fallback dinâmico para versões antigas: verifica direito de config
+            global $DB;
+            $iter = $DB->request([
+                'SELECT' => 'rights',
+                'FROM'   => 'glpi_profilerights',
+                'WHERE'  => [
+                    'profiles_id' => $profileId,
+                    'name'        => 'config'
+                ]
+            ]);
+            if ($iter->count() > 0) {
+                $row = $iter->current();
+                return ($row['rights'] & UPDATE) === UPDATE;
+            }
+        } catch (\Throwable $e) {
+            // Se qualquer chamada falhar, recorre ao ID padrão do GLPI
+            return ($profileId == 4);
+        }
+
+        return false;
+    }
 
     /**
      * Processa a criação de toda a infraestrutura do novo setor.
@@ -95,6 +129,18 @@ class Wizard {
         $entityName = strtoupper($sectorAbbr);
 
         $entity = new Entity();
+
+        if ($entity->getFromDBByCrit(['name' => $entityName, 'entities_id' => $parentEntity])) {
+            $result['errors'][] = sprintf(__('Já existe uma entidade com a sigla \'%s\' sob a entidade pai selecionada. Escolha outra sigla ou exclua a entidade existente.', 'glpinewentity'), htmlspecialchars($entityName, ENT_QUOTES));
+            return $result;
+        }
+
+        $entityInput = ['entities_id' => $parentEntity];
+        if (!$entity->can(-1, CREATE, $entityInput)) {
+            $result['errors'][] = __('Você não tem permissão para criar uma entidade sob a entidade pai selecionada.', 'glpinewentity');
+            return $result;
+        }
+
         $entityId = $entity->add([
             'name'        => $entityName,
             'entities_id' => $parentEntity,
@@ -167,7 +213,18 @@ class Wizard {
         $result['profiles'] = [];
 
         foreach ($profileAssignments as $assignment) {
-            // 1. Clonar o perfil (criar novo Profile com os mesmos direitos)
+            if (!\Profile::currentUserHaveMoreRightThan([$assignment['source_profile_id']])) {
+                $result['errors'][] = sprintf(__('Sem permissão para clonar o perfil #%d.', 'glpinewentity'), $assignment['source_profile_id']);
+                continue;
+            }
+
+            // Regra de Negócio: Proíbe explicitamente a clonagem ou atribuição do Super-Admin (ID 4)
+            if (self::isSuperAdminProfile($assignment['source_profile_id'])) {
+                $result['errors'][] = __('Por motivos de segurança, não é permitido clonar ou atribuir o perfil Super-Admin através deste assistente.', 'glpinewentity');
+                continue;
+            }
+
+            // Clonar o perfil (criar novo Profile com os mesmos direitos)
             $newProfileId = self::cloneProfile(
                 $assignment['source_profile_id'],
                 $assignment['new_name']
@@ -184,36 +241,43 @@ class Wizard {
                 'name' => $assignment['new_name'],
             ];
 
-            // 2. Associar usuários ao NOVO perfil na entidade criada
-            $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
+            // Associar usuários ao NOVO perfil na entidade criada
+            $usersList = array_filter(array_map('trim', preg_split('/[\n,;]+/', $assignment['users'])));
             $usersList = array_slice($usersList, 0, 100); // Previne exaustão
             foreach ($usersList as $userEmail) {
                 if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
-                    $result['errors'][] = sprintf(__('E-mail de usuário inválido para perfil %s: %s. Ignorado.', 'glpinewentity'), $assignment['label'], $userEmail);
+                    $result['errors'][] = sprintf(__('E-mail de usuário inválido para perfil %s: %s. Ignorado.', 'glpinewentity'), htmlspecialchars($assignment['label'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
                     continue;
                 }
                 
                 $userId = self::findUserByEmail($userEmail);
                 if (!$userId) {
-                    $result['errors'][] = sprintf(__('Usuário \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $userEmail);
+                    $result['errors'][] = sprintf(__('Usuário \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), htmlspecialchars($userEmail, ENT_QUOTES));
                     continue;
                 }
 
                 if (!self::canAssignProfile($userId, $newProfileId, $entityId)) {
-                    $result['errors'][] = sprintf(__('Não foi possível atribuir o perfil \'%1$s\' ao usuário \'%2$s\': referência inválida.', 'glpinewentity'), $assignment['new_name'], $userEmail);
+                    $result['errors'][] = sprintf(__('Não foi possível atribuir o perfil \'%1$s\' ao usuário \'%2$s\': referência inválida.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
                     continue;
                 }
                 
-                $profileUser = new Profile_User();
-                $puId = $profileUser->add([
+                $puInput = [
                     'users_id'     => $userId,
                     'profiles_id'  => $newProfileId,
                     'entities_id'  => $entityId,
                     'is_recursive' => 1,
-                ]);
+                ];
+
+                $profileUser = new Profile_User();
+                if (!$profileUser->can(-1, CREATE, $puInput)) {
+                    $result['errors'][] = sprintf(__('Você não tem permissão para atribuir o perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
+                    continue;
+                }
+
+                $puId = $profileUser->add($puInput);
 
                 if (!$puId) {
-                    $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), $assignment['new_name'], $userEmail);
+                    $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
                 } else {
                     // Define a nova entidade e o perfil atrelado como os padrões do usuário nas preferências.
                     // Se o usuário passar por várias atribuições em diferentes blocos (Admin, Atendimento, etc.), o último será o padrão definitivo.
@@ -264,11 +328,11 @@ class Wizard {
                 // Processa técnicos deste bloco
                 $techUserIds = [];
                 if (!empty($sgTechs)) {
-                    $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $sgTechs)));
+                    $techList = array_filter(array_map('trim', preg_split('/[\n,;]+/', $sgTechs)));
                     $techList = array_slice($techList, 0, 100); // Previne exaustão
                     foreach ($techList as $techEmail) {
                         if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
-                            $result['errors'][] = sprintf(__('E-mail de técnico atendente inválido: %s. Ignorado.', 'glpinewentity'), $techEmail);
+                            $result['errors'][] = sprintf(__('E-mail de técnico atendente inválido: %s. Ignorado.', 'glpinewentity'), htmlspecialchars($techEmail, ENT_QUOTES));
                             continue;
                         }
                         $techUserId = self::findUserByEmail($techEmail);
@@ -279,7 +343,7 @@ class Wizard {
                                 'email' => $techEmail . ($sgName ? " -> {$sgName}" : " -> Pai"),
                             ];
                         } else {
-                            $result['errors'][] = sprintf(__('Técnico atendente \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $techEmail);
+                            $result['errors'][] = sprintf(__('Técnico atendente \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), htmlspecialchars($techEmail, ENT_QUOTES));
                         }
                     }
                 }
@@ -431,6 +495,11 @@ class Wizard {
             return $result;
         }
 
+        if (!\Session::haveAccessToEntity($entityId)) {
+            $result['errors'][] = __('Acesso negado à entidade gerenciada por este setor.', 'glpinewentity');
+            return $result;
+        }
+
         $entity = new Entity();
         if (!$entity->getFromDB($entityId)) {
             $result['errors'][] = __('A entidade gerenciada não foi encontrada. A edição foi cancelada para evitar vínculos inconsistentes.', 'glpinewentity');
@@ -472,17 +541,33 @@ class Wizard {
         global $DB;
         $parentGroupId = 0;
         
-        // Buscar grupo pai na entidade
+        // Identificação determinística do Grupo Raiz do Setor.
+        // Anteriormente, o código procurava o primeiro grupo com groups_id = 0.
+        // No entanto, se um subgrupo perdesse seu pai (deletado manualmente por um admin), 
+        // ele assumiria groups_id = 0 e se tornaria um "falso raiz", corrompendo toda a sincronização.
+        // A regra de negócio invariante é: o grupo raiz sempre terá o nome exato "({$oldSectorAbbr})".
+        $oldSectorAbbr = trim($existingFields['sector_abbr'] ?? '');
+        $expectedGroupName = "({$oldSectorAbbr})";
+        
+        // Buscar grupo pai na entidade estritamente pelo nome (invariante)
         $pgIter = $DB->request([
-            'SELECT' => ['id', 'groups_id'],
+            'SELECT' => ['id'],
             'FROM'   => 'glpi_groups',
-            'WHERE'  => ['entities_id' => $entityId]
+            'WHERE'  => [
+                'entities_id' => $entityId,
+                'name'        => $expectedGroupName
+            ],
+            'LIMIT'  => 1
         ]);
+        
         foreach ($pgIter as $row) {
-            if (empty($row['groups_id'])) {
-                $parentGroupId = $row['id'];
-                break;
-            }
+            $parentGroupId = $row['id'];
+        }
+        
+        // [FALLBACK] Se por algum motivo não for encontrado pelo nome (ex: renomeado manualmente por fora),
+        // busca o ID armazenado no metadata original salvo durante a criação do setor.
+        if ($parentGroupId <= 0) {
+            $parentGroupId = (int)($result['groups'][0]['id'] ?? 0);
         }
         
         if ($parentGroupId > 0) {
@@ -547,6 +632,18 @@ class Wizard {
         $result['profiles'] = [];
         foreach ($profileAssignments as $assignment) {
             $newName = $assignment['new_name'];
+
+            // Checagem de segurança (Impede escalar privilégios via edição)
+            if (!\Profile::currentUserHaveMoreRightThan([$assignment['source_profile_id']])) {
+                $result['errors'][] = sprintf(__('Sem permissão para clonar o perfil #%d.', 'glpinewentity'), $assignment['source_profile_id']);
+                continue;
+            }
+            
+            // Regra de Negócio: Proíbe explicitamente a clonagem ou atribuição do Super-Admin (ID 4)
+            if (self::isSuperAdminProfile($assignment['source_profile_id'])) {
+                $result['errors'][] = __('Por motivos de segurança, não é permitido clonar ou atribuir o perfil Super-Admin através deste assistente.', 'glpinewentity');
+                continue;
+            }
             
             // Verificar se o perfil já existe por nome
             $existingProfile = $DB->request([
@@ -560,6 +657,19 @@ class Wizard {
             if (count($existingProfile) > 0) {
                 $row = $existingProfile->current();
                 $profileId = (int)$row['id'];
+                
+                // Checagem de segurança: O usuário não pode se apropriar de um perfil existente 
+                // mais alto que ele (ex: submeter o nome 'Super-Admin' maliciosamente)
+                if (!\Profile::currentUserHaveMoreRightThan([$profileId])) {
+                    $result['errors'][] = sprintf(__('Sem permissão para reutilizar e atribuir o perfil \'%s\'.', 'glpinewentity'), htmlspecialchars($newName, ENT_QUOTES));
+                    continue;
+                }
+                
+                // Regra de Negócio extra: Garante que o perfil reutilizado também não seja Super-Admin
+                if (self::isSuperAdminProfile($profileId)) {
+                    $result['errors'][] = sprintf(__('O perfil \'%s\' é Super-Admin e não pode ser atribuído por este assistente.', 'glpinewentity'), htmlspecialchars($newName, ENT_QUOTES));
+                    continue;
+                }
             } else {
                 // Criar perfil novo (clonar do fonte)
                 $profileId = self::cloneProfile(
@@ -567,7 +677,7 @@ class Wizard {
                     $newName
                 );
                 if (!$profileId) {
-                    $result['errors'][] = sprintf(__('Falha ao criar o perfil \'%s\'.', 'glpinewentity'), $newName);
+                    $result['errors'][] = sprintf(__('Falha ao criar o perfil \'%s\'.', 'glpinewentity'), htmlspecialchars($newName, ENT_QUOTES));
                     continue;
                 }
             }
@@ -580,17 +690,17 @@ class Wizard {
             // Separa e-mails válidos para não descartar os demais por um erro isolado.
             $usersToAssign = [];
             if (!empty($assignment['users'])) {
-                $usersList = array_filter(array_map('trim', preg_split('/[\n,]+/', $assignment['users'])));
+                $usersList = array_filter(array_map('trim', preg_split('/[\n,;]+/', $assignment['users'])));
                 $usersList = array_slice($usersList, 0, 100); // Previne exaustão
                 foreach ($usersList as $userEmail) {
                     if (!filter_var($userEmail, FILTER_VALIDATE_EMAIL)) {
-                        $result['errors'][] = sprintf(__('E-mail de usuário inválido para perfil %s: %s.', 'glpinewentity'), $assignment['label'], $userEmail);
+                        $result['errors'][] = sprintf(__('E-mail de usuário inválido para perfil %s: %s.', 'glpinewentity'), htmlspecialchars($assignment['label'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
                         continue;
                     }
 
                     $userId = self::findUserByEmail($userEmail);
                     if (!$userId || !self::canAssignProfile($userId, $profileId, $entityId)) {
-                        $result['errors'][] = sprintf(__('Não foi possível atribuir o perfil \'%1$s\' ao usuário \'%2$s\': referência inválida.', 'glpinewentity'), $assignment['new_name'], $userEmail);
+                        $result['errors'][] = sprintf(__('Não foi possível atribuir o perfil \'%1$s\' ao usuário \'%2$s\': referência inválida.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
                         continue;
                     }
 
@@ -625,7 +735,7 @@ class Wizard {
                     'is_recursive' => 1,
                 ]);
                 if (!$puId) {
-                    $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), $assignment['new_name'], $userToAssign['email']);
+                    $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userToAssign['email'], ENT_QUOTES));
                 } else {
                     // Define a nova entidade e o perfil atrelado como os padrões do usuário nas preferências.
                     // Se o usuário passar por várias atribuições em diferentes blocos (Admin, Atendimento, etc.), o último será o padrão definitivo.
@@ -645,16 +755,32 @@ class Wizard {
         $subgroupsData = is_array($input['subgroups'] ?? null) ? $input['subgroups'] : [];
         
         if ($parentGroupId > 0) {
-            // Buscar todos os subgrupos atuais na entidade
+            // Buscar todos os subgrupos atuais na entidade que pertençam à hierarquia do setor
             $currentSubgroups = [];
-            $sgIter = $DB->request([
-                'SELECT' => ['id', 'name'],
+            $allGroupsIter = $DB->request([
+                'SELECT' => ['id', 'name', 'groups_id'],
                 'FROM'   => 'glpi_groups',
                 'WHERE'  => ['entities_id' => $entityId]
             ]);
-            foreach ($sgIter as $row) {
-                if ($row['id'] != $parentGroupId) {
-                    $currentSubgroups[$row['name']][] = $row['id'];
+            $groupParents = [];
+            $groupNames = [];
+            foreach ($allGroupsIter as $row) {
+                $groupParents[$row['id']] = $row['groups_id'];
+                $groupNames[$row['id']] = $row['name'];
+            }
+            
+            // Função para verificar se um grupo descende do parentGroupId
+            $isDescendant = function($gId) use (&$groupParents, &$isDescendant, $parentGroupId) {
+                if (!isset($groupParents[$gId])) return false;
+                $pId = $groupParents[$gId];
+                if ($pId == $parentGroupId) return true;
+                if ($pId == 0) return false;
+                return $isDescendant($pId);
+            };
+            
+            foreach ($groupParents as $gId => $pId) {
+                if ($gId != $parentGroupId && $isDescendant($gId)) {
+                    $currentSubgroups[$groupNames[$gId]][] = $gId;
                 }
             }
 
@@ -685,11 +811,14 @@ class Wizard {
                         // Consome um dos IDs disponíveis (para resolver duplicatas)
                         $targetGroupId = array_shift($currentSubgroups[$sgName]);
                         
-                        // Atualiza o pai caso tenha mudado
+                        // Atualiza o pai caso tenha mudado e restaura as flags caso estivesse inativo
                         $subg = new Group();
                         $subg->update([
-                            'id'        => $targetGroupId,
-                            'groups_id' => $mappedParentId
+                            'id'           => $targetGroupId,
+                            'groups_id'    => $mappedParentId,
+                            'is_assign'    => 1,
+                            'is_requester' => 1,
+                            'is_watcher'   => 1
                         ]);
                     } else {
                         // Criar subgrupo novo
@@ -720,11 +849,11 @@ class Wizard {
                 }
 
                 if (!empty($sgTechs)) {
-                    $techList = array_filter(array_map('trim', preg_split('/[\n,]+/', $sgTechs)));
+                    $techList = array_filter(array_map('trim', preg_split('/[\n,;]+/', $sgTechs)));
                     $techList = array_slice($techList, 0, 100); // Previne exaustão
                     foreach ($techList as $techEmail) {
                         if (!filter_var($techEmail, FILTER_VALIDATE_EMAIL)) {
-                            $result['errors'][] = sprintf(__('E-mail de técnico inválido: %s. Ignorado.', 'glpinewentity'), $techEmail);
+                            $result['errors'][] = sprintf(__('E-mail de técnico inválido: %s. Ignorado.', 'glpinewentity'), htmlspecialchars($techEmail, ENT_QUOTES));
                             continue;
                         }
                         $techUserId = self::findUserByEmail($techEmail);
@@ -735,7 +864,7 @@ class Wizard {
                                 'groups_id' => $targetGroupId,
                             ]);
                             if (!$guId) {
-                                $result['errors'][] = sprintf(__('Falha ao associar técnico \'%s\' ao subgrupo.', 'glpinewentity'), $techEmail);
+                                $result['errors'][] = sprintf(__('Falha ao associar técnico \'%s\' ao subgrupo.', 'glpinewentity'), htmlspecialchars($techEmail, ENT_QUOTES));
                             } else {
                                 $result['technicians'][] = [
                                     'id'    => $techUserId,
@@ -743,18 +872,20 @@ class Wizard {
                                 ];
                             }
                         } else {
-                            $result['errors'][] = sprintf(__('Técnico \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), $techEmail);
+                            $result['errors'][] = sprintf(__('Técnico \'%s\' não encontrado no GLPI. Ignorado.', 'glpinewentity'), htmlspecialchars($techEmail, ENT_QUOTES));
                         }
                     }
                 }
             }
 
-            // Subgrupos que sobraram (foram removidos no form ou são duplicados rejeitados)
-            // Agora os deletamos para limpar a base de dados
-            $subgToDelete = new Group();
-            foreach ($currentSubgroups as $sgName => $idsArray) {
-                foreach ($idsArray as $idToDelete) {
-                    $subgToDelete->delete(['id' => $idToDelete], 1); // purge force para limpar
+            // Deleta completamente os subgrupos órfãos (removidos do plugin),
+            // apagando-os da tela e da árvore de grupos do GLPI (purge).
+            $groupObj = new \Group();
+            foreach ($currentSubgroups as $sgName => $ids) {
+                foreach ($ids as $sgId) {
+                    if (!$groupObj->delete(['id' => $sgId], 1)) {
+                        $result['errors'][] = sprintf(__('Falha ao deletar o subgrupo órfão \'%s\'.', 'glpinewentity'), htmlspecialchars($sgName, ENT_QUOTES));
+                    }
                 }
             }
         }
@@ -762,75 +893,94 @@ class Wizard {
         // =================================================================
         // Sincronizar Categorias ITIL
         // =================================================================
-        $childrenByParent = [];
-        $categoryIterator = $DB->request([
-            'SELECT' => ['id', 'itilcategories_id'],
+        $cat_iterator = $DB->request([
+            'SELECT' => ['id', 'name', 'itilcategories_id'],
             'FROM'   => 'glpi_itilcategories',
             'WHERE'  => ['entities_id' => $entityId],
+            'ORDER'  => 'completename ASC'
         ]);
-        foreach ($categoryIterator as $categoryRow) {
-            $childrenByParent[(int) $categoryRow['itilcategories_id']][] = (int) $categoryRow['id'];
+        
+        $cats = [];
+        $children = [];
+        $allCatIds = [];
+        foreach ($cat_iterator as $row) {
+            $cats[$row['id']] = $row;
+            $children[$row['itilcategories_id']][] = $row['id'];
+            $allCatIds[] = $row['id'];
         }
 
-        // Remove primeiro as folhas para preservar a integridade da hierarquia.
-        $categoryIdsToDelete = [];
-        $collectCategoriesToDelete = function (int $parentId) use (&$collectCategoriesToDelete, &$childrenByParent, &$categoryIdsToDelete): void {
-            foreach ($childrenByParent[$parentId] ?? [] as $childId) {
-                $collectCategoriesToDelete($childId);
-                $categoryIdsToDelete[] = $childId;
+        $oldCatList = [];
+        $buildTree = function ($parentId, $depth) use (&$buildTree, &$oldCatList, &$cats, &$children) {
+            if (isset($children[$parentId])) {
+                foreach ($children[$parentId] as $childId) {
+                    $prefix = str_repeat('-', $depth);
+                    $oldCatList[] = $prefix . $cats[$childId]['name'];
+                    $buildTree($childId, $depth + 1);
+                }
             }
         };
-        $collectCategoriesToDelete(0);
+        $buildTree(0, 0);
+        
+        // Compara a árvore atual salva no banco (que já volta em ordem alfabética de completename)
+        // com o que foi submetido.
+        $oldCatString = trim(str_replace("\r", "", implode("\n", $oldCatList)));
+        $newCatString = trim(str_replace("\r", "", $categoryNames));
 
-        $category = new ITILCategory();
-        foreach ($categoryIdsToDelete as $categoryIdToDelete) {
-            $category->delete(['id' => $categoryIdToDelete], 1);
-        }
-
-        $result['categories'] = [];
-        $lastIdAtDepth = [];
-        $catList = array_filter(array_map('trim', preg_split('/[\n]+/', $categoryNames)));
-        foreach ($catList as $line) {
-            preg_match('/^-+/', $line, $matches);
-            $hyphensCount = !empty($matches[0]) ? strlen($matches[0]) : 0;
-            $cleanName = trim(substr($line, $hyphensCount));
-            if (empty($cleanName)) {
-                continue;
+        if ($oldCatString !== $newCatString) {
+            // Houve alteração! O comportamento desejado é deletar TODAS as categorias da entidade e recriar.
+            $catObj = new \ITILCategory();
+            foreach (array_reverse($allCatIds) as $catId) {
+                // Deleta a partir do fim (filhos primeiro) para evitar problemas de restrição
+                $catObj->delete(['id' => $catId], 1);
             }
-
-            $parentId = 0;
-            for ($depth = $hyphensCount - 1; $depth >= 0; $depth--) {
-                if (isset($lastIdAtDepth[$depth])) {
-                    $parentId = $lastIdAtDepth[$depth];
-                    break;
+            
+            $result['categories'] = [];
+            $lastIdAtDepth = [];
+            $catList = array_filter(array_map('trim', explode("\n", $newCatString)));
+            foreach ($catList as $line) {
+                preg_match('/^-+/', $line, $matches);
+                $hyphensCount = !empty($matches[0]) ? strlen($matches[0]) : 0;
+                $cleanName = trim(substr($line, $hyphensCount));
+                if (empty($cleanName)) {
+                    continue;
                 }
-            }
 
-            $category = new ITILCategory();
-            $categoryId = $category->add([
-                'name'              => $cleanName,
-                'entities_id'       => $entityId,
-                'itilcategories_id' => $parentId,
-                'is_recursive'      => 1,
-                'is_incident'       => 1,
-                'is_request'        => 1,
-            ]);
-            if (!$categoryId) {
-                $result['errors'][] = sprintf(__('Falha ao criar categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($cleanName, ENT_QUOTES));
-                continue;
-            }
-
-            $lastIdAtDepth[$hyphensCount] = $categoryId;
-            foreach (array_keys($lastIdAtDepth) as $depth) {
-                if ($depth > $hyphensCount) {
-                    unset($lastIdAtDepth[$depth]);
+                $parentId = 0;
+                for ($depth = $hyphensCount - 1; $depth >= 0; $depth--) {
+                    if (isset($lastIdAtDepth[$depth])) {
+                        $parentId = $lastIdAtDepth[$depth];
+                        break;
+                    }
                 }
+
+                $categoryId = $catObj->add([
+                    'name'              => $cleanName,
+                    'entities_id'       => $entityId,
+                    'itilcategories_id' => $parentId,
+                    'is_recursive'      => 1,
+                    'is_incident'       => 1,
+                    'is_request'        => 1,
+                ]);
+                
+                if (!$categoryId) {
+                    $result['errors'][] = sprintf(__('Falha ao criar categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($cleanName, ENT_QUOTES));
+                    continue;
+                }
+
+                $lastIdAtDepth[$hyphensCount] = $categoryId;
+                foreach (array_keys($lastIdAtDepth) as $depth) {
+                    if ($depth > $hyphensCount) {
+                        unset($lastIdAtDepth[$depth]);
+                    }
+                }
+                $result['categories'][] = [
+                    'id'   => $categoryId,
+                    'name' => $cleanName,
+                ];
             }
-            $result['categories'][] = [
-                'id'   => $categoryId,
-                'name' => $cleanName,
-            ];
         }
+        // Se as strings forem exatamente iguais, não faz nada no banco 
+        // e preserva os metadados existentes intactos.
 
         return $result;
     }
@@ -917,6 +1067,11 @@ class Wizard {
         // Carrega o perfil-fonte
         $sourceProfile = new Profile();
         if (!$sourceProfile->getFromDB($sourceProfileId)) {
+            return false;
+        }
+
+        if (!\Profile::currentUserHaveMoreRightThan([$sourceProfileId])) {
+            \Session::addMessageAfterRedirect(__('Você não tem permissão para clonar um perfil com direitos superiores aos seus.', 'glpinewentity'), false, ERROR);
             return false;
         }
 

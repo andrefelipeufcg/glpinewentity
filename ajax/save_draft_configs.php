@@ -42,6 +42,21 @@ if (!$sector->getFromDB($sectorId)) {
     exit;
 }
 
+// Verifica se o usuário tem acesso à entidade gerenciada por este setor
+$meta_check = json_decode($sector->fields['metadata'] ?? '{}', true) ?: [];
+$managed_entity_id = (int)($meta_check['entity_id'] ?? 0);
+if ($managed_entity_id <= 0 || !Session::haveAccessToEntity($managed_entity_id)) {
+    echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste setor.', 'glpinewentity')]);
+    exit;
+}
+
+// Valida também o acesso à entidade pai do setor
+$parent_entity_id = (int)($sector->fields['entities_id'] ?? 0);
+if (!Session::haveAccessToEntity($parent_entity_id)) {
+    echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade raiz deste setor.', 'glpinewentity')]);
+    exit;
+}
+
 // Montar o array de configs baseado no form submetido
 $names    = $_POST['items_name'] ?? [];
 $contents = $_POST['items_content'] ?? [];
