@@ -364,12 +364,7 @@ class Sector extends CommonDBTM {
         // Template oculto para adicionar novos
         echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $extraOptions);
 
-        // Renderiza existentes (salvos no rascunho) ou padrão se for vazio
-        if (empty($savedConfigs)) {
-            // Valores padrão iniciais para mostrar algo
-            $savedConfigs = self::getDefaultConfigsForTab($tabnum);
-        }
-
+        // Renderiza existentes (salvos no rascunho)
         foreach ($savedConfigs as $idx => $config) {
             echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions);
         }
@@ -1118,42 +1113,6 @@ TWIG);
 
         $html .= "</div>";
         return $html;
-    }
-
-    private static function getDefaultConfigsForTab($tabnum) {
-        switch ($tabnum) {
-            case 1: // Modelos de Chamado
-                return [
-                    ['name' => 'SIGLA - Incidente Padrão', 'content' => '', 'type' => 1, 'copy_from' => 0],
-                    ['name' => 'SIGLA - Requisição Padrão', 'content' => '', 'type' => 2, 'copy_from' => 0],
-                ];
-            case 2: // Respostas Básicas
-                return [
-                    ['name' => 'SIGLA - Acompanhamento Inicial', 'content' => 'Olá, recebemos sua solicitação e já estamos analisando.', 'copy_from' => 0],
-                    ['name' => 'SIGLA - Solicitação de Informação', 'content' => 'Para prosseguirmos com o atendimento, por favor nos informe mais detalhes sobre...', 'copy_from' => 0],
-                ];
-            case 3: // Soluções Básicas
-                return [
-                    ['name' => 'SIGLA - Incidente Resolvido', 'content' => 'O problema foi identificado e corrigido.', 'copy_from' => 0],
-                    ['name' => 'SIGLA - Requisição Atendida', 'content' => 'A solicitação foi atendida com sucesso conforme pedido.', 'copy_from' => 0],
-                ];
-            case 4: // Motivos de Pendências
-                return [
-                    ['name' => 'SIGLA - Aguardando Retorno do Usuário', 'content' => '', 'copy_from' => 0],
-                    ['name' => 'SIGLA - Aguardando Terceiros', 'content' => '', 'copy_from' => 0],
-                ];
-            case 5: // Notificações
-                return [
-                    ['name' => 'SIGLA - Novo Chamado (Ticket)', 'content' => 'Um novo chamado foi aberto: [TICKET_ID]', 'copy_from' => 0],
-                    ['name' => 'SIGLA - Chamado Solucionado', 'content' => 'O chamado [TICKET_ID] foi solucionado.', 'copy_from' => 0],
-                ];
-            case 6: // Formulário Padrão
-                return [
-                    ['name' => 'SIGLA - Formulário de Atendimento', 'content' => '', 'copy_from' => 0],
-                ];
-            default:
-                return [];
-        }
     }
 
     public function showForm($ID, array $options = []) {
