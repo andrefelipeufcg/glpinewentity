@@ -35,13 +35,36 @@ class FormBuilder
     public function build(int $entities_id, array $configs = []): array
     {
         $count = 0;
+        $processedIds = [];
         foreach ($configs as &$config) {
             $formId = $this->getOrCreateForm($config, $entities_id);
             if ($formId > 0) {
                 $count++;
+                $processedIds[] = $formId;
             }
         }
         unset($config);
+
+        // Deleta (purge) os formulários da entidade que foram removidos da configuração do plugin
+        global $DB;
+        $formObj = new Form();
+        $table = $formObj->getTable();
+        
+        if ($DB->tableExists($table)) {
+            $iterator = $DB->request([
+                'SELECT' => 'id',
+                'FROM'   => $table,
+                'WHERE'  => ['entities_id' => $entities_id]
+            ]);
+            
+            foreach ($iterator as $row) {
+                $id = (int)$row['id'];
+                if (!in_array($id, $processedIds)) {
+                    $formObj->delete(['id' => $id], 1);
+                }
+            }
+        }
+
         return ['count' => $count, 'configs' => $configs];
     }
 
@@ -178,6 +201,17 @@ class FormBuilder
         ];
 
         $newId = $source->clone($override_input);
+        
+        // O método clone() nativo do GLPI para formulários força o formulário a nascer inativo (is_active = 0)
+        // por segurança. Mas na nossa automação de setores, queremos que ele já venha ativo.
+        if ($newId > 0) {
+            $newForm = new Form();
+            $newForm->update([
+                'id'        => $newId,
+                'is_active' => 1
+            ]);
+        }
+        
         return (int)$newId;
     }
 

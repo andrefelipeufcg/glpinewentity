@@ -14,7 +14,9 @@ use Toolbox;
 
 class Menu extends CommonGLPI {
 
-    public static string $rightname = 'entity';
+    public static function canView(): bool {
+        return \Session::haveRight('plugin_glpinewentity', READ);
+    }
 
     public static function getMenuName() {
         return __('GLPI New Entity', 'glpinewentity');

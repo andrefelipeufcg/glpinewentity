@@ -19,11 +19,23 @@ if (!defined('GLPI_ROOT')) {
     die("Sorry. You can't access this file directly");
 }
 
-class Sector extends CommonDBTM {
+// GLPI 12 exige tipagem forte em $rightname (string), enquanto GLPI 10/11 proíbe.
+if ((new \ReflectionProperty('\CommonDBTM', 'rightname'))->hasType()) {
+    abstract class SectorBase extends CommonDBTM {
+        public static string $rightname = 'plugin_glpinewentity';
+    }
+} else {
+    abstract class SectorBase extends CommonDBTM {
+        public static $rightname = 'plugin_glpinewentity';
+    }
+}
+
+class Sector extends SectorBase {
     
-    public static string $rightname = 'plugin_glpinewentity';
-    // Permite que o endpoint nativo das abas carregue o registro durante a edição.
-    public bool $get_item_to_display_tab = true;
+    public function __construct() {
+        $this->get_item_to_display_tab = true;
+        parent::__construct();
+    }
 
     public static function canCreate(): bool {
         return Session::haveRight('plugin_glpinewentity', CREATE);
@@ -364,12 +376,7 @@ class Sector extends CommonDBTM {
         // Template oculto para adicionar novos
         echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $extraOptions);
 
-        // Renderiza existentes (salvos no rascunho) ou padrão se for vazio
-        if (empty($savedConfigs)) {
-            // Valores padrão iniciais para mostrar algo
-            $savedConfigs = self::getDefaultConfigsForTab($tabnum);
-        }
-
+        // Renderiza existentes (salvos no rascunho)
         foreach ($savedConfigs as $idx => $config) {
             echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions);
         }
@@ -523,15 +530,15 @@ class Sector extends CommonDBTM {
                             }
                             
                             if (response.data.type) {
-                                block.find('.input-type').val(response.data.type);
+                                block.find('.input-type').val(response.data.type).trigger('change');
                             } else {
-                                block.find('.input-type').val('1');
+                                block.find('.input-type').val('1').trigger('change');
                             }
                             
                             if (response.data.itilcategories_id !== undefined) {
-                                block.find('.input-category').val(response.data.itilcategories_id);
+                                block.find('.input-category').val(response.data.itilcategories_id).trigger('change');
                             } else {
-                                block.find('.input-category').val('0');
+                                block.find('.input-category').val('0').trigger('change');
                             }
 
                             if (tabnum == 4) {
@@ -617,7 +624,7 @@ class Sector extends CommonDBTM {
                 }
 
                 block.find('.input-type').val('1');
-                block.find('.input-category').val('0');
+                block.find('.input-category').val('0').trigger('change');
                 
                 if (tabnum == 4) {
                     block.find('.input-is-default').val('0');
@@ -1120,42 +1127,6 @@ TWIG);
         return $html;
     }
 
-    private static function getDefaultConfigsForTab($tabnum) {
-        switch ($tabnum) {
-            case 1: // Modelos de Chamado
-                return [
-                    ['name' => 'SIGLA - Incidente Padrão', 'content' => '', 'type' => 1, 'copy_from' => 0],
-                    ['name' => 'SIGLA - Requisição Padrão', 'content' => '', 'type' => 2, 'copy_from' => 0],
-                ];
-            case 2: // Respostas Básicas
-                return [
-                    ['name' => 'SIGLA - Acompanhamento Inicial', 'content' => 'Olá, recebemos sua solicitação e já estamos analisando.', 'copy_from' => 0],
-                    ['name' => 'SIGLA - Solicitação de Informação', 'content' => 'Para prosseguirmos com o atendimento, por favor nos informe mais detalhes sobre...', 'copy_from' => 0],
-                ];
-            case 3: // Soluções Básicas
-                return [
-                    ['name' => 'SIGLA - Incidente Resolvido', 'content' => 'O problema foi identificado e corrigido.', 'copy_from' => 0],
-                    ['name' => 'SIGLA - Requisição Atendida', 'content' => 'A solicitação foi atendida com sucesso conforme pedido.', 'copy_from' => 0],
-                ];
-            case 4: // Motivos de Pendências
-                return [
-                    ['name' => 'SIGLA - Aguardando Retorno do Usuário', 'content' => '', 'copy_from' => 0],
-                    ['name' => 'SIGLA - Aguardando Terceiros', 'content' => '', 'copy_from' => 0],
-                ];
-            case 5: // Notificações
-                return [
-                    ['name' => 'SIGLA - Novo Chamado (Ticket)', 'content' => 'Um novo chamado foi aberto: [TICKET_ID]', 'copy_from' => 0],
-                    ['name' => 'SIGLA - Chamado Solucionado', 'content' => 'O chamado [TICKET_ID] foi solucionado.', 'copy_from' => 0],
-                ];
-            case 6: // Formulário Padrão
-                return [
-                    ['name' => 'SIGLA - Formulário de Atendimento', 'content' => '', 'copy_from' => 0],
-                ];
-            default:
-                return [];
-        }
-    }
-
     public function showForm($ID, array $options = []) {
         global $CFG_GLPI, $DB;
         $sectorId = $ID;
@@ -1219,7 +1190,8 @@ TWIG);
                         'FROM'   => 'glpi_groups',
                         'WHERE'  => [
                             'entities_id' => $meta['entity_id'],
-                            'id' => ['<>', $parentGroupId]
+                            'id' => ['<>', $parentGroupId],
+                            'is_assign' => 1
                         ],
                         'ORDER'  => 'id ASC'
                     ]);
@@ -1329,7 +1301,10 @@ TWIG);
                 $cat_iterator = $DB->request([
                     'SELECT' => ['id', 'name', 'itilcategories_id'],
                     'FROM'   => 'glpi_itilcategories',
-                    'WHERE'  => ['entities_id' => $meta['entity_id']]
+                    'WHERE'  => [
+                        'entities_id' => $meta['entity_id'],
+                        'is_helpdeskvisible' => 1
+                    ]
                 ]);
 
                 $cats = [];
@@ -1837,7 +1812,7 @@ TWIG);
                     function validateEmailsStr(str) {
                         let cleanStr = str.trim();
                         if (cleanStr === '') return false;
-                        let emails = cleanStr.split(/[\\n,]+/);
+                        let emails = cleanStr.split(/[\\n,;]+/);
                         let emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                         for (let i = 0; i < emails.length; i++) {
                             let e = emails[i].trim();
@@ -1889,7 +1864,10 @@ TWIG);
                             if (!match) return;
                             let currentBlockIndex = match[0];
                             
-                            let selectHtml = '<option value=\"-1\">' + siglaText + '</option>';
+                            select.empty();
+                            let defaultOption = $('<option>').val('-1').text(siglaText);
+                            select.append(defaultOption);
+                            
                             let hasCurrentValue = false;
                             if (currentValue === '-1') hasCurrentValue = true;
                             
@@ -1897,11 +1875,10 @@ TWIG);
                                 let parentInfo = availableParents[i];
                                 if (parentInfo.index === currentBlockIndex) break;
                                 
-                                selectHtml += '<option value=\"' + parentInfo.index + '\">' + parentInfo.name + '</option>';
+                                let opt = $('<option>').val(parentInfo.index).text(parentInfo.name);
+                                select.append(opt);
                                 if (currentValue === parentInfo.index) hasCurrentValue = true;
                             }
-                            
-                            select.html(selectHtml);
                             
                             if (hasCurrentValue) {
                                 select.val(currentValue);
@@ -1928,6 +1905,7 @@ TWIG);
                         
                         // Validação: verifica se os blocos atuais estão preenchidos
                         let allFilled = true;
+                        let emailsValid = true;
                         let isSiglaEmpty = getSigla() === '';
                         
                         container.find('.subgroup-block').each(function() {
@@ -1938,17 +1916,21 @@ TWIG);
                             if (isFirst) {
                                 if (isSiglaEmpty || techsVal === '') {
                                     allFilled = false;
+                                } else if (!validateEmailsStr(techsVal)) {
+                                    emailsValid = false;
                                 }
                             } else {
                                 const parentVal = $(this).find('select.sg-parent-select, input[name$=\"[parent]\"]').val();
                                 if (nameVal === '' || parentVal === null || parentVal === '' || isSiglaEmpty || techsVal === '') {
                                     allFilled = false;
+                                } else if (!validateEmailsStr(techsVal)) {
+                                    emailsValid = false;
                                 }
                             }
                         });
                         
-                        if (!allFilled) {
-                            alert('Por favor, preencha o Nome do Subgrupo, Grupo Pai e os E-mails dos técnicos em todos os blocos atuais antes de adicionar um novo.');
+                        if (!allFilled || !emailsValid) {
+                            alert('Por favor, preencha o Nome do Subgrupo, Grupo Pai e certifique-se de que todos os e-mails dos técnicos são válidos (ex: nome@dominio.com) em todos os blocos atuais antes de adicionar um novo.');
                             return;
                         }
 
@@ -2095,6 +2077,37 @@ TWIG);
                         if (!customFilled || !customEmailsValid) {
                             e.preventDefault();
                             alert('Por favor, preencha o nome do perfil, selecione de qual perfil copiar e certifique-se de que todos os e-mails informados são válidos (ex: nome@dominio.com) para todos os Perfis Adicionais.');
+                            return false;
+                        }
+                        
+                        let subgroupsFilled = true;
+                        let subgroupsEmailsValid = true;
+                        let isSiglaEmpty = getSigla() === '';
+                        
+                        $('#subgroups-container .subgroup-block').each(function() {
+                            const nameVal = $(this).find('input.sg-name-input').val().trim();
+                            const techsVal = $(this).find('textarea').val().trim();
+                            const isFirst = $(this).index() === 0;
+                            
+                            if (isFirst) {
+                                if (isSiglaEmpty || techsVal === '') {
+                                    subgroupsFilled = false;
+                                } else if (!validateEmailsStr(techsVal)) {
+                                    subgroupsEmailsValid = false;
+                                }
+                            } else {
+                                const parentVal = $(this).find('select.sg-parent-select, input[name$=\"[parent]\"]').val();
+                                if (nameVal === '' || parentVal === null || parentVal === '' || isSiglaEmpty || techsVal === '') {
+                                    subgroupsFilled = false;
+                                } else if (!validateEmailsStr(techsVal)) {
+                                    subgroupsEmailsValid = false;
+                                }
+                            }
+                        });
+                        
+                        if (!subgroupsFilled || !subgroupsEmailsValid) {
+                            e.preventDefault();
+                            alert('Por favor, preencha o Nome do Subgrupo, Grupo Pai e certifique-se de que todos os e-mails dos técnicos são válidos (ex: nome@dominio.com) em todos os Grupos/Subgrupos.');
                             return false;
                         }
                         

@@ -77,12 +77,81 @@ if ($new_entity_id <= 0) {
     exit;
 }
 
+if (!\Session::haveAccessToEntity($new_entity_id)) {
+    echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste setor.', 'glpinewentity')]);
+    exit;
+}
+
+// Prevenção de Escalada de Privilégio: Valida acesso à entidade pai do setor
+$parent_entity_id = (int)($sector->fields['entities_id'] ?? 0);
+if (!\Session::haveAccessToEntity($parent_entity_id)) {
+    echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade raiz deste setor.', 'glpinewentity')]);
+    exit;
+}
+
 $tabKey = 'tab_' . $tabnum;
 $savedConfigs = $meta['configs'][$tabKey] ?? [];
 
 if (empty($savedConfigs)) {
     echo json_encode(['success' => false, 'error' => 'Nenhuma configuração definida para esta aba. Salve o rascunho primeiro.']);
     exit;
+}
+
+// Prevenção de IDOR: Valida todos os IDs referenciados no rascunho antes de processar
+$classMap = [
+    1 => \TicketTemplate::class,
+    2 => \ITILFollowupTemplate::class,
+    3 => \SolutionTemplate::class,
+    4 => \PendingReason::class,
+    5 => \Notification::class,
+    6 => \Glpi\Form\Form::class,
+];
+$itemClass = $classMap[$tabnum] ?? null;
+
+if ($itemClass && class_exists($itemClass)) {
+    foreach ($savedConfigs as $config) {
+        $generatedId = (int)($config['generated_id'] ?? 0);
+        if ($generatedId > 0) {
+            $item = new $itemClass();
+            if ($item->getFromDB($generatedId)) {
+                if ($item->fields['entities_id'] != $new_entity_id) {
+                    echo json_encode(['success' => false, 'error' => "Violação de segurança: O item gerado #$generatedId não pertence à entidade gerenciada."]);
+                    exit;
+                }
+            }
+        }
+        $sourceId = (int)($config['copy_from'] ?? 0);
+        if ($sourceId > 0) {
+            $item = new $itemClass();
+            if ($item->getFromDB($sourceId)) {
+                if (!\Session::haveAccessToEntity($item->fields['entities_id'])) {
+                    echo json_encode(['success' => false, 'error' => "Sem permissão para clonar o item #$sourceId (acesso negado à entidade de origem)."]);
+                    exit;
+                }
+            }
+        }
+        // Outras chaves estrangeiras que podem vir no rascunho
+        $fkMap = [
+            'itilcategories_id'        => \ITILCategory::class,
+            'calendars_id'             => \Calendar::class,
+            'itilfollowuptemplates_id' => \ITILFollowupTemplate::class,
+            'solutiontemplates_id'     => \SolutionTemplate::class,
+            'notificationtemplates_id' => \NotificationTemplate::class,
+            'forms_categories_id'      => \Glpi\Form\Category::class,
+        ];
+        foreach ($fkMap as $field => $fkClass) {
+            $fkId = (int)($config[$field] ?? 0);
+            if ($fkId > 0 && class_exists($fkClass)) {
+                $fkItem = new $fkClass();
+                if ($fkItem->getFromDB($fkId)) {
+                    if (isset($fkItem->fields['entities_id']) && !\Session::haveAccessToEntity($fkItem->fields['entities_id'])) {
+                        echo json_encode(['success' => false, 'error' => "Sem permissão para referenciar $field #$fkId (acesso negado à entidade)."]);
+                        exit;
+                    }
+                }
+            }
+        }
+    }
 }
 
 try {
