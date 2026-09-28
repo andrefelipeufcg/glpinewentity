@@ -304,7 +304,8 @@ class Wizard {
         ]);
 
         if (!$parentGroupId) {
-            $result['errors'][] = sprintf(__('Falha ao criar grupo pai \'%s\'.', 'glpinewentity'), $parentGroupName);
+            $safeParentGroupName = htmlspecialchars($parentGroupName, ENT_QUOTES);
+            $result['errors'][] = sprintf(__('Falha ao criar grupo pai \'%s\'.', 'glpinewentity'), $safeParentGroupName);
         } else {
             $result['groups'][] = [
                 'id'   => $parentGroupId,
@@ -521,9 +522,10 @@ class Wizard {
             ]);
 
             if (count($duplicateEntity) > 0) {
+                $safeEntityName = htmlspecialchars($entityName, ENT_QUOTES);
                 $result['errors'][] = sprintf(
                     __('Não foi possível alterar a entidade pai: já existe uma entidade chamada "%s" nesse nível.', 'glpinewentity'),
-                    $entityName
+                    $safeEntityName
                 );
                 return $result;
             }
@@ -829,7 +831,8 @@ class Wizard {
                             'groups_id'   => $mappedParentId,
                         ]);
                         if (!$targetGroupId) {
-                            $result['errors'][] = sprintf(__('Falha ao criar subgrupo \'%s\'.', 'glpinewentity'), $sgName);
+                            $safeSgName = htmlspecialchars($sgName, ENT_QUOTES);
+                            $result['errors'][] = sprintf(__('Falha ao criar subgrupo \'%s\'.', 'glpinewentity'), $safeSgName);
                             continue;
                         }
                     }
