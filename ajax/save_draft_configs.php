@@ -22,8 +22,8 @@ use GlpiPlugin\Glpinewentity\Sector;
 
 header('Content-Type: application/json');
 
-if (!Session::haveRight('plugin_glpinewentity', UPDATE)) {
-    echo json_encode(['success' => false, 'error' => __('Acesso negado.', 'glpinewentity')]);
+if (!Session::haveRight('plugin_glpinewentity', UPDATE) || !Sector::canUpdate()) {
+    echo json_encode(['success' => false, 'error' => __('Acesso negado. Apenas o perfil Super-Admin pode realizar esta operação.', 'glpinewentity')]);
     exit;
 }
 

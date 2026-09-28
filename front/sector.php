@@ -16,6 +16,10 @@ use GlpiPlugin\Glpinewentity\Sector;
 
 // Verifica direito de acesso
 Session::checkRight('plugin_glpinewentity', READ);
+if (!Sector::canView()) {
+    Session::addMessageAfterRedirect(__('Acesso negado: Este recurso é restrito exclusivamente para o perfil Super-Admin.', 'glpinewentity'), false, ERROR);
+    Html::redirect($CFG_GLPI['root_doc'] ?? '/');
+}
 
 $sector = new Sector();
 

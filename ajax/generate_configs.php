@@ -48,9 +48,9 @@ include $inc;
 
 header('Content-Type: application/json');
 
-// Verificar sessão
-if (!Session::haveRight('plugin_glpinewentity', UPDATE)) {
-    echo json_encode(['success' => false, 'error' => 'Acesso negado.']);
+// Verificar sessão e exclusividade Super-Admin
+if (!Session::haveRight('plugin_glpinewentity', UPDATE) || !Sector::canUpdate()) {
+    echo json_encode(['success' => false, 'error' => 'Acesso negado. Apenas o perfil Super-Admin pode realizar esta operação.']);
     exit;
 }
 

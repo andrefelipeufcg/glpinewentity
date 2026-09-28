@@ -16,7 +16,12 @@ use GlpiPlugin\Glpinewentity\Sector;
 use GlpiPlugin\Glpinewentity\Wizard;
 
 // READ permite acessar o wizard; CREATE é validado pelo GLPI na inclusão.
+// O plugin requer permissão híbrida: direito de READ + perfil obrigatoriamente de Super-Admin.
 Session::checkRight("plugin_glpinewentity", READ);
+if (!Sector::canView()) {
+    Session::addMessageAfterRedirect(__('Acesso negado: Este recurso é restrito exclusivamente para o perfil Super-Admin.', 'glpinewentity'), false, ERROR);
+    Html::redirect($CFG_GLPI['root_doc'] ?? '/');
+}
 
 // -----------------------------------------------------------------------
 // POST: Processar criação

@@ -37,20 +37,32 @@ class Sector extends SectorBase {
         parent::__construct();
     }
 
+    /**
+     * Valida se o perfil ativo do usuário atual é um perfil de Super-Admin
+     * nativo do GLPI (id 4 ou perfis criados a partir dele marcados internamente).
+     */
+    private static function isStrictSuperAdmin(): bool {
+        if (!isset($_SESSION['glpiactiveprofile']['id'])) {
+            return false;
+        }
+        $superAdminIds = \Profile::getSuperAdminProfilesId();
+        return in_array($_SESSION['glpiactiveprofile']['id'], (array)$superAdminIds);
+    }
+
     public static function canCreate(): bool {
-        return Session::haveRight('plugin_glpinewentity', CREATE);
+        return self::isStrictSuperAdmin() && Session::haveRight('plugin_glpinewentity', CREATE);
     }
 
     public static function canView(): bool {
-        return Session::haveRight('plugin_glpinewentity', READ);
+        return self::isStrictSuperAdmin() && Session::haveRight('plugin_glpinewentity', READ);
     }
 
     public static function canUpdate(): bool {
-        return Session::haveRight('plugin_glpinewentity', UPDATE);
+        return self::isStrictSuperAdmin() && Session::haveRight('plugin_glpinewentity', UPDATE);
     }
 
     public static function canDelete(): bool {
-        return Session::haveRight('plugin_glpinewentity', PURGE);
+        return self::isStrictSuperAdmin() && Session::haveRight('plugin_glpinewentity', PURGE);
     }
 
     public function canCreateItem(): bool {
