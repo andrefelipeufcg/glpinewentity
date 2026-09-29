@@ -226,6 +226,7 @@ switch ($tabnum) {
                 }
                 $data['name'] = $row['name'] ?? '';
                 $data['description'] = $row['description'] ?? '';
+                $data['is_active'] = $row['is_active'] ?? 1;
                 
                 // Mapeia também a coluna antiga do Formcreator caso seja versão legada do plugin no GLPI 10
                 $data['forms_categories_id'] = $row['forms_categories_id'] ?? $row['plugin_formcreator_categories_id'] ?? 0;

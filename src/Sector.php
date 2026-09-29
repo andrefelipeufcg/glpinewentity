@@ -565,7 +565,7 @@ class Sector extends SectorBase {
                             }
 
                             if (tabnum == 5) {
-                                block.find('.input-is-active').val(response.data.is_active || '1');
+                                block.find('.input-is-active').val(response.data.is_active !== undefined ? response.data.is_active : '1');
                                 block.find('.input-itemtype').val(response.data.itemtype || 'Ticket').trigger('change');
                                 block.find('.input-event').val(response.data.event || 'new').trigger('change');
                                 block.find('.input-attach-documents').val(response.data.attach_documents !== undefined ? response.data.attach_documents : '-2');
@@ -587,6 +587,7 @@ class Sector extends SectorBase {
                             }
 
                             if (tabnum == 6) {
+                                block.find('.input-is-active').val(response.data.is_active !== undefined ? response.data.is_active : '1');
                                 let textarea = block.find('.input-description-wrapper textarea');
                                 let editorId = textarea.attr('id');
                                 if (editorId && typeof tinymce !== 'undefined' && tinymce.get(editorId)) {
@@ -662,6 +663,7 @@ class Sector extends SectorBase {
                 }
 
                 if (tabnum == 6) {
+                    block.find('.input-is-active').val('1');
                     let textarea = block.find('.input-description-wrapper textarea');
                     let editorId = textarea.attr('id');
                     if (editorId && typeof tinymce !== 'undefined' && tinymce.get(editorId)) {
@@ -717,7 +719,11 @@ class Sector extends SectorBase {
         }
 
         function generateSectorConfigs(sectorId, tabnum) {
-            if(confirm('Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?')) {
+            let confirmMsg = 'Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?';
+            if (tabnum === 6) {
+                confirmMsg = 'Atenção: A padronização irá criar e atualizar formulários conforme as configurações. Formulários que foram removidos desta tela e que já possuem respostas serão INATIVADOS para preservar o histórico. Formulários removidos e sem uso serão excluídos.\\n\\nO rascunho atual será salvo automaticamente.\\nDeseja prosseguir com a sincronização?';
+            }
+            if(confirm(confirmMsg)) {
                 
                 let btn = $('#btn_generate_' + tabnum);
                 let originalHtml = btn.html();
@@ -1067,7 +1073,15 @@ class Sector extends SectorBase {
             $html .= "  </div>";
 
         } elseif ($tabnum == 6) {
-            $html .= "  <input type='hidden' name='items_is_active[]' class='input-is-active' value='1'>";
+            $is_active = $config['is_active'] ?? 1;
+
+            $html .= "  <div style='margin-bottom: 10px;'>";
+            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Ativo</label>";
+            $html .= "      <select name='items_is_active[]' class='form-select input-is-active' style='width: 100%;'>";
+            $html .= "          <option value='1' " . ($is_active == 1 ? 'selected' : '') . ">Sim</option>";
+            $html .= "          <option value='0' " . ($is_active == 0 ? 'selected' : '') . ">Não</option>";
+            $html .= "      </select>";
+            $html .= "  </div>";
 
             $html .= "  <div style='margin-bottom: 10px;'>";
             if (!$isTemplate) {

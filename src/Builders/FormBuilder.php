@@ -45,10 +45,15 @@ class FormBuilder
         }
         unset($config);
 
-        // Deleta (purge) os formulários da entidade que foram removidos da configuração do plugin
+        // Deleta os formulários que não estão na configuração, mas apenas se não tiverem respostas.
+        // Se tiverem respostas, apenas inativa para preservar histórico e referências.
         global $DB;
         $formObj = new Form();
         $table = $formObj->getTable();
+        
+        $answersSetClass = '\Glpi\Form\AnswersSet';
+        $hasAnswersSetTable = class_exists($answersSetClass);
+        $answersTable = $hasAnswersSetTable ? (new $answersSetClass())->getTable() : '';
         
         if ($DB->tableExists($table)) {
             $iterator = $DB->request([
@@ -60,7 +65,19 @@ class FormBuilder
             foreach ($iterator as $row) {
                 $id = (int)$row['id'];
                 if (!in_array($id, $processedIds)) {
-                    $formObj->delete(['id' => $id], 1);
+                    $hasAnswers = false;
+                    if ($hasAnswersSetTable && $DB->tableExists($answersTable)) {
+                        $countAns = $DB->countElementsInTable($answersTable, ['forms_forms_id' => $id]);
+                        if ($countAns > 0) {
+                            $hasAnswers = true;
+                        }
+                    }
+                    
+                    if ($hasAnswers) {
+                        $formObj->update(['id' => $id, 'is_active' => 0]);
+                    } else {
+                        $formObj->delete(['id' => $id], 1);
+                    }
                 }
             }
         }
@@ -105,7 +122,8 @@ class FormBuilder
                     $name,
                     $description,
                     $forms_categories_id,
-                    $illustration
+                    $illustration,
+                    $config['is_active'] ?? 1
                 );
                 if ($importedId > 0) {
                     $form->delete(['id' => $generatedId], true);
@@ -121,6 +139,7 @@ class FormBuilder
                 'description' => $description,
                 'forms_categories_id' => $forms_categories_id,
                 'illustration' => $illustration,
+                'is_active' => $config['is_active'] ?? 1,
             ]);
             return $generatedId;
         }
@@ -134,7 +153,7 @@ class FormBuilder
             'name' => $name,
             'entities_id' => $entities_id,
             'is_recursive' => 1,
-            'is_active' => 1,
+            'is_active' => $config['is_active'] ?? 1,
             'description' => $description ?: ($sourceData['description'] ?? __('Formulário padrão gerado automaticamente para a entidade.', 'glpinewentity')),
             'forms_categories_id' => $forms_categories_id ?: ($sourceData['forms_categories_id'] ?? 0),
             'illustration' => $illustration,
@@ -164,7 +183,8 @@ class FormBuilder
                 $name,
                 $description,
                 $forms_categories_id,
-                $illustration
+                $illustration,
+                $config['is_active'] ?? 1
             );
             if ($importedId > 0) {
                 $config['generated_id'] = $importedId;
@@ -187,7 +207,8 @@ class FormBuilder
         string $name,
         string $description,
         int $categoryId,
-        string $illustration
+        string $illustration,
+        int $isActive = 1
     ): int
     {
         $override_input = [
@@ -196,19 +217,19 @@ class FormBuilder
             'description'         => $description,
             'forms_categories_id' => $categoryId,
             'illustration'        => $illustration,
-            'is_active'           => 1,
+            'is_active'           => $isActive,
             'is_recursive'        => 1
         ];
 
         $newId = $source->clone($override_input);
         
         // O método clone() nativo do GLPI para formulários força o formulário a nascer inativo (is_active = 0)
-        // por segurança. Mas na nossa automação de setores, queremos que ele já venha ativo.
+        // por segurança. Atualizamos para respeitar a configuração do plugin.
         if ($newId > 0) {
             $newForm = new Form();
             $newForm->update([
                 'id'        => $newId,
-                'is_active' => 1
+                'is_active' => $isActive
             ]);
         }
         
