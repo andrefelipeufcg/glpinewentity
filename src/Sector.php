@@ -1031,8 +1031,9 @@ class Sector extends SectorBase {
             $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Adicionar documentos</label>";
             $html .= "          <select name='items_attach_documents[]' class='form-select input-attach-documents' style='width: 100%;'>";
             $html .= "            <option value='-2' " . ($attach_documents == -2 ? 'selected' : '') . ">Usar configuração global</option>";
-            $html .= "            <option value='0' " . ($attach_documents == 0 ? 'selected' : '') . ">Não</option>";
-            $html .= "            <option value='1' " . ($attach_documents == 1 ? 'selected' : '') . ">Sim</option>";
+            $html .= "            <option value='0' " . ($attach_documents == 0 ? 'selected' : '') . ">Nenhum documento</option>";
+            $html .= "            <option value='1' " . ($attach_documents == 1 ? 'selected' : '') . ">Todos os documentos</option>";
+            $html .= "            <option value='2' " . ($attach_documents == 2 ? 'selected' : '') . ">Somente documentos relacionados ao item que aciona o evento</option>";
             $html .= "          </select>";
             $html .= "      </div>";
             $html .= "      <div style='flex: 1;'>";
