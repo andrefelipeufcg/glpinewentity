@@ -2,7 +2,7 @@
 /**
  * -----------------------------------------------------------------------
  * GLPI New Entity — front/sector.form.php
- * Formulário para criação e edição de infraestrutura de novo setor.
+ * Formulário para criação e edição de estrutura de novo setor.
  * -----------------------------------------------------------------------
  */
 
@@ -83,7 +83,7 @@ if (isset($_POST['process_wizard'])) {
         ]);
 
         if (empty($result['errors'])) {
-            Session::addMessageAfterRedirect(__('Infraestrutura atualizada com sucesso!', 'glpinewentity'), true, INFO);
+            Session::addMessageAfterRedirect(__('Estrutura atualizada com sucesso!', 'glpinewentity'), true, INFO);
         } else {
             foreach ($result['errors'] as $err) {
                 Session::addMessageAfterRedirect($err, false, ERROR);
@@ -102,7 +102,7 @@ if (isset($_POST['process_wizard'])) {
                 'sector_abbr' => $_POST['sector_abbr'],
                 'metadata' => json_encode($result)
             ]);
-            Session::addMessageAfterRedirect(__('Infraestrutura criada com sucesso!', 'glpinewentity'), true, INFO);
+            Session::addMessageAfterRedirect(__('Estrutura criada com sucesso!', 'glpinewentity'), true, INFO);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');
         } else {
@@ -117,7 +117,7 @@ if (isset($_POST['process_wizard'])) {
                 foreach ($result['errors'] as $err) {
                     Session::addMessageAfterRedirect($err, false, ERROR);
                 }
-                Session::addMessageAfterRedirect(__('Infraestrutura criada parcialmente. Verifique os erros.', 'glpinewentity'), false, WARNING);
+                Session::addMessageAfterRedirect(__('Estrutura criada parcialmente. Verifique os erros.', 'glpinewentity'), false, WARNING);
                 global $CFG_GLPI;
                 Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $newSectorId);
             } else {

@@ -4,7 +4,7 @@
  * GLPI New Entity — ajax/get_template_data.php
  * 
  * Este script é um endpoint AJAX responsável por buscar no banco de dados 
- * as configurações de um modelo de infraestrutura selecionado na tela 
+ * as configurações de um modelo de estrutura selecionado na tela 
  * (ex: Modelo de Chamado, Motivo de Pendência) quando o usuário escolhe 
  * algo no dropdown "Copiar de...". Ele retorna um JSON com os campos 
  * preenchidos para que o JavaScript atualize a tela em tempo real.

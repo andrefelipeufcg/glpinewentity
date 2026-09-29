@@ -53,7 +53,7 @@ class Wizard {
     }
 
     /**
-     * Processa a criação de toda a infraestrutura do novo setor.
+     * Processa a criação de toda a estrutura do novo setor.
      *
      * @param array $input Dados vindos do formulário ($_POST)
      * @return array Resumo com IDs criados e eventuais erros
@@ -492,12 +492,12 @@ class Wizard {
         // Atualizar Entidade
         // =================================================================
         if ($entityId <= 0) {
-            $result['errors'][] = __('A infraestrutura não possui uma entidade gerenciada vinculada.', 'glpinewentity');
+            $result['errors'][] = __('A estrutura não possui uma entidade gerenciada vinculada.', 'glpinewentity');
             return $result;
         }
 
         if (!\Session::haveAccessToEntity($entityId)) {
-            $result['errors'][] = __('Acesso negado à entidade gerenciada por este setor.', 'glpinewentity');
+            $result['errors'][] = __('Acesso negado à entidade gerenciada por esta estrutura.', 'glpinewentity');
             return $result;
         }
 

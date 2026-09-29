@@ -105,7 +105,7 @@ class Sector extends SectorBase {
     }
 
     public static function getTypeName($nb = 0) {
-        return _n('Infraestrutura da entidade', 'Infraestruturas da entidade', $nb, 'glpinewentity');
+        return _n('Estrutura da entidade', 'Estruturas da entidade', $nb, 'glpinewentity');
     }
 
     /**
@@ -1802,13 +1802,22 @@ TWIG);
 
         // ── Bloco 4: Catálogo de Serviços ──
         echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-        echo "<tr><th colspan='2'><i class='fas fa-clipboard-list' style='margin-right: 5px;'></i> Catálogo de Serviços (Categorias ITIL)</th></tr>";
+        echo "<tr><th colspan='2'><i class='fas fa-clipboard-list' style='margin-right: 5px;'></i> Categorias do Catálogo de Serviços (Categorias ITIL)</th></tr>";
 
         echo "<tr class='tab_bg_1'>";
-        echo "<td style='width: 35%;'>Categorias de Serviço <span style='color:red;'>*</span></td>";
+        echo "<td style='width: 35%;'>Categorias<span style='color:red;'>*</span></td>";
         echo "<td>";
         echo "<textarea name='category_names' class='form-control' style='width: 100%; height: 160px; overflow-y: scroll;' placeholder='Uma categoria por linha. Use hífen (-) para subcategorias.&#10;Ex:&#10;Hardware&#10;- Manutenção de Hardware&#10;-- Troca de Peças&#10;Software&#10;- Instalação de Software' required>" . htmlspecialchars($def_category_names) . "</textarea>";
-        echo "<br><small class='text-muted'>Cada categoria será vinculada exclusivamente à nova entidade, habilitada para Incidentes e Requisições.<br><strong>Importante:</strong> O sistema só identificará a hierarquia (Categorias Pai e Filha) se você usar o hífen (-) no início da linha correspondente.</small>";
+        echo "<br><small class='text-muted'>Cada categoria será vinculada exclusivamente à nova entidade, habilitada para Incidentes e Requisições.";
+        echo "<br><strong>Hierarquia:</strong> O sistema só identificará a relação pai/filho se você usar o hífen (-) no início da linha.<br>";
+        echo "<span style='display:inline-block; margin-top:5px; padding:5px 10px; background:#f5f5f5; border-radius:3px; font-family:monospace; color:#333;'>";
+        echo "1 (pai)<br>";
+        echo "- 1.1 (filho)<br>";
+        echo "- 1.2 (filho)<br>";
+        echo "-- 1.2.1 (neto)<br>";
+        echo "2 (pai)<br>";
+        echo "- 2.1 (filho)";
+        echo "</span></small>";
         echo "</td>";
         echo "</tr>";
 
@@ -1822,7 +1831,7 @@ TWIG);
         echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
         echo "<tr class='tab_bg_2'>";
         echo "<td class='center' style='padding: 15px;'>";
-        $btnTitle = $isEdit ? 'Salvar Modificações' : 'Criar Infraestrutura da Entidade';
+        $btnTitle = $isEdit ? 'Salvar Modificações' : 'Criar Estrutura da Entidade';
 
         echo "<button type='submit' id='btn-submit-wizard' class='btn btn-primary' style='font-size: 1.05em; padding: 8px 30px;'>";
         echo $btnTitle;
@@ -2137,6 +2146,17 @@ TWIG);
                             return false;
                         }
                         
+                        // Validação de edição de categorias
+                        let isEdit = " . ($isEdit ? 'true' : 'false') . ";
+                        if (isEdit) {
+                            let catTextarea = document.querySelector('textarea[name=\"category_names\"]');
+                            if (catTextarea && catTextarea.value !== catTextarea.defaultValue) {
+                                if (!confirm('Atenção (Ação Destrutiva): Você alterou as categorias ITIL. Ao salvar, TODAS as categorias da entidade serão deletadas e recriadas do zero, resultando na perda de vínculos em tickets existentes (categorias ITIL não suportam inativação).\\n\\nDeseja prosseguir?')) {
+                                    e.preventDefault();
+                                    return false;
+                                }
+                            }
+                        }                        
                         // Se chegou até aqui, todas as validações passaram.
                         // Troca o texto do botão para Salvando...
                         $('#btn-submit-wizard').html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Salvando...').css('pointer-events', 'none').css('opacity', '0.7');
