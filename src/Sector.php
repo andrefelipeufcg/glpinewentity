@@ -31,8 +31,6 @@ if ((new \ReflectionProperty('\CommonDBTM', 'rightname'))->hasType()) {
 }
 
 class Sector extends SectorBase {
-    private static $searchAcrossAllEntities = false;
-
     
     public function __construct() {
         $this->get_item_to_display_tab = true;
@@ -81,19 +79,6 @@ class Sector extends SectorBase {
 
     public function canDeleteItem(): bool {
         return self::canDelete();
-    }
-
-    public static function setSearchAcrossAllEntities(bool $enabled): void {
-        self::$searchAcrossAllEntities = $enabled;
-    }
-
-    public function isEntityAssign() {
-        return !self::$searchAcrossAllEntities && parent::isEntityAssign();
-    }
-
-    // O template da busca oculta o checkbox se a entidade pai não estiver entre as entidades ativas.
-    public function maybeRecursive() {
-        return !self::$searchAcrossAllEntities && parent::maybeRecursive();
     }
 
     /**
