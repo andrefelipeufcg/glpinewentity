@@ -33,7 +33,7 @@ function plugin_init_glpinewentity(): void {
 
     $plugin = new Plugin();
     if ($plugin->isActivated('glpinewentity')) {
-        if (Session::haveRight('plugin_glpinewentity', READ)) {
+        if (\GlpiPlugin\Glpinewentity\Sector::canView()) {
             // O menu usa a classe própria para manter o título "GLPI New Entity"
             // e abrir a listagem com o botão de inclusão.
             $PLUGIN_HOOKS[Hooks::MENU_TOADD]['glpinewentity'] = [

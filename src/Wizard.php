@@ -85,11 +85,6 @@ class Wizard {
             return $result;
         }
 
-        if (!\Session::haveAccessToEntity($parentEntity)) {
-            $result['errors'][] = __('Acesso negado à entidade pai escolhida.', 'glpinewentity');
-            return $result;
-        }
-
         // ── Validação de Subgrupos e Técnicos ──
         $hasAnySubgroup = false;
         foreach ($subgroupsData as $sg) {
@@ -480,8 +475,8 @@ class Wizard {
             $result['errors'][] = __('Informe pelo menos uma Categoria de Serviço.', 'glpinewentity');
             return $result;
         }
-        
-        if (!\Session::haveAccessToEntity($parentEntity)) {
+
+        if (!Sector::canUpdate() && !\Session::haveAccessToEntity($parentEntity)) {
             $result['errors'][] = __('Acesso negado à entidade pai escolhida.', 'glpinewentity');
             return $result;
         }
@@ -496,7 +491,7 @@ class Wizard {
             return $result;
         }
 
-        if (!\Session::haveAccessToEntity($entityId)) {
+        if (!Sector::canUpdate() && !\Session::haveAccessToEntity($entityId)) {
             $result['errors'][] = __('Acesso negado à entidade gerenciada por esta estrutura.', 'glpinewentity');
             return $result;
         }

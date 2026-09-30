@@ -42,17 +42,17 @@ if (!$sector->getFromDB($sectorId)) {
     exit;
 }
 
-// Verifica se o usuário tem acesso à entidade gerenciada por este setor
+// Verifica se o usuário tem acesso à entidade gerenciada por este setor.
 $meta_check = json_decode($sector->fields['metadata'] ?? '{}', true) ?: [];
 $managed_entity_id = (int)($meta_check['entity_id'] ?? 0);
-if ($managed_entity_id <= 0 || !Session::haveAccessToEntity($managed_entity_id)) {
+if ($managed_entity_id <= 0 || (!Sector::canUpdate() && !Session::haveAccessToEntity($managed_entity_id))) {
     echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste setor.', 'glpinewentity')]);
     exit;
 }
 
-// Valida também o acesso à entidade pai do setor
+// Valida também o acesso à entidade pai do setor.
 $parent_entity_id = (int)($sector->fields['entities_id'] ?? 0);
-if (!Session::haveAccessToEntity($parent_entity_id)) {
+if (!Sector::canUpdate() && !Session::haveAccessToEntity($parent_entity_id)) {
     echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade raiz deste setor.', 'glpinewentity')]);
     exit;
 }
@@ -150,6 +150,22 @@ if (!isset($meta['configs'])) {
 }
 
 if ($tabnum == 6) {
+    $previousConfigsByGeneratedId = [];
+    foreach ($meta['configs'][$tabKey] ?? [] as $previousConfig) {
+        $previousGeneratedId = (int)($previousConfig['generated_id'] ?? 0);
+        if ($previousGeneratedId > 0) {
+            $previousConfigsByGeneratedId[$previousGeneratedId] = $previousConfig;
+        }
+    }
+
+    foreach ($configsToSave as &$configToSave) {
+        $generatedId = (int)($configToSave['generated_id'] ?? 0);
+        if ($generatedId > 0 && isset($previousConfigsByGeneratedId[$generatedId]['applied_hash'])) {
+            $configToSave['applied_hash'] = $previousConfigsByGeneratedId[$generatedId]['applied_hash'];
+        }
+    }
+    unset($configToSave);
+
     $managedIds = $meta['managed_ids'][$tabKey] ?? [];
     if (!isset($meta['managed_ids'][$tabKey])) {
         foreach ($meta['configs'][$tabKey] ?? [] as $config) {

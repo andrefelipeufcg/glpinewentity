@@ -77,8 +77,12 @@ class FormBuilder
 
             $hasAnswers = false;
             if ($hasAnswersSetTable && $DB->tableExists($answersTable)) {
-                $countAns = $DB->countElementsInTable($answersTable, ['forms_forms_id' => $id]);
-                if ($countAns > 0) {
+                $answersCount = $DB->request([
+                    'COUNT' => 'cpt',
+                    'FROM'  => $answersTable,
+                    'WHERE' => ['forms_forms_id' => $id],
+                ]);
+                if ((int)($answersCount->current()['cpt'] ?? 0) > 0) {
                     $hasAnswers = true;
                 }
             }
@@ -125,6 +129,7 @@ class FormBuilder
         $description = trim($config['description'] ?? '');
         $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
         $illustration = $config['illustration'] ?? $config['icon'] ?? 'request-service';
+        $configHash = $this->getConfigHash($config);
 
         $sourceData = [];
         $sourceForm = null;
@@ -138,23 +143,10 @@ class FormBuilder
         }
 
         if ($generatedId > 0 && $form->getFromDB($generatedId)) {
-            // Como o objetivo do plugin é sempre refletir o que foi copiado (e sobrescrever eventuais edições no GLPI),
-            // se o usuário selecionou uma origem (Copiar de...), nós recriamos o formulário.
-            if ($sourceForm !== null) {
-                $importedId = $this->importCompleteForm(
-                    $sourceForm,
-                    $entities_id,
-                    $name,
-                    $description,
-                    $forms_categories_id,
-                    $illustration,
-                    $config['is_active'] ?? 1
-                );
-                if ($importedId > 0) {
-                    $form->delete(['id' => $generatedId], true);
-                    $config['generated_id'] = $importedId;
-                    return $importedId;
-                }
+            if (($config['applied_hash'] ?? '') === $configHash
+                || $this->matchesConfiguration($form, $entities_id, $name, $description, $forms_categories_id, $illustration, $config['is_active'] ?? 1)) {
+                $config['applied_hash'] = $configHash;
+                return $generatedId;
             }
 
             $form->update([
@@ -166,12 +158,33 @@ class FormBuilder
                 'illustration' => $illustration,
                 'is_active' => $config['is_active'] ?? 1,
             ]);
+            $config['applied_hash'] = $configHash;
             return $generatedId;
         }
 
         if ($form->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
             $config['generated_id'] = $form->getID();
+            if ($this->matchesConfiguration($form, $entities_id, $name, $description, $forms_categories_id, $illustration, $config['is_active'] ?? 1)) {
+                $config['applied_hash'] = $configHash;
+            }
             return (int) $form->getID();
+        }
+
+        if ($sourceForm !== null) {
+            $importedId = $this->importCompleteForm(
+                $sourceForm,
+                $entities_id,
+                $name,
+                $description,
+                $forms_categories_id,
+                $illustration,
+                $config['is_active'] ?? 1
+            );
+            if ($importedId > 0) {
+                $config['generated_id'] = $importedId;
+                $config['applied_hash'] = $configHash;
+            }
+            return $importedId;
         }
 
         $insertData = [
@@ -200,30 +213,44 @@ class FormBuilder
         $config['generated_id'] = $formId;
         $form->getFromDB($formId);
 
-        if ($sourceForm !== null) {
-            $form->delete(['id' => $formId], true);
-            $importedId = $this->importCompleteForm(
-                $sourceForm,
-                $entities_id,
-                $name,
-                $description,
-                $forms_categories_id,
-                $illustration,
-                $config['is_active'] ?? 1
-            );
-            if ($importedId > 0) {
-                $config['generated_id'] = $importedId;
-                return $importedId;
-            }
-            return 0;
-        } else {
-            $questions = $this->addQuestions($form);
-            if ($questions !== null) {
-                $this->configureDestination($form, $questions);
-            }
+        $questions = $this->addQuestions($form);
+        if ($questions !== null) {
+            $this->configureDestination($form, $questions);
         }
 
+        $config['applied_hash'] = $configHash;
         return $formId;
+    }
+
+    private function getConfigHash(array $config): string
+    {
+        $values = [
+            'name'                => trim((string)($config['name'] ?? '')),
+            'copy_from'           => (int)($config['copy_from'] ?? 0),
+            'description'         => str_replace("\r\n", "\n", trim((string)($config['description'] ?? ''))),
+            'forms_categories_id' => (int)($config['forms_categories_id'] ?? 0),
+            'illustration'        => (string)($config['illustration'] ?? $config['icon'] ?? 'request-service'),
+            'is_active'           => (int)($config['is_active'] ?? 1),
+        ];
+
+        return hash('sha256', json_encode($values, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function matchesConfiguration(
+        Form $form,
+        int $entitiesId,
+        string $name,
+        string $description,
+        int $categoryId,
+        string $illustration,
+        int $isActive
+    ): bool {
+        return (int)($form->fields['entities_id'] ?? 0) === $entitiesId
+            && (string)($form->fields['name'] ?? '') === $name
+            && str_replace("\r\n", "\n", trim((string)($form->fields['description'] ?? ''))) === str_replace("\r\n", "\n", $description)
+            && (int)($form->fields['forms_categories_id'] ?? 0) === $categoryId
+            && (string)($form->fields['illustration'] ?? 'request-service') === $illustration
+            && (int)($form->fields['is_active'] ?? 0) === $isActive;
     }
 
     private function importCompleteForm(

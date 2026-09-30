@@ -800,7 +800,7 @@ class Sector extends SectorBase {
         function generateSectorConfigs(sectorId, tabnum) {
             let confirmMsg = 'Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?';
             if (tabnum === 6) {
-                confirmMsg = 'Atenção! A padronização irá criar e atualizar formulários conforme as seguintes configurações:\\nFormulários externos removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos desta tela serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\\n\\nO rascunho atual será salvo automaticamente.\\nDeseja prosseguir com a sincronização?';
+                confirmMsg = 'Atenção! A padronização irá criar, atualizar e remover formulários conforme as seguintes configurações:\\nFormulários não gerenciados pelo plugin (externos) que forem removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos desta tela serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\\nO rascunho atual será salvo automaticamente.\\nDeseja prosseguir com a sincronização?';
             }
             if(confirm(confirmMsg)) {
                 

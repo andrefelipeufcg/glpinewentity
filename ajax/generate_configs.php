@@ -77,14 +77,14 @@ if ($new_entity_id <= 0) {
     exit;
 }
 
-if (!\Session::haveAccessToEntity($new_entity_id)) {
+if (!Sector::canUpdate() && !\Session::haveAccessToEntity($new_entity_id)) {
     echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste setor.', 'glpinewentity')]);
     exit;
 }
 
-// Prevenção de Escalada de Privilégio: Valida acesso à entidade pai do setor
+// A geração também requer acesso à entidade pai onde o setor foi definido.
 $parent_entity_id = (int)($sector->fields['entities_id'] ?? 0);
-if (!\Session::haveAccessToEntity($parent_entity_id)) {
+if (!Sector::canUpdate() && !\Session::haveAccessToEntity($parent_entity_id)) {
     echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade raiz deste setor.', 'glpinewentity')]);
     exit;
 }
@@ -123,17 +123,16 @@ if ($itemClass && class_exists($itemClass)) {
                 }
             }
         }
+
         $sourceId = (int)($config['copy_from'] ?? 0);
         if ($sourceId > 0) {
             $item = new $itemClass();
-            if ($item->getFromDB($sourceId)) {
-                if (!\Session::haveAccessToEntity($item->fields['entities_id'])) {
-                    echo json_encode(['success' => false, 'error' => "Sem permissão para clonar o item #$sourceId (acesso negado à entidade de origem)."]);
-                    exit;
-                }
+            if ($item->getFromDB($sourceId) && !Sector::canUpdate() && !\Session::haveAccessToEntity($item->fields['entities_id'])) {
+                echo json_encode(['success' => false, 'error' => "Sem permissão para clonar o item #$sourceId (acesso negado à entidade de origem)."]);
+                exit;
             }
         }
-        // Outras chaves estrangeiras que podem vir no rascunho
+
         $fkMap = [
             'itilcategories_id'        => \ITILCategory::class,
             'calendars_id'             => \Calendar::class,
@@ -146,11 +145,12 @@ if ($itemClass && class_exists($itemClass)) {
             $fkId = (int)($config[$field] ?? 0);
             if ($fkId > 0 && class_exists($fkClass)) {
                 $fkItem = new $fkClass();
-                if ($fkItem->getFromDB($fkId)) {
-                    if (isset($fkItem->fields['entities_id']) && !\Session::haveAccessToEntity($fkItem->fields['entities_id'])) {
-                        echo json_encode(['success' => false, 'error' => "Sem permissão para referenciar $field #$fkId (acesso negado à entidade)."]);
-                        exit;
-                    }
+                if ($fkItem->getFromDB($fkId)
+                    && isset($fkItem->fields['entities_id'])
+                    && !Sector::canUpdate()
+                    && !\Session::haveAccessToEntity($fkItem->fields['entities_id'])) {
+                    echo json_encode(['success' => false, 'error' => "Sem permissão para referenciar $field #$fkId (acesso negado à entidade)."]);
+                    exit;
                 }
             }
         }
@@ -207,6 +207,6 @@ try {
     Session::addMessageAfterRedirect('Configurações aplicadas com sucesso!', true, INFO);
 
     echo json_encode(['success' => true, 'count' => $count]);
-} catch (\Exception $e) {
+} catch (\Throwable $e) {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }
