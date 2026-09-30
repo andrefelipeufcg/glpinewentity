@@ -91,6 +91,11 @@ class Sector extends SectorBase {
         return !self::$searchAcrossAllEntities && parent::isEntityAssign();
     }
 
+    // O template da busca oculta o checkbox se a entidade pai não estiver entre as entidades ativas.
+    public function maybeRecursive() {
+        return !self::$searchAcrossAllEntities && parent::maybeRecursive();
+    }
+
     /**
      * Nome que aparece na interface do GLPI
      */
@@ -480,7 +485,7 @@ class Sector extends SectorBase {
 
         async function initializeIllustrationPickers(scope = document) {
             try {
-const module = await import('{$CFG_GLPI['root_doc']}/js/modules/IllustrationPicker/Controller.js');
+                const module = await import('{$CFG_GLPI['root_doc']}/js/modules/IllustrationPicker/Controller.js');
                 scope.querySelectorAll('.illustration-wrapper [data-glpi-icon-picker-value]').forEach(function(input) {
                     const pickerContainer = input.parentElement;
                     if (!pickerContainer || pickerContainer.dataset.glpinewentityIllustrationPicker === 'initialized') {
