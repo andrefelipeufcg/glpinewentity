@@ -142,7 +142,12 @@ class FormBuilder
             }
         }
 
-        if ($generatedId > 0 && $form->getFromDB($generatedId)) {
+        if ($generatedId === 0 && $form->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
+            $generatedId = (int) $form->getID();
+            $config['generated_id'] = $generatedId;
+        }
+
+        if ($generatedId > 0 && ($form->getID() === $generatedId || $form->getFromDB($generatedId))) {
             if (($config['applied_hash'] ?? '') === $configHash
                 || $this->matchesConfiguration($form, $entities_id, $name, $description, $forms_categories_id, $illustration, $config['is_active'] ?? 1)) {
                 $config['applied_hash'] = $configHash;
@@ -160,14 +165,6 @@ class FormBuilder
             ]);
             $config['applied_hash'] = $configHash;
             return $generatedId;
-        }
-
-        if ($form->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
-            $config['generated_id'] = $form->getID();
-            if ($this->matchesConfiguration($form, $entities_id, $name, $description, $forms_categories_id, $illustration, $config['is_active'] ?? 1)) {
-                $config['applied_hash'] = $configHash;
-            }
-            return (int) $form->getID();
         }
 
         if ($sourceForm !== null) {
