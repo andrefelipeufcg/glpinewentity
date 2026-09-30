@@ -31,6 +31,8 @@ if ((new \ReflectionProperty('\CommonDBTM', 'rightname'))->hasType()) {
 }
 
 class Sector extends SectorBase {
+    private static $searchAcrossAllEntities = false;
+
     
     public function __construct() {
         $this->get_item_to_display_tab = true;
@@ -79,6 +81,14 @@ class Sector extends SectorBase {
 
     public function canDeleteItem(): bool {
         return self::canDelete();
+    }
+
+    public static function setSearchAcrossAllEntities(bool $enabled): void {
+        self::$searchAcrossAllEntities = $enabled;
+    }
+
+    public function isEntityAssign() {
+        return !self::$searchAcrossAllEntities && parent::isEntityAssign();
     }
 
     /**
@@ -165,7 +175,7 @@ class Sector extends SectorBase {
             $ong['GlpiPlugin\Glpinewentity\Sector$3'] = self::createTabEntry(__('Soluções Básicas', 'glpinewentity'), 0, __CLASS__, 'ti ti-bulb');
             $ong['GlpiPlugin\Glpinewentity\Sector$4'] = self::createTabEntry(__('Motivos de Pendências', 'glpinewentity'), 0, __CLASS__, 'ti ti-clock-pause');
             $ong['GlpiPlugin\Glpinewentity\Sector$5'] = self::createTabEntry(__('Notificações', 'glpinewentity'), 0, __CLASS__, 'ti ti-bell');
-            $ong['GlpiPlugin\Glpinewentity\Sector$6'] = self::createTabEntry(__('Formulário Padrão', 'glpinewentity'), 0, __CLASS__, 'ti ti-clipboard-list');
+            $ong['GlpiPlugin\Glpinewentity\Sector$6'] = self::createTabEntry(__('Formulários', 'glpinewentity'), 0, __CLASS__, 'ti ti-clipboard-list');
         }
         return $ong;
     }
@@ -178,7 +188,7 @@ class Sector extends SectorBase {
             $ong[3] = self::createTabEntry(__('Soluções Básicas', 'glpinewentity'), 0, $item::class, 'ti ti-bulb');
             $ong[4] = self::createTabEntry(__('Motivos de Pendências', 'glpinewentity'), 0, $item::class, 'ti ti-clock-pause');
             $ong[5] = self::createTabEntry(__('Notificações', 'glpinewentity'), 0, $item::class, 'ti ti-bell');
-            $ong[6] = self::createTabEntry(__('Formulário Padrão', 'glpinewentity'), 0, $item::class, 'ti ti-clipboard-list');
+            $ong[6] = self::createTabEntry(__('Formulários', 'glpinewentity'), 0, $item::class, 'ti ti-clipboard-list');
             return $ong;
         }
         return '';
@@ -195,7 +205,7 @@ class Sector extends SectorBase {
             3 => 'Soluções Básicas',
             4 => 'Motivos de Pendências',
             5 => 'Notificações',
-            6 => 'Formulário Padrão',
+            6 => 'Formulários',
         ];
         $title = $titles[$tabnum] ?? '';
 
@@ -468,6 +478,29 @@ class Sector extends SectorBase {
             return new TextDecoder('utf-8').decode(bytes);
         }
 
+        async function initializeIllustrationPickers(scope = document) {
+            try {
+                const module = await import('/js/modules/IllustrationPicker/Controller.js');
+                scope.querySelectorAll('.illustration-wrapper [data-glpi-icon-picker-value]').forEach(function(input) {
+                    const pickerContainer = input.parentElement;
+                    if (!pickerContainer || pickerContainer.dataset.glpinewentityIllustrationPicker === 'initialized') {
+                        return;
+                    }
+
+                    const modalSelector = pickerContainer.querySelector('[data-bs-target]')?.getAttribute('data-bs-target');
+                    const modal = modalSelector ? pickerContainer.querySelector(modalSelector) : null;
+                    if (!modal) {
+                        return;
+                    }
+
+                    pickerContainer.dataset.glpinewentityIllustrationPicker = 'initialized';
+                    new module.GlpiIllustrationPickerController(pickerContainer, modal, 'custom:');
+                });
+            } catch (error) {
+                console.error('Unable to initialize the illustration picker.', error);
+            }
+        }
+
         function addConfigItem(tabnum) {
             let container = $('#items-container-tab-' + tabnum);
             let template = container.find('.config-block.template').clone();
@@ -485,6 +518,9 @@ class Sector extends SectorBase {
             selects.find('option').removeAttr('data-select2-id');
 
             container.append(template);
+            if (tabnum == 6) {
+                initializeIllustrationPickers(template.get(0));
+            }
             
             // Inicializa Select2
             template.find('.select2-copy-from').select2({ width: '100%' });
@@ -764,7 +800,7 @@ class Sector extends SectorBase {
         function generateSectorConfigs(sectorId, tabnum) {
             let confirmMsg = 'Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?';
             if (tabnum === 6) {
-                confirmMsg = 'Atenção: A padronização irá criar e atualizar formulários conforme as configurações. Formulários externos removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\n\nO rascunho atual será salvo automaticamente.\nDeseja prosseguir com a sincronização?';
+                confirmMsg = 'Atenção! A padronização irá criar e atualizar formulários conforme as seguintes configurações:\\nFormulários externos removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos desta tela serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\\n\\nO rascunho atual será salvo automaticamente.\\nDeseja prosseguir com a sincronização?';
             }
             if(confirm(confirmMsg)) {
                 
@@ -849,6 +885,7 @@ class Sector extends SectorBase {
             $('.select2-event').select2({ width: '100%' });
             $('.select2-tpl').select2({ width: '100%' });
             $('.select2-target').select2({ width: '100%' });
+            initializeIllustrationPickers();
         });
         </script>";
 
@@ -1129,7 +1166,7 @@ class Sector extends SectorBase {
 
             $html .= "  <div style='margin-bottom: 10px;'>";
             if (!$isTemplate) {
-                // Renderiza o macro usado pelo formulário padrão do GLPI.
+                // Renderiza o macro usado pelos formulários nativos do GLPI.
                 $twig = \Glpi\Application\View\TemplateRenderer::getInstance()->getEnvironment();
                 $categoryTemplate = $twig->createTemplate(<<<'TWIG'
 {% import 'components/form/fields_macros.html.twig' as fields %}
@@ -1154,7 +1191,11 @@ TWIG);
             }
             $html .= "      </div>";
 
-            $illustration = htmlspecialchars($config['illustration'] ?? $config['icon'] ?? 'request-service');
+            $illustration = trim((string)($config['illustration'] ?? $config['icon'] ?? ''));
+            if ($illustration === '') {
+                $illustration = 'request-service';
+            }
+            $illustration = htmlspecialchars($illustration, ENT_QUOTES, 'UTF-8');
 
             $twig_code = "{% import 'components/form/fields_macros.html.twig' as fields %}{{ fields.illustrationField('items_illustration[]', illustration_value, 'Ilustração', {'is_horizontal': false, 'full_width': true}) }}";
             $twig = \Glpi\Application\View\TemplateRenderer::getInstance()->getEnvironment();

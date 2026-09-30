@@ -85,7 +85,7 @@ O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descrit
    *   **Soluções Básicas:** Padronize soluções frequentes para o fechamento.
    *   **Motivos de Pendências:** Defina motivos customizados para pausar os chamados.
    *   **Notificações:** Ajuste ou sobrescreva os alertas de e-mail do setor.
-   *   **Formulário Padrão:** Gerencie formulários (do Formcreator) vinculados ao setor.
+  *   **Formulários:** Gerencie formulários (do Formcreator) vinculados ao setor.
 
 ## ⚙️ Estrutura Técnica e Classes
 

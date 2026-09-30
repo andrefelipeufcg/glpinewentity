@@ -35,7 +35,7 @@ $sectorObj  = new Sector();
 if ($sectorId > 0) {
     if ($sectorObj->getFromDB($sectorId)) {
         // Prevenção de IDOR: Checar acesso à entidade pai
-        if (!Session::haveAccessToEntity($sectorObj->fields['entities_id'])) {
+        if (!Sector::canView() && !Session::haveAccessToEntity($sectorObj->fields['entities_id'])) {
             Session::addMessageAfterRedirect(__('Acesso negado à entidade.', 'glpinewentity'), false, ERROR);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');
@@ -46,7 +46,7 @@ if ($sectorId > 0) {
         // porque o showForm() fará queries na entidade filha para popular a tela.
         $meta = json_decode($sectorObj->fields['metadata'] ?? '{}', true);
         $managedEntity = (int)($meta['entity_id'] ?? 0);
-        if ($managedEntity <= 0 || !Session::haveAccessToEntity($managedEntity)) {
+        if ($managedEntity <= 0 || (!Sector::canView() && !Session::haveAccessToEntity($managedEntity))) {
             Session::addMessageAfterRedirect(__('Acesso negado à entidade gerenciada por este setor.', 'glpinewentity'), false, ERROR);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');

@@ -41,7 +41,7 @@ if (isset($_POST["add"])) {
 }
 
 // -----------------------------------------------------------------------
-// Renderiza o grid de listagem padrão do GLPI
+// Renderiza o grid de listagem padrão do GLPI sem filtrar pela entidade ativa.
 // -----------------------------------------------------------------------
 
 // Reconstrói o menu para disponibilizar as ações nativas após atualizações do plugin.
@@ -56,6 +56,20 @@ Html::header(
     strtolower(Menu::class)
 );
 
-Search::show(Sector::class);
+$forcedColumns = $_GET['forcetoview'] ?? [];
+if (!is_array($forcedColumns)) {
+    $forcedColumns = [$forcedColumns];
+}
+if (!in_array(3, array_map('intval', $forcedColumns), true)) {
+    $forcedColumns[] = 3;
+}
+$_GET['forcetoview'] = $forcedColumns;
+
+Sector::setSearchAcrossAllEntities(true);
+try {
+    Search::show(Sector::class);
+} finally {
+    Sector::setSearchAcrossAllEntities(false);
+}
 
 Html::footer();

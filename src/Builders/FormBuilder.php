@@ -25,7 +25,7 @@ use Glpi\Form\Tag\AnswerTagProvider;
 
 class FormBuilder
 {
-    private const FORM_NAME = 'Formulário Padrão de Atendimento';
+    private const FORM_NAME = 'Formulários';
 
     /**
      * @param int $entities_id
@@ -179,7 +179,7 @@ class FormBuilder
             'entities_id' => $entities_id,
             'is_recursive' => 1,
             'is_active' => $config['is_active'] ?? 1,
-            'description' => $description ?: ($sourceData['description'] ?? __('Formulário padrão gerado automaticamente para a entidade.', 'glpinewentity')),
+            'description' => $description ?: ($sourceData['description'] ?? __('Formulários gerados automaticamente para a entidade.', 'glpinewentity')),
             'forms_categories_id' => $forms_categories_id ?: ($sourceData['forms_categories_id'] ?? 0),
             'illustration' => $illustration,
         ];
