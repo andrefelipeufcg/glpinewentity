@@ -41,7 +41,7 @@ if (isset($_POST["add"])) {
 }
 
 // -----------------------------------------------------------------------
-// Renderiza o grid de listagem padrão do GLPI sem filtrar pela entidade ativa.
+// Renderiza o grid de listagem padrão do GLPI
 // -----------------------------------------------------------------------
 
 // Reconstrói o menu para disponibilizar as ações nativas após atualizações do plugin.
@@ -56,20 +56,20 @@ Html::header(
     strtolower(Menu::class)
 );
 
-$forcedColumns = $_GET['forcetoview'] ?? [];
-if (!is_array($forcedColumns)) {
-    $forcedColumns = [$forcedColumns];
-}
-if (!in_array(3, array_map('intval', $forcedColumns), true)) {
-    $forcedColumns[] = 3;
-}
-$_GET['forcetoview'] = $forcedColumns;
+Search::show(Sector::class);
 
-Sector::setSearchAcrossAllEntities(true);
-try {
-    Search::show(Sector::class);
-} finally {
-    Sector::setSearchAcrossAllEntities(false);
+// A busca respeita a entidade ativa: fora da raiz, a lista vazia pode só estar filtrada.
+if ((int) ($_SESSION['glpiactive_entity'] ?? 0) !== 0) {
+    $hint = json_encode(
+        __('Verifique se está na entidade raiz para visualizar todas as entidades.', 'glpinewentity'),
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    );
+    echo Html::scriptBlock("
+        $(function () {
+            $('.alert.alert-info .alert-title').first()
+                .after($('<div>', { class: 'text-muted', text: {$hint} }));
+        });
+    ");
 }
 
 Html::footer();
