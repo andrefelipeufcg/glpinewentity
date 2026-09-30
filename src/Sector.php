@@ -480,7 +480,7 @@ class Sector extends SectorBase {
 
         async function initializeIllustrationPickers(scope = document) {
             try {
-                const module = await import('/js/modules/IllustrationPicker/Controller.js');
+const module = await import('{$CFG_GLPI['root_doc']}/js/modules/IllustrationPicker/Controller.js');
                 scope.querySelectorAll('.illustration-wrapper [data-glpi-icon-picker-value]').forEach(function(input) {
                     const pickerContainer = input.parentElement;
                     if (!pickerContainer || pickerContainer.dataset.glpinewentityIllustrationPicker === 'initialized') {
