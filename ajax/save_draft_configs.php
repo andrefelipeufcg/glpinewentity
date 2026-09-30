@@ -129,6 +129,7 @@ foreach ($names as $i => $name) {
     }
 
     if ($tabnum == 6) {
+        $itemConfig['is_active'] = (int)($is_active[$i] ?? 1);
         $itemConfig['description'] = $descriptions[$i] ?? '';
         $itemConfig['forms_categories_id'] = (int)($forms_categories_id[$i] ?? 0);
         // Mantém a ilustração escolhida ao salvar ou aplicar a padronização.
