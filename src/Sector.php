@@ -1406,45 +1406,14 @@ TWIG);
 
 
             // Reconstruir categorias a partir do banco para manter a hierarquia com hífens
-            $catList = [];
-            if (!empty($meta['entity_id'])) {
-                global $DB;
-                $cat_iterator = $DB->request([
-                    'SELECT' => ['id', 'name', 'itilcategories_id'],
-                    'FROM'   => 'glpi_itilcategories',
-                    'WHERE'  => [
-                        'entities_id' => $meta['entity_id'],
-                        'is_helpdeskvisible' => 1
-                    ]
-                ]);
-
-                $cats = [];
-                $children = [];
-                foreach ($cat_iterator as $row) {
-                    $cats[$row['id']] = $row;
-                    $children[$row['itilcategories_id']][] = $row['id'];
-                }
-
-                $buildTree = function ($parentId, $depth) use (&$buildTree, &$catList, &$cats, &$children) {
-                    if (isset($children[$parentId])) {
-                        foreach ($children[$parentId] as $childId) {
-                            $prefix = str_repeat('-', $depth);
-                            $catList[] = $prefix . $cats[$childId]['name'];
-                            $buildTree($childId, $depth + 1);
-                        }
-                    }
-                };
-
-                $buildTree(0, 0);
-            }
+            $def_category_names = !empty($meta['entity_id'])
+                ? Wizard::getCategoryTreeText((int)$meta['entity_id'])
+                : '';
 
             // Fallback caso a entidade não tenha sido criada ou não tenha categorias no DB
-            if (empty($catList) && !empty($meta['categories'])) {
-                foreach ($meta['categories'] as $c) {
-                    $catList[] = $c['name'];
-                }
+            if ($def_category_names === '' && !empty($meta['categories'])) {
+                $def_category_names = implode("\n", array_column($meta['categories'], 'name'));
             }
-            $def_category_names = implode("\n", $catList);
 
             // Reconstruir Perfis (Buscando diretamente do banco para a entidade criada)
             if (!empty($meta['entity_id'])) {
@@ -2236,7 +2205,7 @@ TWIG);
                         if (isEdit) {
                             let catTextarea = document.querySelector('textarea[name=\"category_names\"]');
                             if (catTextarea && catTextarea.value !== catTextarea.defaultValue) {
-                                if (!confirm('Atenção (Ação Destrutiva): Você alterou as categorias ITIL. Ao salvar, TODAS as categorias da entidade serão deletadas e recriadas do zero, resultando na perda de vínculos em tickets existentes (categorias ITIL não suportam inativação).\\n\\nDeseja prosseguir?')) {
+                                if (!confirm('Atenção: Você alterou as categorias ITIL. Ao salvar, as categorias iguais serão mantidas, as novas serão criadas e as removidas do texto serão excluídas (categorias ITIL não suportam inativação). Categorias em uso por chamados não serão excluídas e você será avisado.\\n\\nDeseja prosseguir?')) {
                                     e.preventDefault();
                                     return false;
                                 }

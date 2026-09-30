@@ -78,6 +78,10 @@ if (isset($_POST['process_wizard'])) {
             'metadata' => json_encode($result)
         ]);
 
+        foreach ($result['warnings'] ?? [] as $warn) {
+            Session::addMessageAfterRedirect($warn, false, WARNING);
+        }
+
         if (empty($result['errors'])) {
             Session::addMessageAfterRedirect(__('Estrutura atualizada com sucesso!', 'glpinewentity'), true, INFO);
         } else {
