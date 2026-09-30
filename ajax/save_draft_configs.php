@@ -90,6 +90,7 @@ $forms_categories_id = $_POST['items_forms_categories_id'] ?? [];
 $illustrations = $_POST['items_illustration'] ?? [];
 
 $generated_ids = $_POST['items_generated_id'] ?? [];
+$removed_generated_ids = $_POST['removed_items_generated_id'] ?? [];
 
 $configsToSave = [];
 foreach ($names as $i => $name) {
@@ -146,6 +147,33 @@ $meta = json_decode($sector->fields['metadata'] ?? '{}', true) ?: [];
 $tabKey = 'tab_' . $tabnum;
 if (!isset($meta['configs'])) {
     $meta['configs'] = [];
+}
+
+if ($tabnum == 6) {
+    $managedIds = $meta['managed_ids'][$tabKey] ?? [];
+    if (!isset($meta['managed_ids'][$tabKey])) {
+        foreach ($meta['configs'][$tabKey] ?? [] as $config) {
+            $generatedId = (int)($config['generated_id'] ?? 0);
+            if ($generatedId > 0) {
+                $managedIds[] = $generatedId;
+            }
+        }
+    }
+    $externalIds = $meta['external_ids'][$tabKey] ?? [];
+    foreach ($configsToSave as $config) {
+        $generatedId = (int)($config['generated_id'] ?? 0);
+        if ($generatedId > 0 && !in_array($generatedId, $managedIds, true)) {
+            $externalIds[] = $generatedId;
+        }
+    }
+    foreach ($removed_generated_ids as $generatedId) {
+        $generatedId = (int)$generatedId;
+        if ($generatedId > 0 && !in_array($generatedId, $managedIds, true)) {
+            $externalIds[] = $generatedId;
+        }
+    }
+    $meta['managed_ids'][$tabKey] = array_values(array_unique(array_map('intval', $managedIds)));
+    $meta['external_ids'][$tabKey] = array_values(array_unique(array_map('intval', $externalIds)));
 }
 $meta['configs'][$tabKey] = $configsToSave;
 

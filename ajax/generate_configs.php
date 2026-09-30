@@ -97,6 +97,9 @@ if (empty($savedConfigs)) {
     exit;
 }
 
+$managedIds = $meta['managed_ids'][$tabKey] ?? [];
+$externalIds = $meta['external_ids'][$tabKey] ?? [];
+
 // Prevenção de IDOR: Valida todos os IDs referenciados no rascunho antes de processar
 $classMap = [
     1 => \TicketTemplate::class,
@@ -181,7 +184,7 @@ try {
             break;
         case 6:
             $builder = new FormBuilder();
-            $result = $builder->build($new_entity_id, $savedConfigs);
+            $result = $builder->build($new_entity_id, $savedConfigs, $managedIds, $externalIds);
             break;
         default:
             echo json_encode(['success' => false, 'error' => 'Aba desconhecida.']);
@@ -192,6 +195,10 @@ try {
     $updatedConfigs = $result['configs'];
 
     $meta['configs'][$tabKey] = $updatedConfigs;
+    if ($tabnum == 6) {
+        $meta['managed_ids'][$tabKey] = $result['managed_ids'];
+        $meta['external_ids'][$tabKey] = $result['external_ids'];
+    }
     $sector->update([
         'id'       => $sector_id,
         'metadata' => json_encode($meta)

@@ -206,6 +206,39 @@ class Sector extends SectorBase {
         $tabKey = 'tab_' . $tabnum;
         $savedConfigs = $meta['configs'][$tabKey] ?? [];
 
+        if ($tabnum == 6 && $DB->tableExists('glpi_forms_forms')) {
+            $savedFormIds = [];
+            foreach ($savedConfigs as $config) {
+                $generatedId = (int)($config['generated_id'] ?? 0);
+                if ($generatedId > 0) {
+                    $savedFormIds[$generatedId] = true;
+                }
+            }
+
+            $entityId = (int)($meta['entity_id'] ?? 0);
+            if ($entityId > 0) {
+                $iterator = $DB->request([
+                    'SELECT' => ['id', 'name', 'description', 'forms_categories_id', 'illustration', 'is_active'],
+                    'FROM'   => 'glpi_forms_forms',
+                    'WHERE'  => ['entities_id' => $entityId],
+                    'ORDER'  => 'name ASC',
+                ]);
+                foreach ($iterator as $form) {
+                    $formId = (int)$form['id'];
+                    if (!isset($savedFormIds[$formId])) {
+                        $savedConfigs[] = [
+                            'generated_id'       => $formId,
+                            'name'               => $form['name'],
+                            'description'        => $form['description'] ?? '',
+                            'forms_categories_id' => (int)($form['forms_categories_id'] ?? 0),
+                            'illustration'       => $form['illustration'] ?? 'request-service',
+                            'is_active'          => (int)($form['is_active'] ?? 1),
+                        ];
+                    }
+                }
+            }
+        }
+
         // Definições por aba
         $tableMapping = [
             1 => 'glpi_tickettemplates',
@@ -367,6 +400,9 @@ class Sector extends SectorBase {
         echo "<input type='hidden' name='action' value='save_draft'>";
         echo "<input type='hidden' name='sector_id' value='{$item->getID()}'>";
         echo "<input type='hidden' name='tabnum' value='{$tabnum}'>";
+        if ($tabnum == 6) {
+            echo "<div id='removed-configs-tab-{$tabnum}'></div>";
+        }
 
         echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
         echo "<tr><th colspan='2' style='font-size: 1.2em;'>Configuração de {$title}</th></tr>";
@@ -508,6 +544,13 @@ class Sector extends SectorBase {
 
         $(document).on('click', '.btn-remove-config', function() {
             let block = $(this).closest('.config-block');
+            let generatedId = parseInt(block.find('.input-generated-id').val(), 10) || 0;
+            let tabnum = $('#form_configs_tab_6').length ? 6 : 0;
+            if (tabnum === 6 && generatedId > 0) {
+                $('#removed-configs-tab-6').append(
+                    $('<input>', { type: 'hidden', name: 'removed_items_generated_id[]', value: generatedId })
+                );
+            }
             let editorId = block.find('.input-content-wrapper textarea').attr('id');
             if (editorId && typeof tinymce !== 'undefined' && tinymce.get(editorId)) {
                 tinymce.get(editorId).remove();
@@ -721,7 +764,7 @@ class Sector extends SectorBase {
         function generateSectorConfigs(sectorId, tabnum) {
             let confirmMsg = 'Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?';
             if (tabnum === 6) {
-                confirmMsg = 'Atenção: A padronização irá criar e atualizar formulários conforme as configurações. Formulários que foram removidos desta tela e que já possuem respostas serão INATIVADOS para preservar o histórico. Formulários removidos e sem uso serão excluídos.\\n\\nO rascunho atual será salvo automaticamente.\\nDeseja prosseguir com a sincronização?';
+                confirmMsg = 'Atenção: A padronização irá criar e atualizar formulários conforme as configurações. Formulários externos removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\n\nO rascunho atual será salvo automaticamente.\nDeseja prosseguir com a sincronização?';
             }
             if(confirm(confirmMsg)) {
                 

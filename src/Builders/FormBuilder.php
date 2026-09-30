@@ -30,59 +30,84 @@ class FormBuilder
     /**
      * @param int $entities_id
      * @param array $configs Dados vindos do formulário (JSON)
+     * @param array $managedIds IDs de formulários previamente gerados pelo plugin
+     * @param array $externalIds IDs de formulários externos adotados pela configuração
      * @return array Array contendo 'count' e 'configs' atualizado.
      */
-    public function build(int $entities_id, array $configs = []): array
+    public function build(int $entities_id, array $configs = [], array $managedIds = [], array $externalIds = []): array
     {
         $count = 0;
         $processedIds = [];
+        $processedManagedIds = [];
+        $processedExternalIds = [];
+        $managedIds = array_values(array_unique(array_filter(array_map('intval', $managedIds))));
+        $externalIds = array_values(array_unique(array_filter(array_map('intval', $externalIds))));
         foreach ($configs as &$config) {
+            $generatedId = (int)($config['generated_id'] ?? 0);
             $formId = $this->getOrCreateForm($config, $entities_id);
             if ($formId > 0) {
                 $count++;
                 $processedIds[] = $formId;
+                if (in_array($generatedId, $managedIds, true)
+                    || ($generatedId === 0 && !in_array($formId, $externalIds, true))) {
+                    $processedManagedIds[] = $formId;
+                } else {
+                    $processedExternalIds[] = $formId;
+                }
             }
         }
         unset($config);
 
-        // Deleta os formulários que não estão na configuração, mas apenas se não tiverem respostas.
-        // Se tiverem respostas, apenas inativa para preservar histórico e referências.
+        $remainingManagedIds = $processedManagedIds;
+        $remainingExternalIds = $processedExternalIds;
+
         global $DB;
         $formObj = new Form();
-        $table = $formObj->getTable();
-        
+
         $answersSetClass = '\Glpi\Form\AnswersSet';
         $hasAnswersSetTable = class_exists($answersSetClass);
         $answersTable = $hasAnswersSetTable ? (new $answersSetClass())->getTable() : '';
-        
-        if ($DB->tableExists($table)) {
-            $iterator = $DB->request([
-                'SELECT' => 'id',
-                'FROM'   => $table,
-                'WHERE'  => ['entities_id' => $entities_id]
-            ]);
-            
-            foreach ($iterator as $row) {
-                $id = (int)$row['id'];
-                if (!in_array($id, $processedIds)) {
-                    $hasAnswers = false;
-                    if ($hasAnswersSetTable && $DB->tableExists($answersTable)) {
-                        $countAns = $DB->countElementsInTable($answersTable, ['forms_forms_id' => $id]);
-                        if ($countAns > 0) {
-                            $hasAnswers = true;
-                        }
-                    }
-                    
-                    if ($hasAnswers) {
-                        $formObj->update(['id' => $id, 'is_active' => 0]);
-                    } else {
-                        $formObj->delete(['id' => $id], 1);
-                    }
+
+        foreach ($managedIds as $id) {
+            if (in_array($id, $processedIds, true)
+                || !$formObj->getFromDB($id)
+                || (int)$formObj->fields['entities_id'] !== $entities_id) {
+                continue;
+            }
+
+            $hasAnswers = false;
+            if ($hasAnswersSetTable && $DB->tableExists($answersTable)) {
+                $countAns = $DB->countElementsInTable($answersTable, ['forms_forms_id' => $id]);
+                if ($countAns > 0) {
+                    $hasAnswers = true;
                 }
+            }
+
+            if ($hasAnswers) {
+                $formObj->update(['id' => $id, 'is_active' => 0]);
+                $remainingManagedIds[] = $id;
+            } else {
+                $formObj->delete(['id' => $id], 1);
             }
         }
 
-        return ['count' => $count, 'configs' => $configs];
+        foreach ($externalIds as $id) {
+            if (in_array($id, $processedIds, true)
+                || !$formObj->getFromDB($id)
+                || (int)$formObj->fields['entities_id'] !== $entities_id) {
+                continue;
+            }
+
+            $formObj->update(['id' => $id, 'is_active' => 0]);
+            $remainingExternalIds[] = $id;
+        }
+
+        return [
+            'count' => $count,
+            'configs' => $configs,
+            'managed_ids' => array_values(array_unique($remainingManagedIds)),
+            'external_ids' => array_values(array_unique($remainingExternalIds)),
+        ];
     }
 
     private function getOrCreateForm(array &$config, int $entities_id): int
