@@ -235,7 +235,7 @@ class Sector extends SectorBase {
             $modelsPadrao = [];
             $modelsNormal = [];
             foreach ($iterator as $row) {
-                if (preg_match('/^\[padr[aã]o\]/i', $row['name'])) {
+                if (preg_match('/^\[padr(?:a|ã)o\]/iu', $row['name'])) {
                     $modelsPadrao[$row['id']] = $row['name'];
                 } else {
                     $modelsNormal[$row['id']] = $row['name'];
