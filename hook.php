@@ -7,7 +7,7 @@
  */
 
 // -----------------------------------------------------------------------
-// INSTALL — Criar tabela para armazenar as infraestruturas geradas
+// INSTALL — Criar tabela para armazenar as estruturas geradas
 // -----------------------------------------------------------------------
 function plugin_glpinewentity_install(): bool {
     global $DB;

@@ -26,7 +26,6 @@ function plugin_init_glpinewentity(): void {
     // A engrenagem do plugin inicia diretamente o wizard de inclusão.
     $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['glpinewentity'] = 'front/sector.form.php';
     $PLUGIN_HOOKS[Hooks::UNDISCLOSED_CONFIG_VALUE]['glpinewentity'] = 'plugin_glpinewentity_undisclosed_config_value';
-    $PLUGIN_HOOKS['profile_declare']['glpinewentity'] = 'GlpiPlugin\Glpinewentity\Profile';
 
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Wizard');
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Sector');
@@ -34,7 +33,7 @@ function plugin_init_glpinewentity(): void {
 
     $plugin = new Plugin();
     if ($plugin->isActivated('glpinewentity')) {
-        if (Session::haveRight('plugin_glpinewentity', READ)) {
+        if (\GlpiPlugin\Glpinewentity\Sector::canView()) {
             // O menu usa a classe própria para manter o título "GLPI New Entity"
             // e abrir a listagem com o botão de inclusão.
             $PLUGIN_HOOKS[Hooks::MENU_TOADD]['glpinewentity'] = [

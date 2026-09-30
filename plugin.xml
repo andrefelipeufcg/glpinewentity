@@ -6,12 +6,12 @@
     <logo>https://raw.githubusercontent.com/andrefelipeufcg/glpinewentity/main/logo.png</logo>
     <description>
        <short>
-          <en>Wizard to create Entity, Admin, Groups, and ITIL Categories</en>
-          <pt_BR>Wizard para criação de Entidade, Admin, Grupos e Categorias ITIL</pt_BR>
+          <en>Wizard to set up entities, profiles, groups, ITIL categories, and entity-specific service desk configurations</en>
+          <pt_BR>Assistente para configurar entidades, perfis, grupos, categorias ITIL e configurações de atendimento por entidade</pt_BR>
        </short>
        <long>
-          <en>Wizard to create Entity, Admin, Groups, and ITIL Categories</en>
-          <pt_BR>Wizard para criação de Entidade, Admin, Grupos e Categorias ITIL</pt_BR>
+          <en>Create a complete entity structure in one workflow: create the entity, clone supported profiles, assign users by email, create groups and subgroups, associate technicians, and build hierarchical ITIL categories. Configure entity-specific ticket templates, canned follow-ups and solutions, pending reasons, notifications, and standard forms. Existing entity structures can also be edited and synchronized.</en>
+          <pt_BR>Crie a estrutura completa de uma entidade em um único fluxo: crie a entidade, clone perfis compatíveis, vincule usuários por e-mail, crie grupos e subgrupos, associe técnicos e monte categorias ITIL hierárquicas. Configure modelos de chamados, acompanhamentos e soluções padronizados, motivos de pendência, notificações e formulários padrão específicos da entidade. As estruturas existentes também podem ser editadas e sincronizadas.</pt_BR>
        </long>
     </description>
     <homepage>https://github.com/andrefelipeufcg/glpinewentity</homepage>

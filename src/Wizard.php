@@ -53,7 +53,7 @@ class Wizard {
     }
 
     /**
-     * Processa a criação de toda a infraestrutura do novo setor.
+     * Processa a criação de toda a estrutura do novo setor.
      *
      * @param array $input Dados vindos do formulário ($_POST)
      * @return array Resumo com IDs criados e eventuais erros
@@ -82,11 +82,6 @@ class Wizard {
         // ── Validação básica ──
         if (empty($sectorName) || empty($sectorAbbr)) {
             $result['errors'][] = __('O nome do setor e a sigla são obrigatórios.', 'glpinewentity');
-            return $result;
-        }
-
-        if (!\Session::haveAccessToEntity($parentEntity)) {
-            $result['errors'][] = __('Acesso negado à entidade pai escolhida.', 'glpinewentity');
             return $result;
         }
 
@@ -304,7 +299,8 @@ class Wizard {
         ]);
 
         if (!$parentGroupId) {
-            $result['errors'][] = sprintf(__('Falha ao criar grupo pai \'%s\'.', 'glpinewentity'), $parentGroupName);
+            $safeParentGroupName = htmlspecialchars($parentGroupName, ENT_QUOTES);
+            $result['errors'][] = sprintf(__('Falha ao criar grupo pai \'%s\'.', 'glpinewentity'), $safeParentGroupName);
         } else {
             $result['groups'][] = [
                 'id'   => $parentGroupId,
@@ -460,6 +456,33 @@ class Wizard {
     // Métodos auxiliares
     // =====================================================================
 
+    public static function getCategoryTreeText(int $entityId): string {
+        global $DB;
+
+        $cats = [];
+        $children = [];
+        foreach ($DB->request([
+            'SELECT' => ['id', 'name', 'itilcategories_id'],
+            'FROM'   => 'glpi_itilcategories',
+            'WHERE'  => ['entities_id' => $entityId],
+            'ORDER'  => 'completename ASC'
+        ]) as $row) {
+            $cats[$row['id']] = $row;
+            $children[$row['itilcategories_id']][] = $row['id'];
+        }
+
+        $lines = [];
+        $buildTree = function ($parentId, $depth) use (&$buildTree, &$lines, &$cats, &$children) {
+            foreach ($children[$parentId] ?? [] as $childId) {
+                $lines[] = str_repeat('-', $depth) . $cats[$childId]['name'];
+                $buildTree($childId, $depth + 1);
+            }
+        };
+        $buildTree(0, 0);
+
+        return trim(str_replace("\r", "", implode("\n", $lines)));
+    }
+
     public static function processUpdate(array $input, array $existingFields): array {
         $result = json_decode($existingFields['metadata'] ?? '{}', true) ?: [];
         // Limpa erros antigos carregados do metadata
@@ -479,8 +502,8 @@ class Wizard {
             $result['errors'][] = __('Informe pelo menos uma Categoria de Serviço.', 'glpinewentity');
             return $result;
         }
-        
-        if (!\Session::haveAccessToEntity($parentEntity)) {
+
+        if (!Sector::canUpdate() && !\Session::haveAccessToEntity($parentEntity)) {
             $result['errors'][] = __('Acesso negado à entidade pai escolhida.', 'glpinewentity');
             return $result;
         }
@@ -491,12 +514,12 @@ class Wizard {
         // Atualizar Entidade
         // =================================================================
         if ($entityId <= 0) {
-            $result['errors'][] = __('A infraestrutura não possui uma entidade gerenciada vinculada.', 'glpinewentity');
+            $result['errors'][] = __('A estrutura não possui uma entidade gerenciada vinculada.', 'glpinewentity');
             return $result;
         }
 
-        if (!\Session::haveAccessToEntity($entityId)) {
-            $result['errors'][] = __('Acesso negado à entidade gerenciada por este setor.', 'glpinewentity');
+        if (!Sector::canUpdate() && !\Session::haveAccessToEntity($entityId)) {
+            $result['errors'][] = __('Acesso negado à entidade gerenciada por esta estrutura.', 'glpinewentity');
             return $result;
         }
 
@@ -521,9 +544,10 @@ class Wizard {
             ]);
 
             if (count($duplicateEntity) > 0) {
+                $safeEntityName = htmlspecialchars($entityName, ENT_QUOTES);
                 $result['errors'][] = sprintf(
                     __('Não foi possível alterar a entidade pai: já existe uma entidade chamada "%s" nesse nível.', 'glpinewentity'),
-                    $entityName
+                    $safeEntityName
                 );
                 return $result;
             }
@@ -829,7 +853,8 @@ class Wizard {
                             'groups_id'   => $mappedParentId,
                         ]);
                         if (!$targetGroupId) {
-                            $result['errors'][] = sprintf(__('Falha ao criar subgrupo \'%s\'.', 'glpinewentity'), $sgName);
+                            $safeSgName = htmlspecialchars($sgName, ENT_QUOTES);
+                            $result['errors'][] = sprintf(__('Falha ao criar subgrupo \'%s\'.', 'glpinewentity'), $safeSgName);
                             continue;
                         }
                     }
@@ -893,96 +918,187 @@ class Wizard {
         // =================================================================
         // Sincronizar Categorias ITIL
         // =================================================================
-        $cat_iterator = $DB->request([
-            'SELECT' => ['id', 'name', 'itilcategories_id'],
-            'FROM'   => 'glpi_itilcategories',
-            'WHERE'  => ['entities_id' => $entityId],
-            'ORDER'  => 'completename ASC'
-        ]);
-        
-        $cats = [];
-        $children = [];
-        $allCatIds = [];
-        foreach ($cat_iterator as $row) {
-            $cats[$row['id']] = $row;
-            $children[$row['itilcategories_id']][] = $row['id'];
-            $allCatIds[] = $row['id'];
-        }
-
-        $oldCatList = [];
-        $buildTree = function ($parentId, $depth) use (&$buildTree, &$oldCatList, &$cats, &$children) {
-            if (isset($children[$parentId])) {
-                foreach ($children[$parentId] as $childId) {
-                    $prefix = str_repeat('-', $depth);
-                    $oldCatList[] = $prefix . $cats[$childId]['name'];
-                    $buildTree($childId, $depth + 1);
-                }
-            }
-        };
-        $buildTree(0, 0);
-        
-        // Compara a árvore atual salva no banco (que já volta em ordem alfabética de completename)
-        // com o que foi submetido.
-        $oldCatString = trim(str_replace("\r", "", implode("\n", $oldCatList)));
+        // Mesmo texto canônico exibido no formulário, para não mexer sem alteração real
+        $oldCatString = self::getCategoryTreeText((int)$entityId);
         $newCatString = trim(str_replace("\r", "", $categoryNames));
 
         if ($oldCatString !== $newCatString) {
-            // Houve alteração! O comportamento desejado é deletar TODAS as categorias da entidade e recriar.
-            $catObj = new \ITILCategory();
-            foreach (array_reverse($allCatIds) as $catId) {
-                // Deleta a partir do fim (filhos primeiro) para evitar problemas de restrição
-                $catObj->delete(['id' => $catId], 1);
-            }
-            
-            $result['categories'] = [];
-            $lastIdAtDepth = [];
-            $catList = array_filter(array_map('trim', explode("\n", $newCatString)));
-            foreach ($catList as $line) {
-                preg_match('/^-+/', $line, $matches);
-                $hyphensCount = !empty($matches[0]) ? strlen($matches[0]) : 0;
-                $cleanName = trim(substr($line, $hyphensCount));
-                if (empty($cleanName)) {
-                    continue;
-                }
-
-                $parentId = 0;
-                for ($depth = $hyphensCount - 1; $depth >= 0; $depth--) {
-                    if (isset($lastIdAtDepth[$depth])) {
-                        $parentId = $lastIdAtDepth[$depth];
-                        break;
-                    }
-                }
-
-                $categoryId = $catObj->add([
-                    'name'              => $cleanName,
-                    'entities_id'       => $entityId,
-                    'itilcategories_id' => $parentId,
-                    'is_recursive'      => 1,
-                    'is_incident'       => 1,
-                    'is_request'        => 1,
-                ]);
-                
-                if (!$categoryId) {
-                    $result['errors'][] = sprintf(__('Falha ao criar categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($cleanName, ENT_QUOTES));
-                    continue;
-                }
-
-                $lastIdAtDepth[$hyphensCount] = $categoryId;
-                foreach (array_keys($lastIdAtDepth) as $depth) {
-                    if ($depth > $hyphensCount) {
-                        unset($lastIdAtDepth[$depth]);
-                    }
-                }
-                $result['categories'][] = [
-                    'id'   => $categoryId,
-                    'name' => $cleanName,
-                ];
-            }
+            self::reconcileCategories((int)$entityId, $newCatString, $result);
         }
-        // Se as strings forem exatamente iguais, não faz nada no banco 
-        // e preserva os metadados existentes intactos.
 
         return $result;
+    }
+
+    /**
+     * Reconcilia as categorias ITIL da entidade com o texto informado, sem purgar a árvore:
+     * mantém as iguais, renomeia por posição, cria as novas e remove as ausentes que não estejam em uso.
+     */
+    private static function reconcileCategories(int $entityId, string $text, array &$result): void {
+        global $DB;
+
+        $old = [];
+        foreach ($DB->request([
+            'SELECT' => ['id', 'name', 'itilcategories_id'],
+            'FROM'   => 'glpi_itilcategories',
+            'WHERE'  => ['entities_id' => $entityId],
+            'ORDER'  => 'id ASC'
+        ]) as $row) {
+            $old[(int)$row['id']] = ['name' => $row['name'], 'parent' => (int)$row['itilcategories_id']];
+        }
+
+        // Nós desejados: índice => [depth, name, parentIndex|null]
+        $nodes = [];
+        $lastAtDepth = [];
+        foreach (array_filter(array_map('trim', explode("\n", $text))) as $line) {
+            preg_match('/^-+/', $line, $m);
+            $depth = empty($m[0]) ? 0 : strlen($m[0]);
+            $name = trim(substr($line, $depth));
+            if ($name === '') {
+                continue;
+            }
+            $parent = null;
+            for ($d = $depth - 1; $d >= 0; $d--) {
+                if (isset($lastAtDepth[$d])) {
+                    $parent = $lastAtDepth[$d];
+                    break;
+                }
+            }
+            $idx = count($nodes);
+            $nodes[$idx] = ['depth' => $parent === null ? 0 : $nodes[$parent]['depth'] + 1, 'name' => $name, 'parent' => $parent];
+            $lastAtDepth[$depth] = $idx;
+            foreach (array_keys($lastAtDepth) as $d) {
+                if ($d > $depth) {
+                    unset($lastAtDepth[$d]);
+                }
+            }
+        }
+
+        $catObj = new \ITILCategory();
+        $resolved = [];
+        $used = [];
+        $maxDepth = $nodes ? max(array_column($nodes, 'depth')) : 0;
+
+        for ($depth = 0; $depth <= $maxDepth; $depth++) {
+            $groups = [];
+            foreach ($nodes as $idx => $node) {
+                if ($node['depth'] !== $depth) {
+                    continue;
+                }
+                if ($node['parent'] === null) {
+                    $parentId = 0;
+                } elseif (isset($resolved[$node['parent']])) {
+                    $parentId = $resolved[$node['parent']];
+                } else {
+                    continue;
+                }
+                $groups[$parentId][] = $idx;
+            }
+
+            foreach ($groups as $parentId => $idxs) {
+                $pending = [];
+                foreach ($idxs as $idx) {
+                    $match = null;
+                    foreach ($old as $id => $o) {
+                        if (!isset($used[$id]) && $o['parent'] === $parentId && $o['name'] === $nodes[$idx]['name']) {
+                            $match = $id;
+                            break;
+                        }
+                    }
+                    if ($match !== null) {
+                        $used[$match] = true;
+                        $resolved[$idx] = $match;
+                    } else {
+                        $pending[] = $idx;
+                    }
+                }
+
+                $free = [];
+                foreach ($old as $id => $o) {
+                    if (!isset($used[$id]) && $o['parent'] === $parentId) {
+                        $free[] = $id;
+                    }
+                }
+
+                // Pareamento por posição só quando não há ambiguidade (mesma quantidade de sobras).
+                if ($pending && count($free) === count($pending)) {
+                    foreach ($pending as $i => $idx) {
+                        $id = $free[$i];
+                        if ($catObj->update(['id' => $id, 'name' => $nodes[$idx]['name']])) {
+                            $used[$id] = true;
+                            $resolved[$idx] = $id;
+                            $old[$id]['name'] = $nodes[$idx]['name'];
+                        }
+                    }
+                    $pending = array_values(array_filter($pending, static fn($idx) => !isset($resolved[$idx])));
+                }
+
+                foreach ($pending as $idx) {
+                    $newId = $catObj->add([
+                        'name'              => $nodes[$idx]['name'],
+                        'entities_id'       => $entityId,
+                        'itilcategories_id' => $parentId,
+                        'is_recursive'      => 1,
+                        'is_incident'       => 1,
+                        'is_request'        => 1,
+                    ]);
+                    if ($newId) {
+                        $resolved[$idx] = (int)$newId;
+                        $used[(int)$newId] = true;
+                    } else {
+                        $result['errors'][] = sprintf(__('Falha ao criar categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($nodes[$idx]['name'], ENT_QUOTES));
+                    }
+                }
+            }
+        }
+
+        // Remove as categorias ausentes do texto, dos filhos para os pais; as em uso são preservadas.
+        $depthOf = static function (int $id) use ($old): int {
+            $d = 0;
+            while (isset($old[$id]) && $old[$id]['parent'] > 0 && $d < 50) {
+                $id = $old[$id]['parent'];
+                $d++;
+            }
+            return $d;
+        };
+        $toRemove = array_diff(array_keys($old), array_keys($used));
+        usort($toRemove, static fn($a, $b) => $depthOf($b) <=> $depthOf($a));
+
+        $kept = array_fill_keys(array_keys($used), true);
+        foreach ($toRemove as $id) {
+            $hasKeptChild = false;
+            foreach ($old as $cid => $o) {
+                if ($o['parent'] === $id && isset($kept[$cid])) {
+                    $hasKeptChild = true;
+                    break;
+                }
+            }
+
+            $inUse = false;
+            foreach (['glpi_tickets', 'glpi_problems', 'glpi_changes'] as $table) {
+                $cnt = $DB->request(['COUNT' => 'cpt', 'FROM' => $table, 'WHERE' => ['itilcategories_id' => $id]])->current();
+                if ((int)($cnt['cpt'] ?? 0) > 0) {
+                    $inUse = true;
+                    break;
+                }
+            }
+
+            if ($hasKeptChild || $inUse) {
+                $kept[$id] = true;
+                $result['warnings'][] = sprintf(
+                    __('A categoria \'%s\' está em uso e não foi removida.', 'glpinewentity'),
+                    htmlspecialchars($old[$id]['name'], ENT_QUOTES)
+                );
+            } elseif (!$catObj->delete(['id' => $id], 1)) {
+                $result['errors'][] = sprintf(__('Falha ao remover a categoria \'%s\'.', 'glpinewentity'), htmlspecialchars($old[$id]['name'], ENT_QUOTES));
+            }
+        }
+
+        $result['categories'] = [];
+        foreach ($nodes as $idx => $node) {
+            if (isset($resolved[$idx])) {
+                $result['categories'][] = ['id' => $resolved[$idx], 'name' => $node['name']];
+            }
+        }
     }
 
     /**

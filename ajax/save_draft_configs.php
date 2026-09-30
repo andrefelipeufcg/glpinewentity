@@ -22,8 +22,8 @@ use GlpiPlugin\Glpinewentity\Sector;
 
 header('Content-Type: application/json');
 
-if (!Session::haveRight('plugin_glpinewentity', UPDATE)) {
-    echo json_encode(['success' => false, 'error' => __('Acesso negado.', 'glpinewentity')]);
+if (!Session::haveRight('plugin_glpinewentity', UPDATE) || !Sector::canUpdate()) {
+    echo json_encode(['success' => false, 'error' => __('Acesso negado. Apenas o perfil Super-Admin pode realizar esta operação.', 'glpinewentity')]);
     exit;
 }
 
@@ -42,17 +42,17 @@ if (!$sector->getFromDB($sectorId)) {
     exit;
 }
 
-// Verifica se o usuário tem acesso à entidade gerenciada por este setor
+// Verifica se o usuário tem acesso à entidade gerenciada por este setor.
 $meta_check = json_decode($sector->fields['metadata'] ?? '{}', true) ?: [];
 $managed_entity_id = (int)($meta_check['entity_id'] ?? 0);
-if ($managed_entity_id <= 0 || !Session::haveAccessToEntity($managed_entity_id)) {
+if ($managed_entity_id <= 0 || (!Sector::canUpdate() && !Session::haveAccessToEntity($managed_entity_id))) {
     echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste setor.', 'glpinewentity')]);
     exit;
 }
 
-// Valida também o acesso à entidade pai do setor
+// Valida também o acesso à entidade pai do setor.
 $parent_entity_id = (int)($sector->fields['entities_id'] ?? 0);
-if (!Session::haveAccessToEntity($parent_entity_id)) {
+if (!Sector::canUpdate() && !Session::haveAccessToEntity($parent_entity_id)) {
     echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade raiz deste setor.', 'glpinewentity')]);
     exit;
 }
@@ -90,6 +90,7 @@ $forms_categories_id = $_POST['items_forms_categories_id'] ?? [];
 $illustrations = $_POST['items_illustration'] ?? [];
 
 $generated_ids = $_POST['items_generated_id'] ?? [];
+$removed_generated_ids = $_POST['removed_items_generated_id'] ?? [];
 
 $configsToSave = [];
 foreach ($names as $i => $name) {
@@ -129,6 +130,7 @@ foreach ($names as $i => $name) {
     }
 
     if ($tabnum == 6) {
+        $itemConfig['is_active'] = (int)($is_active[$i] ?? 1);
         $itemConfig['description'] = $descriptions[$i] ?? '';
         $itemConfig['forms_categories_id'] = (int)($forms_categories_id[$i] ?? 0);
         // Mantém a ilustração escolhida ao salvar ou aplicar a padronização.
@@ -145,6 +147,49 @@ $meta = json_decode($sector->fields['metadata'] ?? '{}', true) ?: [];
 $tabKey = 'tab_' . $tabnum;
 if (!isset($meta['configs'])) {
     $meta['configs'] = [];
+}
+
+if ($tabnum == 6) {
+    $previousConfigsByGeneratedId = [];
+    foreach ($meta['configs'][$tabKey] ?? [] as $previousConfig) {
+        $previousGeneratedId = (int)($previousConfig['generated_id'] ?? 0);
+        if ($previousGeneratedId > 0) {
+            $previousConfigsByGeneratedId[$previousGeneratedId] = $previousConfig;
+        }
+    }
+
+    foreach ($configsToSave as &$configToSave) {
+        $generatedId = (int)($configToSave['generated_id'] ?? 0);
+        if ($generatedId > 0 && isset($previousConfigsByGeneratedId[$generatedId]['applied_hash'])) {
+            $configToSave['applied_hash'] = $previousConfigsByGeneratedId[$generatedId]['applied_hash'];
+        }
+    }
+    unset($configToSave);
+
+    $managedIds = $meta['managed_ids'][$tabKey] ?? [];
+    if (!isset($meta['managed_ids'][$tabKey])) {
+        foreach ($meta['configs'][$tabKey] ?? [] as $config) {
+            $generatedId = (int)($config['generated_id'] ?? 0);
+            if ($generatedId > 0) {
+                $managedIds[] = $generatedId;
+            }
+        }
+    }
+    $externalIds = $meta['external_ids'][$tabKey] ?? [];
+    foreach ($configsToSave as $config) {
+        $generatedId = (int)($config['generated_id'] ?? 0);
+        if ($generatedId > 0 && !in_array($generatedId, $managedIds, true)) {
+            $externalIds[] = $generatedId;
+        }
+    }
+    foreach ($removed_generated_ids as $generatedId) {
+        $generatedId = (int)$generatedId;
+        if ($generatedId > 0 && !in_array($generatedId, $managedIds, true)) {
+            $externalIds[] = $generatedId;
+        }
+    }
+    $meta['managed_ids'][$tabKey] = array_values(array_unique(array_map('intval', $managedIds)));
+    $meta['external_ids'][$tabKey] = array_values(array_unique(array_map('intval', $externalIds)));
 }
 $meta['configs'][$tabKey] = $configsToSave;
 

@@ -25,47 +25,93 @@ use Glpi\Form\Tag\AnswerTagProvider;
 
 class FormBuilder
 {
-    private const FORM_NAME = 'Formulário Padrão de Atendimento';
+    private const FORM_NAME = 'Formulários';
 
     /**
      * @param int $entities_id
      * @param array $configs Dados vindos do formulário (JSON)
+     * @param array $managedIds IDs de formulários previamente gerados pelo plugin
+     * @param array $externalIds IDs de formulários externos adotados pela configuração
      * @return array Array contendo 'count' e 'configs' atualizado.
      */
-    public function build(int $entities_id, array $configs = []): array
+    public function build(int $entities_id, array $configs = [], array $managedIds = [], array $externalIds = []): array
     {
         $count = 0;
         $processedIds = [];
+        $processedManagedIds = [];
+        $processedExternalIds = [];
+        $managedIds = array_values(array_unique(array_filter(array_map('intval', $managedIds))));
+        $externalIds = array_values(array_unique(array_filter(array_map('intval', $externalIds))));
         foreach ($configs as &$config) {
+            $generatedId = (int)($config['generated_id'] ?? 0);
             $formId = $this->getOrCreateForm($config, $entities_id);
             if ($formId > 0) {
                 $count++;
                 $processedIds[] = $formId;
+                if (in_array($generatedId, $managedIds, true)
+                    || ($generatedId === 0 && !in_array($formId, $externalIds, true))) {
+                    $processedManagedIds[] = $formId;
+                } else {
+                    $processedExternalIds[] = $formId;
+                }
             }
         }
         unset($config);
 
-        // Deleta (purge) os formulários da entidade que foram removidos da configuração do plugin
+        $remainingManagedIds = $processedManagedIds;
+        $remainingExternalIds = $processedExternalIds;
+
         global $DB;
         $formObj = new Form();
-        $table = $formObj->getTable();
-        
-        if ($DB->tableExists($table)) {
-            $iterator = $DB->request([
-                'SELECT' => 'id',
-                'FROM'   => $table,
-                'WHERE'  => ['entities_id' => $entities_id]
-            ]);
-            
-            foreach ($iterator as $row) {
-                $id = (int)$row['id'];
-                if (!in_array($id, $processedIds)) {
-                    $formObj->delete(['id' => $id], 1);
+
+        $answersSetClass = '\Glpi\Form\AnswersSet';
+        $hasAnswersSetTable = class_exists($answersSetClass);
+        $answersTable = $hasAnswersSetTable ? (new $answersSetClass())->getTable() : '';
+
+        foreach ($managedIds as $id) {
+            if (in_array($id, $processedIds, true)
+                || !$formObj->getFromDB($id)
+                || (int)$formObj->fields['entities_id'] !== $entities_id) {
+                continue;
+            }
+
+            $hasAnswers = false;
+            if ($hasAnswersSetTable && $DB->tableExists($answersTable)) {
+                $answersCount = $DB->request([
+                    'COUNT' => 'cpt',
+                    'FROM'  => $answersTable,
+                    'WHERE' => ['forms_forms_id' => $id],
+                ]);
+                if ((int)($answersCount->current()['cpt'] ?? 0) > 0) {
+                    $hasAnswers = true;
                 }
+            }
+
+            if ($hasAnswers) {
+                $formObj->update(['id' => $id, 'is_active' => 0]);
+                $remainingManagedIds[] = $id;
+            } else {
+                $formObj->delete(['id' => $id], 1);
             }
         }
 
-        return ['count' => $count, 'configs' => $configs];
+        foreach ($externalIds as $id) {
+            if (in_array($id, $processedIds, true)
+                || !$formObj->getFromDB($id)
+                || (int)$formObj->fields['entities_id'] !== $entities_id) {
+                continue;
+            }
+
+            $formObj->update(['id' => $id, 'is_active' => 0]);
+            $remainingExternalIds[] = $id;
+        }
+
+        return [
+            'count' => $count,
+            'configs' => $configs,
+            'managed_ids' => array_values(array_unique($remainingManagedIds)),
+            'external_ids' => array_values(array_unique($remainingExternalIds)),
+        ];
     }
 
     private function getOrCreateForm(array &$config, int $entities_id): int
@@ -83,6 +129,7 @@ class FormBuilder
         $description = trim($config['description'] ?? '');
         $forms_categories_id = (int)($config['forms_categories_id'] ?? 0);
         $illustration = $config['illustration'] ?? $config['icon'] ?? 'request-service';
+        $configHash = $this->getConfigHash($config);
 
         $sourceData = [];
         $sourceForm = null;
@@ -95,23 +142,16 @@ class FormBuilder
             }
         }
 
-        if ($generatedId > 0 && $form->getFromDB($generatedId)) {
-            // Como o objetivo do plugin é sempre refletir o que foi copiado (e sobrescrever eventuais edições no GLPI),
-            // se o usuário selecionou uma origem (Copiar de...), nós recriamos o formulário.
-            if ($sourceForm !== null) {
-                $importedId = $this->importCompleteForm(
-                    $sourceForm,
-                    $entities_id,
-                    $name,
-                    $description,
-                    $forms_categories_id,
-                    $illustration
-                );
-                if ($importedId > 0) {
-                    $form->delete(['id' => $generatedId], true);
-                    $config['generated_id'] = $importedId;
-                    return $importedId;
-                }
+        if ($generatedId === 0 && $form->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
+            $generatedId = (int) $form->getID();
+            $config['generated_id'] = $generatedId;
+        }
+
+        if ($generatedId > 0 && ($form->getID() === $generatedId || $form->getFromDB($generatedId))) {
+            if (($config['applied_hash'] ?? '') === $configHash
+                || $this->matchesConfiguration($form, $entities_id, $name, $description, $forms_categories_id, $illustration, $config['is_active'] ?? 1)) {
+                $config['applied_hash'] = $configHash;
+                return $generatedId;
             }
 
             $form->update([
@@ -121,21 +161,35 @@ class FormBuilder
                 'description' => $description,
                 'forms_categories_id' => $forms_categories_id,
                 'illustration' => $illustration,
+                'is_active' => $config['is_active'] ?? 1,
             ]);
+            $config['applied_hash'] = $configHash;
             return $generatedId;
         }
 
-        if ($form->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
-            $config['generated_id'] = $form->getID();
-            return (int) $form->getID();
+        if ($sourceForm !== null) {
+            $importedId = $this->importCompleteForm(
+                $sourceForm,
+                $entities_id,
+                $name,
+                $description,
+                $forms_categories_id,
+                $illustration,
+                $config['is_active'] ?? 1
+            );
+            if ($importedId > 0) {
+                $config['generated_id'] = $importedId;
+                $config['applied_hash'] = $configHash;
+            }
+            return $importedId;
         }
 
         $insertData = [
             'name' => $name,
             'entities_id' => $entities_id,
             'is_recursive' => 1,
-            'is_active' => 1,
-            'description' => $description ?: ($sourceData['description'] ?? __('Formulário padrão gerado automaticamente para a entidade.', 'glpinewentity')),
+            'is_active' => $config['is_active'] ?? 1,
+            'description' => $description ?: ($sourceData['description'] ?? __('Formulários gerados automaticamente para a entidade.', 'glpinewentity')),
             'forms_categories_id' => $forms_categories_id ?: ($sourceData['forms_categories_id'] ?? 0),
             'illustration' => $illustration,
         ];
@@ -156,29 +210,44 @@ class FormBuilder
         $config['generated_id'] = $formId;
         $form->getFromDB($formId);
 
-        if ($sourceForm !== null) {
-            $form->delete(['id' => $formId], true);
-            $importedId = $this->importCompleteForm(
-                $sourceForm,
-                $entities_id,
-                $name,
-                $description,
-                $forms_categories_id,
-                $illustration
-            );
-            if ($importedId > 0) {
-                $config['generated_id'] = $importedId;
-                return $importedId;
-            }
-            return 0;
-        } else {
-            $questions = $this->addQuestions($form);
-            if ($questions !== null) {
-                $this->configureDestination($form, $questions);
-            }
+        $questions = $this->addQuestions($form);
+        if ($questions !== null) {
+            $this->configureDestination($form, $questions);
         }
 
+        $config['applied_hash'] = $configHash;
         return $formId;
+    }
+
+    private function getConfigHash(array $config): string
+    {
+        $values = [
+            'name'                => trim((string)($config['name'] ?? '')),
+            'copy_from'           => (int)($config['copy_from'] ?? 0),
+            'description'         => str_replace("\r\n", "\n", trim((string)($config['description'] ?? ''))),
+            'forms_categories_id' => (int)($config['forms_categories_id'] ?? 0),
+            'illustration'        => (string)($config['illustration'] ?? $config['icon'] ?? 'request-service'),
+            'is_active'           => (int)($config['is_active'] ?? 1),
+        ];
+
+        return hash('sha256', json_encode($values, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function matchesConfiguration(
+        Form $form,
+        int $entitiesId,
+        string $name,
+        string $description,
+        int $categoryId,
+        string $illustration,
+        int $isActive
+    ): bool {
+        return (int)($form->fields['entities_id'] ?? 0) === $entitiesId
+            && (string)($form->fields['name'] ?? '') === $name
+            && str_replace("\r\n", "\n", trim((string)($form->fields['description'] ?? ''))) === str_replace("\r\n", "\n", $description)
+            && (int)($form->fields['forms_categories_id'] ?? 0) === $categoryId
+            && (string)($form->fields['illustration'] ?? 'request-service') === $illustration
+            && (int)($form->fields['is_active'] ?? 0) === $isActive;
     }
 
     private function importCompleteForm(
@@ -187,7 +256,8 @@ class FormBuilder
         string $name,
         string $description,
         int $categoryId,
-        string $illustration
+        string $illustration,
+        int $isActive = 1
     ): int
     {
         $override_input = [
@@ -196,19 +266,19 @@ class FormBuilder
             'description'         => $description,
             'forms_categories_id' => $categoryId,
             'illustration'        => $illustration,
-            'is_active'           => 1,
+            'is_active'           => $isActive,
             'is_recursive'        => 1
         ];
 
         $newId = $source->clone($override_input);
         
         // O método clone() nativo do GLPI para formulários força o formulário a nascer inativo (is_active = 0)
-        // por segurança. Mas na nossa automação de setores, queremos que ele já venha ativo.
+        // por segurança. Atualizamos para respeitar a configuração do plugin.
         if ($newId > 0) {
             $newForm = new Form();
             $newForm->update([
                 'id'        => $newId,
-                'is_active' => 1
+                'is_active' => $isActive
             ]);
         }
         

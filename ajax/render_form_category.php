@@ -37,9 +37,11 @@ include $inc;
 
 header('Content-Type: text/html; charset=utf-8');
 
-if (!Session::haveRight('plugin_glpinewentity', READ)) {
+use GlpiPlugin\Glpinewentity\Sector;
+
+if (!Session::haveRight('plugin_glpinewentity', READ) || !Sector::canView()) {
     http_response_code(403);
-    exit('Acesso negado');
+    exit('Acesso negado. Apenas o perfil Super-Admin pode realizar esta operação.');
 }
 
 $category_id = (int)($_POST['category_id'] ?? 0);

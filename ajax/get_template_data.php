@@ -4,7 +4,7 @@
  * GLPI New Entity — ajax/get_template_data.php
  * 
  * Este script é um endpoint AJAX responsável por buscar no banco de dados 
- * as configurações de um modelo de infraestrutura selecionado na tela 
+ * as configurações de um modelo de estrutura selecionado na tela 
  * (ex: Modelo de Chamado, Motivo de Pendência) quando o usuário escolhe 
  * algo no dropdown "Copiar de...". Ele retorna um JSON com os campos 
  * preenchidos para que o JavaScript atualize a tela em tempo real.
@@ -22,8 +22,10 @@ global $DB, $CFG_GLPI;
 
 header('Content-Type: application/json');
 
-if (!Session::haveRight('plugin_glpinewentity', UPDATE)) {
-    echo json_encode(['success' => false, 'error' => __('Acesso negado.', 'glpinewentity')]);
+use GlpiPlugin\Glpinewentity\Sector;
+
+if (!Session::haveRight('plugin_glpinewentity', UPDATE) || !Sector::canUpdate()) {
+    echo json_encode(['success' => false, 'error' => __('Acesso negado. Apenas o perfil Super-Admin pode realizar esta operação.', 'glpinewentity')]);
     exit;
 }
 
@@ -41,7 +43,7 @@ switch ($tabnum) {
     case 1: // TicketTemplate
         $item = new TicketTemplate();
         if ($item->getFromDB($id)) {
-            if (!Session::haveAccessToEntity($item->fields['entities_id'])) {
+            if (!Sector::canUpdate() && !Session::haveAccessToEntity($item->fields['entities_id'])) {
                 echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste modelo.', 'glpinewentity')]);
                 exit;
             }
@@ -78,7 +80,7 @@ switch ($tabnum) {
     case 2: // ITILFollowupTemplate
         $item = new ITILFollowupTemplate();
         if ($item->getFromDB($id)) {
-            if (!Session::haveAccessToEntity($item->fields['entities_id'])) {
+            if (!Sector::canUpdate() && !Session::haveAccessToEntity($item->fields['entities_id'])) {
                 echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste modelo.', 'glpinewentity')]);
                 exit;
             }
@@ -89,7 +91,7 @@ switch ($tabnum) {
     case 3: // SolutionTemplate
         $item = new SolutionTemplate();
         if ($item->getFromDB($id)) {
-            if (!Session::haveAccessToEntity($item->fields['entities_id'])) {
+            if (!Sector::canUpdate() && !Session::haveAccessToEntity($item->fields['entities_id'])) {
                 echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste modelo.', 'glpinewentity')]);
                 exit;
             }
@@ -100,7 +102,7 @@ switch ($tabnum) {
     case 4: // PendingReason
         $item = new PendingReason();
         if ($item->getFromDB($id)) {
-            if (!Session::haveAccessToEntity($item->fields['entities_id'])) {
+            if (!Sector::canUpdate() && !Session::haveAccessToEntity($item->fields['entities_id'])) {
                 echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste modelo.', 'glpinewentity')]);
                 exit;
             }
@@ -118,7 +120,7 @@ switch ($tabnum) {
     case 5: // Notification
         $item = new Notification();
         if ($item->getFromDB($id)) {
-            if (!Session::haveAccessToEntity($item->fields['entities_id'])) {
+            if (!Sector::canUpdate() && !Session::haveAccessToEntity($item->fields['entities_id'])) {
                 echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste modelo.', 'glpinewentity')]);
                 exit;
             }
@@ -218,12 +220,13 @@ switch ($tabnum) {
             
             if ($iter->count() > 0) {
                 $row = $iter->current();
-                if (!Session::haveAccessToEntity($row['entities_id'] ?? 0)) {
+                if (!Sector::canUpdate() && !Session::haveAccessToEntity($row['entities_id'] ?? 0)) {
                     echo json_encode(['success' => false, 'error' => __('Acesso negado à entidade deste formulário.', 'glpinewentity')]);
                     exit;
                 }
                 $data['name'] = $row['name'] ?? '';
                 $data['description'] = $row['description'] ?? '';
+                $data['is_active'] = $row['is_active'] ?? 1;
                 
                 // Mapeia também a coluna antiga do Formcreator caso seja versão legada do plugin no GLPI 10
                 $data['forms_categories_id'] = $row['forms_categories_id'] ?? $row['plugin_formcreator_categories_id'] ?? 0;

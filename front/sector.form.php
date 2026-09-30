@@ -2,7 +2,7 @@
 /**
  * -----------------------------------------------------------------------
  * GLPI New Entity — front/sector.form.php
- * Formulário para criação e edição de infraestrutura de novo setor.
+ * Formulário para criação e edição de estrutura de novo setor.
  * -----------------------------------------------------------------------
  */
 
@@ -16,7 +16,12 @@ use GlpiPlugin\Glpinewentity\Sector;
 use GlpiPlugin\Glpinewentity\Wizard;
 
 // READ permite acessar o wizard; CREATE é validado pelo GLPI na inclusão.
+// O plugin requer permissão híbrida: direito de READ + perfil obrigatoriamente de Super-Admin.
 Session::checkRight("plugin_glpinewentity", READ);
+if (!Sector::canView()) {
+    Session::addMessageAfterRedirect(__('Acesso negado: Este recurso é restrito exclusivamente para o perfil Super-Admin.', 'glpinewentity'), false, ERROR);
+    Html::redirect($CFG_GLPI['root_doc'] ?? '/');
+}
 
 // -----------------------------------------------------------------------
 // POST: Processar criação
@@ -29,19 +34,15 @@ $sectorObj  = new Sector();
 
 if ($sectorId > 0) {
     if ($sectorObj->getFromDB($sectorId)) {
-        // Prevenção de IDOR: Checar acesso à entidade pai
-        if (!Session::haveAccessToEntity($sectorObj->fields['entities_id'])) {
+        if (!Sector::canView() && !Session::haveAccessToEntity($sectorObj->fields['entities_id'])) {
             Session::addMessageAfterRedirect(__('Acesso negado à entidade.', 'glpinewentity'), false, ERROR);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');
         }
 
-        // Prevenção de Information Disclosure: Checar acesso à entidade gerenciada (filha)
-        // Se o usuário não tem acesso à entidade gerada, ele não pode ver o formulário
-        // porque o showForm() fará queries na entidade filha para popular a tela.
         $meta = json_decode($sectorObj->fields['metadata'] ?? '{}', true);
         $managedEntity = (int)($meta['entity_id'] ?? 0);
-        if ($managedEntity <= 0 || !Session::haveAccessToEntity($managedEntity)) {
+        if ($managedEntity <= 0 || (!Sector::canView() && !Session::haveAccessToEntity($managedEntity))) {
             Session::addMessageAfterRedirect(__('Acesso negado à entidade gerenciada por este setor.', 'glpinewentity'), false, ERROR);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');
@@ -60,7 +61,7 @@ if (isset($_POST['process_wizard'])) {
         Session::checkRight("plugin_glpinewentity", UPDATE);
 
         $newParent = (int)($_POST['parent_entity'] ?? 0);
-        if (!Session::haveAccessToEntity($newParent)) {
+        if (!Sector::canUpdate() && !Session::haveAccessToEntity($newParent)) {
             Session::addMessageAfterRedirect(__('Acesso negado à nova entidade pai escolhida.', 'glpinewentity'), false, ERROR);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $sectorId);
@@ -77,8 +78,12 @@ if (isset($_POST['process_wizard'])) {
             'metadata' => json_encode($result)
         ]);
 
+        foreach ($result['warnings'] ?? [] as $warn) {
+            Session::addMessageAfterRedirect($warn, false, WARNING);
+        }
+
         if (empty($result['errors'])) {
-            Session::addMessageAfterRedirect(__('Infraestrutura atualizada com sucesso!', 'glpinewentity'), true, INFO);
+            Session::addMessageAfterRedirect(__('Estrutura atualizada com sucesso!', 'glpinewentity'), true, INFO);
         } else {
             foreach ($result['errors'] as $err) {
                 Session::addMessageAfterRedirect($err, false, ERROR);
@@ -97,7 +102,7 @@ if (isset($_POST['process_wizard'])) {
                 'sector_abbr' => $_POST['sector_abbr'],
                 'metadata' => json_encode($result)
             ]);
-            Session::addMessageAfterRedirect(__('Infraestrutura criada com sucesso!', 'glpinewentity'), true, INFO);
+            Session::addMessageAfterRedirect(__('Estrutura criada com sucesso!', 'glpinewentity'), true, INFO);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');
         } else {
@@ -112,7 +117,7 @@ if (isset($_POST['process_wizard'])) {
                 foreach ($result['errors'] as $err) {
                     Session::addMessageAfterRedirect($err, false, ERROR);
                 }
-                Session::addMessageAfterRedirect(__('Infraestrutura criada parcialmente. Verifique os erros.', 'glpinewentity'), false, WARNING);
+                Session::addMessageAfterRedirect(__('Estrutura criada parcialmente. Verifique os erros.', 'glpinewentity'), false, WARNING);
                 global $CFG_GLPI;
                 Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $newSectorId);
             } else {

@@ -31,26 +31,40 @@ if ((new \ReflectionProperty('\CommonDBTM', 'rightname'))->hasType()) {
 }
 
 class Sector extends SectorBase {
+    private static $searchAcrossAllEntities = false;
+
     
     public function __construct() {
         $this->get_item_to_display_tab = true;
         parent::__construct();
     }
 
+    /**
+     * Valida se o perfil ativo do usuário atual é um perfil de Super-Admin
+     * nativo do GLPI (id 4 ou perfis criados a partir dele marcados internamente).
+     */
+    private static function isStrictSuperAdmin(): bool {
+        if (!isset($_SESSION['glpiactiveprofile']['id'])) {
+            return false;
+        }
+        $superAdminIds = \Profile::getSuperAdminProfilesId();
+        return in_array($_SESSION['glpiactiveprofile']['id'], (array)$superAdminIds);
+    }
+
     public static function canCreate(): bool {
-        return Session::haveRight('plugin_glpinewentity', CREATE);
+        return self::isStrictSuperAdmin() && Session::haveRight('plugin_glpinewentity', CREATE);
     }
 
     public static function canView(): bool {
-        return Session::haveRight('plugin_glpinewentity', READ);
+        return self::isStrictSuperAdmin() && Session::haveRight('plugin_glpinewentity', READ);
     }
 
     public static function canUpdate(): bool {
-        return Session::haveRight('plugin_glpinewentity', UPDATE);
+        return self::isStrictSuperAdmin() && Session::haveRight('plugin_glpinewentity', UPDATE);
     }
 
     public static function canDelete(): bool {
-        return Session::haveRight('plugin_glpinewentity', PURGE);
+        return self::isStrictSuperAdmin() && Session::haveRight('plugin_glpinewentity', PURGE);
     }
 
     public function canCreateItem(): bool {
@@ -67,6 +81,19 @@ class Sector extends SectorBase {
 
     public function canDeleteItem(): bool {
         return self::canDelete();
+    }
+
+    public static function setSearchAcrossAllEntities(bool $enabled): void {
+        self::$searchAcrossAllEntities = $enabled;
+    }
+
+    public function isEntityAssign() {
+        return !self::$searchAcrossAllEntities && parent::isEntityAssign();
+    }
+
+    // O template da busca oculta o checkbox se a entidade pai não estiver entre as entidades ativas.
+    public function maybeRecursive() {
+        return !self::$searchAcrossAllEntities && parent::maybeRecursive();
     }
 
     /**
@@ -93,7 +120,7 @@ class Sector extends SectorBase {
     }
 
     public static function getTypeName($nb = 0) {
-        return _n('Infraestrutura da entidade', 'Infraestruturas da entidade', $nb, 'glpinewentity');
+        return _n('Estrutura da entidade', 'Estruturas da entidade', $nb, 'glpinewentity');
     }
 
     /**
@@ -153,7 +180,7 @@ class Sector extends SectorBase {
             $ong['GlpiPlugin\Glpinewentity\Sector$3'] = self::createTabEntry(__('Soluções Básicas', 'glpinewentity'), 0, __CLASS__, 'ti ti-bulb');
             $ong['GlpiPlugin\Glpinewentity\Sector$4'] = self::createTabEntry(__('Motivos de Pendências', 'glpinewentity'), 0, __CLASS__, 'ti ti-clock-pause');
             $ong['GlpiPlugin\Glpinewentity\Sector$5'] = self::createTabEntry(__('Notificações', 'glpinewentity'), 0, __CLASS__, 'ti ti-bell');
-            $ong['GlpiPlugin\Glpinewentity\Sector$6'] = self::createTabEntry(__('Formulário Padrão', 'glpinewentity'), 0, __CLASS__, 'ti ti-clipboard-list');
+            $ong['GlpiPlugin\Glpinewentity\Sector$6'] = self::createTabEntry(__('Formulários', 'glpinewentity'), 0, __CLASS__, 'ti ti-clipboard-list');
         }
         return $ong;
     }
@@ -166,7 +193,7 @@ class Sector extends SectorBase {
             $ong[3] = self::createTabEntry(__('Soluções Básicas', 'glpinewentity'), 0, $item::class, 'ti ti-bulb');
             $ong[4] = self::createTabEntry(__('Motivos de Pendências', 'glpinewentity'), 0, $item::class, 'ti ti-clock-pause');
             $ong[5] = self::createTabEntry(__('Notificações', 'glpinewentity'), 0, $item::class, 'ti ti-bell');
-            $ong[6] = self::createTabEntry(__('Formulário Padrão', 'glpinewentity'), 0, $item::class, 'ti ti-clipboard-list');
+            $ong[6] = self::createTabEntry(__('Formulários', 'glpinewentity'), 0, $item::class, 'ti ti-clipboard-list');
             return $ong;
         }
         return '';
@@ -183,7 +210,7 @@ class Sector extends SectorBase {
             3 => 'Soluções Básicas',
             4 => 'Motivos de Pendências',
             5 => 'Notificações',
-            6 => 'Formulário Padrão',
+            6 => 'Formulários',
         ];
         $title = $titles[$tabnum] ?? '';
 
@@ -193,6 +220,39 @@ class Sector extends SectorBase {
         $meta = json_decode($item->fields['metadata'] ?? '{}', true) ?: [];
         $tabKey = 'tab_' . $tabnum;
         $savedConfigs = $meta['configs'][$tabKey] ?? [];
+
+        if ($tabnum == 6 && $DB->tableExists('glpi_forms_forms')) {
+            $savedFormIds = [];
+            foreach ($savedConfigs as $config) {
+                $generatedId = (int)($config['generated_id'] ?? 0);
+                if ($generatedId > 0) {
+                    $savedFormIds[$generatedId] = true;
+                }
+            }
+
+            $entityId = (int)($meta['entity_id'] ?? 0);
+            if ($entityId > 0) {
+                $iterator = $DB->request([
+                    'SELECT' => ['id', 'name', 'description', 'forms_categories_id', 'illustration', 'is_active'],
+                    'FROM'   => 'glpi_forms_forms',
+                    'WHERE'  => ['entities_id' => $entityId],
+                    'ORDER'  => 'name ASC',
+                ]);
+                foreach ($iterator as $form) {
+                    $formId = (int)$form['id'];
+                    if (!isset($savedFormIds[$formId])) {
+                        $savedConfigs[] = [
+                            'generated_id'       => $formId,
+                            'name'               => $form['name'],
+                            'description'        => $form['description'] ?? '',
+                            'forms_categories_id' => (int)($form['forms_categories_id'] ?? 0),
+                            'illustration'       => $form['illustration'] ?? 'request-service',
+                            'is_active'          => (int)($form['is_active'] ?? 1),
+                        ];
+                    }
+                }
+            }
+        }
 
         // Definições por aba
         $tableMapping = [
@@ -223,7 +283,7 @@ class Sector extends SectorBase {
             $modelsPadrao = [];
             $modelsNormal = [];
             foreach ($iterator as $row) {
-                if (preg_match('/^\[padr[aã]o\]/i', $row['name'])) {
+                if (preg_match('/^\[padr(?:a|ã)o\]/iu', $row['name'])) {
                     $modelsPadrao[$row['id']] = $row['name'];
                 } else {
                     $modelsNormal[$row['id']] = $row['name'];
@@ -355,6 +415,9 @@ class Sector extends SectorBase {
         echo "<input type='hidden' name='action' value='save_draft'>";
         echo "<input type='hidden' name='sector_id' value='{$item->getID()}'>";
         echo "<input type='hidden' name='tabnum' value='{$tabnum}'>";
+        if ($tabnum == 6) {
+            echo "<div id='removed-configs-tab-{$tabnum}'></div>";
+        }
 
         echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
         echo "<tr><th colspan='2' style='font-size: 1.2em;'>Configuração de {$title}</th></tr>";
@@ -420,6 +483,29 @@ class Sector extends SectorBase {
             return new TextDecoder('utf-8').decode(bytes);
         }
 
+        async function initializeIllustrationPickers(scope = document) {
+            try {
+                const module = await import('{$CFG_GLPI['root_doc']}/js/modules/IllustrationPicker/Controller.js');
+                scope.querySelectorAll('.illustration-wrapper [data-glpi-icon-picker-value]').forEach(function(input) {
+                    const pickerContainer = input.parentElement;
+                    if (!pickerContainer || pickerContainer.dataset.glpinewentityIllustrationPicker === 'initialized') {
+                        return;
+                    }
+
+                    const modalSelector = pickerContainer.querySelector('[data-bs-target]')?.getAttribute('data-bs-target');
+                    const modal = modalSelector ? pickerContainer.querySelector(modalSelector) : null;
+                    if (!modal) {
+                        return;
+                    }
+
+                    pickerContainer.dataset.glpinewentityIllustrationPicker = 'initialized';
+                    new module.GlpiIllustrationPickerController(pickerContainer, modal, 'custom:');
+                });
+            } catch (error) {
+                console.error('Unable to initialize the illustration picker.', error);
+            }
+        }
+
         function addConfigItem(tabnum) {
             let container = $('#items-container-tab-' + tabnum);
             let template = container.find('.config-block.template').clone();
@@ -437,6 +523,9 @@ class Sector extends SectorBase {
             selects.find('option').removeAttr('data-select2-id');
 
             container.append(template);
+            if (tabnum == 6) {
+                initializeIllustrationPickers(template.get(0));
+            }
             
             // Inicializa Select2
             template.find('.select2-copy-from').select2({ width: '100%' });
@@ -496,6 +585,13 @@ class Sector extends SectorBase {
 
         $(document).on('click', '.btn-remove-config', function() {
             let block = $(this).closest('.config-block');
+            let generatedId = parseInt(block.find('.input-generated-id').val(), 10) || 0;
+            let tabnum = $('#form_configs_tab_6').length ? 6 : 0;
+            if (tabnum === 6 && generatedId > 0) {
+                $('#removed-configs-tab-6').append(
+                    $('<input>', { type: 'hidden', name: 'removed_items_generated_id[]', value: generatedId })
+                );
+            }
             let editorId = block.find('.input-content-wrapper textarea').attr('id');
             if (editorId && typeof tinymce !== 'undefined' && tinymce.get(editorId)) {
                 tinymce.get(editorId).remove();
@@ -553,7 +649,7 @@ class Sector extends SectorBase {
                             }
 
                             if (tabnum == 5) {
-                                block.find('.input-is-active').val(response.data.is_active || '1');
+                                block.find('.input-is-active').val(response.data.is_active !== undefined ? response.data.is_active : '1');
                                 block.find('.input-itemtype').val(response.data.itemtype || 'Ticket').trigger('change');
                                 block.find('.input-event').val(response.data.event || 'new').trigger('change');
                                 block.find('.input-attach-documents').val(response.data.attach_documents !== undefined ? response.data.attach_documents : '-2');
@@ -575,6 +671,7 @@ class Sector extends SectorBase {
                             }
 
                             if (tabnum == 6) {
+                                block.find('.input-is-active').val(response.data.is_active !== undefined ? response.data.is_active : '1');
                                 let textarea = block.find('.input-description-wrapper textarea');
                                 let editorId = textarea.attr('id');
                                 if (editorId && typeof tinymce !== 'undefined' && tinymce.get(editorId)) {
@@ -650,6 +747,7 @@ class Sector extends SectorBase {
                 }
 
                 if (tabnum == 6) {
+                    block.find('.input-is-active').val('1');
                     let textarea = block.find('.input-description-wrapper textarea');
                     let editorId = textarea.attr('id');
                     if (editorId && typeof tinymce !== 'undefined' && tinymce.get(editorId)) {
@@ -705,7 +803,11 @@ class Sector extends SectorBase {
         }
 
         function generateSectorConfigs(sectorId, tabnum) {
-            if(confirm('Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?')) {
+            let confirmMsg = 'Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?';
+            if (tabnum === 6) {
+                confirmMsg = 'Atenção! A padronização irá criar, atualizar e remover formulários conforme as seguintes configurações:\\nFormulários não gerenciados pelo plugin (externos) que forem removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos desta tela serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\\nO rascunho atual será salvo automaticamente.\\nDeseja prosseguir com a sincronização?';
+            }
+            if(confirm(confirmMsg)) {
                 
                 let btn = $('#btn_generate_' + tabnum);
                 let originalHtml = btn.html();
@@ -788,6 +890,7 @@ class Sector extends SectorBase {
             $('.select2-event').select2({ width: '100%' });
             $('.select2-tpl').select2({ width: '100%' });
             $('.select2-target').select2({ width: '100%' });
+            initializeIllustrationPickers();
         });
         </script>";
 
@@ -1013,8 +1116,9 @@ class Sector extends SectorBase {
             $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Adicionar documentos</label>";
             $html .= "          <select name='items_attach_documents[]' class='form-select input-attach-documents' style='width: 100%;'>";
             $html .= "            <option value='-2' " . ($attach_documents == -2 ? 'selected' : '') . ">Usar configuração global</option>";
-            $html .= "            <option value='0' " . ($attach_documents == 0 ? 'selected' : '') . ">Não</option>";
-            $html .= "            <option value='1' " . ($attach_documents == 1 ? 'selected' : '') . ">Sim</option>";
+            $html .= "            <option value='0' " . ($attach_documents == 0 ? 'selected' : '') . ">Nenhum documento</option>";
+            $html .= "            <option value='1' " . ($attach_documents == 1 ? 'selected' : '') . ">Todos os documentos</option>";
+            $html .= "            <option value='2' " . ($attach_documents == 2 ? 'selected' : '') . ">Somente documentos relacionados ao item que aciona o evento</option>";
             $html .= "          </select>";
             $html .= "      </div>";
             $html .= "      <div style='flex: 1;'>";
@@ -1055,11 +1159,19 @@ class Sector extends SectorBase {
             $html .= "  </div>";
 
         } elseif ($tabnum == 6) {
-            $html .= "  <input type='hidden' name='items_is_active[]' class='input-is-active' value='1'>";
+            $is_active = $config['is_active'] ?? 1;
+
+            $html .= "  <div style='margin-bottom: 10px;'>";
+            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Ativo</label>";
+            $html .= "      <select name='items_is_active[]' class='form-select input-is-active' style='width: 100%;'>";
+            $html .= "          <option value='1' " . ($is_active == 1 ? 'selected' : '') . ">Sim</option>";
+            $html .= "          <option value='0' " . ($is_active == 0 ? 'selected' : '') . ">Não</option>";
+            $html .= "      </select>";
+            $html .= "  </div>";
 
             $html .= "  <div style='margin-bottom: 10px;'>";
             if (!$isTemplate) {
-                // Renderiza o macro usado pelo formulário padrão do GLPI.
+                // Renderiza o macro usado pelos formulários nativos do GLPI.
                 $twig = \Glpi\Application\View\TemplateRenderer::getInstance()->getEnvironment();
                 $categoryTemplate = $twig->createTemplate(<<<'TWIG'
 {% import 'components/form/fields_macros.html.twig' as fields %}
@@ -1084,7 +1196,11 @@ TWIG);
             }
             $html .= "      </div>";
 
-            $illustration = htmlspecialchars($config['illustration'] ?? $config['icon'] ?? 'request-service');
+            $illustration = trim((string)($config['illustration'] ?? $config['icon'] ?? ''));
+            if ($illustration === '') {
+                $illustration = 'request-service';
+            }
+            $illustration = htmlspecialchars($illustration, ENT_QUOTES, 'UTF-8');
 
             $twig_code = "{% import 'components/form/fields_macros.html.twig' as fields %}{{ fields.illustrationField('items_illustration[]', illustration_value, 'Ilustração', {'is_horizontal': false, 'full_width': true}) }}";
             $twig = \Glpi\Application\View\TemplateRenderer::getInstance()->getEnvironment();
@@ -1295,45 +1411,14 @@ TWIG);
 
 
             // Reconstruir categorias a partir do banco para manter a hierarquia com hífens
-            $catList = [];
-            if (!empty($meta['entity_id'])) {
-                global $DB;
-                $cat_iterator = $DB->request([
-                    'SELECT' => ['id', 'name', 'itilcategories_id'],
-                    'FROM'   => 'glpi_itilcategories',
-                    'WHERE'  => [
-                        'entities_id' => $meta['entity_id'],
-                        'is_helpdeskvisible' => 1
-                    ]
-                ]);
-
-                $cats = [];
-                $children = [];
-                foreach ($cat_iterator as $row) {
-                    $cats[$row['id']] = $row;
-                    $children[$row['itilcategories_id']][] = $row['id'];
-                }
-
-                $buildTree = function ($parentId, $depth) use (&$buildTree, &$catList, &$cats, &$children) {
-                    if (isset($children[$parentId])) {
-                        foreach ($children[$parentId] as $childId) {
-                            $prefix = str_repeat('-', $depth);
-                            $catList[] = $prefix . $cats[$childId]['name'];
-                            $buildTree($childId, $depth + 1);
-                        }
-                    }
-                };
-
-                $buildTree(0, 0);
-            }
+            $def_category_names = !empty($meta['entity_id'])
+                ? Wizard::getCategoryTreeText((int)$meta['entity_id'])
+                : '';
 
             // Fallback caso a entidade não tenha sido criada ou não tenha categorias no DB
-            if (empty($catList) && !empty($meta['categories'])) {
-                foreach ($meta['categories'] as $c) {
-                    $catList[] = $c['name'];
-                }
+            if ($def_category_names === '' && !empty($meta['categories'])) {
+                $def_category_names = implode("\n", array_column($meta['categories'], 'name'));
             }
-            $def_category_names = implode("\n", $catList);
 
             // Reconstruir Perfis (Buscando diretamente do banco para a entidade criada)
             if (!empty($meta['entity_id'])) {
@@ -1776,13 +1861,22 @@ TWIG);
 
         // ── Bloco 4: Catálogo de Serviços ──
         echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
-        echo "<tr><th colspan='2'><i class='fas fa-clipboard-list' style='margin-right: 5px;'></i> Catálogo de Serviços (Categorias ITIL)</th></tr>";
+        echo "<tr><th colspan='2'><i class='fas fa-clipboard-list' style='margin-right: 5px;'></i> Categorias do Catálogo de Serviços (Categorias ITIL)</th></tr>";
 
         echo "<tr class='tab_bg_1'>";
-        echo "<td style='width: 35%;'>Categorias de Serviço <span style='color:red;'>*</span></td>";
+        echo "<td style='width: 35%;'>Categorias<span style='color:red;'>*</span></td>";
         echo "<td>";
         echo "<textarea name='category_names' class='form-control' style='width: 100%; height: 160px; overflow-y: scroll;' placeholder='Uma categoria por linha. Use hífen (-) para subcategorias.&#10;Ex:&#10;Hardware&#10;- Manutenção de Hardware&#10;-- Troca de Peças&#10;Software&#10;- Instalação de Software' required>" . htmlspecialchars($def_category_names) . "</textarea>";
-        echo "<br><small class='text-muted'>Cada categoria será vinculada exclusivamente à nova entidade, habilitada para Incidentes e Requisições.<br><strong>Importante:</strong> O sistema só identificará a hierarquia (Categorias Pai e Filha) se você usar o hífen (-) no início da linha correspondente.</small>";
+        echo "<br><small class='text-muted'>Cada categoria será vinculada exclusivamente à nova entidade, habilitada para Incidentes e Requisições.";
+        echo "<br><strong>Hierarquia:</strong> O sistema só identificará a relação pai/filho se você usar o hífen (-) no início da linha.<br>";
+        echo "<span style='display:inline-block; margin-top:5px; padding:5px 10px; background:#f5f5f5; border-radius:3px; font-family:monospace; color:#333;'>";
+        echo "1 (pai)<br>";
+        echo "- 1.1 (filho)<br>";
+        echo "- 1.2 (filho)<br>";
+        echo "-- 1.2.1 (neto)<br>";
+        echo "2 (pai)<br>";
+        echo "- 2.1 (filho)";
+        echo "</span></small>";
         echo "</td>";
         echo "</tr>";
 
@@ -1796,7 +1890,7 @@ TWIG);
         echo "<table class='tab_cadre_fixe' style='width: 750px;'>";
         echo "<tr class='tab_bg_2'>";
         echo "<td class='center' style='padding: 15px;'>";
-        $btnTitle = $isEdit ? 'Salvar Modificações' : 'Criar Infraestrutura da Entidade';
+        $btnTitle = $isEdit ? 'Salvar Modificações' : 'Criar Estrutura da Entidade';
 
         echo "<button type='submit' id='btn-submit-wizard' class='btn btn-primary' style='font-size: 1.05em; padding: 8px 30px;'>";
         echo $btnTitle;
@@ -2111,6 +2205,17 @@ TWIG);
                             return false;
                         }
                         
+                        // Validação de edição de categorias
+                        let isEdit = " . ($isEdit ? 'true' : 'false') . ";
+                        if (isEdit) {
+                            let catTextarea = document.querySelector('textarea[name=\"category_names\"]');
+                            if (catTextarea && catTextarea.value !== catTextarea.defaultValue) {
+                                if (!confirm('Atenção: Você alterou as categorias ITIL. Ao salvar, as categorias iguais serão mantidas, as novas serão criadas e as removidas do texto serão excluídas (categorias ITIL não suportam inativação). Categorias em uso por chamados não serão excluídas e você será avisado.\\n\\nDeseja prosseguir?')) {
+                                    e.preventDefault();
+                                    return false;
+                                }
+                            }
+                        }                        
                         // Se chegou até aqui, todas as validações passaram.
                         // Troca o texto do botão para Salvando...
                         $('#btn-submit-wizard').html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Salvando...').css('pointer-events', 'none').css('opacity', '0.7');

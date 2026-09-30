@@ -59,7 +59,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 1. Entre no GLPI utilizando um usuário com perfil **Super-Admin**.
 2. No menu principal superior, navegue até **Configurar > GLPI New Entity**.
 ![Menu do Plugin](./docs/images/screenshot1.png)
-3. Você visualizará uma lista (vazia caso seja a primeira vez) das infraestruturas de setores gerenciadas pelo plugin.
+3. Você visualizará uma lista (vazia caso seja a primeira vez) das estruturas de setores gerenciadas pelo plugin.
 ![Lista de Setores Vazia](./docs/images/screenshot2.png)
 4. Clique em **Adicionar** (ou botão "+" dependendo do seu tema).
 ![Botão de Adicionar](./docs/images/screenshot3.png)
@@ -79,13 +79,13 @@ O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descrit
 
 ![Abas de Configuração](./docs/images/screenshot6.png)
 
-   *   **Infraestrutura da entidade:** Retorna ao formulário do Wizard para edição de membros, grupos e categorias.
+   *   **Estrutura da entidade:** Retorna ao formulário do Wizard para edição de membros, grupos e categorias.
    *   **Modelos de Chamado:** Crie e associe templates de chamados específicos.
    *   **Respostas Básicas:** Configure textos padronizados para os atendimentos.
    *   **Soluções Básicas:** Padronize soluções frequentes para o fechamento.
    *   **Motivos de Pendências:** Defina motivos customizados para pausar os chamados.
    *   **Notificações:** Ajuste ou sobrescreva os alertas de e-mail do setor.
-   *   **Formulário Padrão:** Gerencie formulários (do Formcreator) vinculados ao setor.
+  *   **Formulários:** Gerencie formulários (do Formcreator) vinculados ao setor.
 
 ## ⚙️ Estrutura Técnica e Classes
 
