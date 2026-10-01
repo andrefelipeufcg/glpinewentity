@@ -462,7 +462,7 @@ class Sector extends SectorBase {
         $needsLegacyIllustrationPicker = (int) GLPI_VERSION < 12;
 
         echo "<script>
-        const useLegacyIllustrationPicker = " . json_encode($needsLegacyIllustrationPicker) . ";
+        var useLegacyIllustrationPicker = " . json_encode($needsLegacyIllustrationPicker) . ";
 
         function decodeBase64Utf8(value) {
             let binary = atob(value);
