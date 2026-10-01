@@ -14,6 +14,7 @@ use Session;
 use Entity;
 use Html;
 use Profile;
+use Glpi\UI\IllustrationManager;
 
 if (!defined('GLPI_ROOT')) {
     die("Sorry. You can't access this file directly");
@@ -480,7 +481,7 @@ class Sector extends SectorBase {
         $ajax_render_richtext_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_richtext.php';
         $ajax_render_form_category_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_form_category.php';
         $ajax_render_illustration_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_illustration.php';
-        $default_illustration_preview = json_encode((new \Glpi\UI\IllustrationManager())->renderIcon('request-service', 100));
+        $default_illustration_preview = json_encode((new IllustrationManager())->renderIcon('request-service', 100));
         $needsLegacyIllustrationPicker = (int) GLPI_VERSION < 12;
 
         echo "<script>
@@ -972,13 +973,10 @@ class Sector extends SectorBase {
             return 'request-service';
         }
         if (str_starts_with($value, 'custom:')) {
-            try {
-                $manager = new \Glpi\UI\IllustrationManager();
-                if (method_exists($manager, 'isKnownIllustrationValue') && !$manager->isKnownIllustrationValue($value)) {
-                    return 'request-service';
-                }
-            } catch (\Throwable $e) {
-                // IllustrationManager indisponível: aceita o valor como está
+            $manager = new IllustrationManager();
+            if (method_exists($manager, 'isKnownIllustrationValue')
+                && !$manager->isKnownIllustrationValue($value)) {
+                return 'request-service';
             }
         }
         return $value;
