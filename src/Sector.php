@@ -207,6 +207,28 @@ class Sector extends SectorBase {
         $savedConfigs = $meta['configs'][$tabKey] ?? [];
 
         if ($tabnum == 6 && $DB->tableExists('glpi_forms_forms')) {
+            // A ilustração exibida é sempre a do formulário nativo, não a do metadata do plugin.
+            foreach ($savedConfigs as $idx => $config) {
+                $generatedId = (int)($config['generated_id'] ?? 0);
+                if ($generatedId <= 0) {
+                    continue;
+                }
+                $nativeForm = $DB->request([
+                    'SELECT' => ['illustration'],
+                    'FROM'   => 'glpi_forms_forms',
+                    'WHERE'  => ['id' => $generatedId],
+                    'LIMIT'  => 1,
+                ])->current();
+                $nativeIllustration = $nativeForm !== null
+                    ? trim((string)($nativeForm['illustration'] ?? ''))
+                    : '';
+                if ($nativeIllustration !== '') {
+                    $savedConfigs[$idx]['illustration'] = $nativeIllustration;
+                } elseif (trim((string)($config['illustration'] ?? '')) === '') {
+                    $savedConfigs[$idx]['illustration'] = 'request-service';
+                }
+            }
+
             $savedFormIds = [];
             foreach ($savedConfigs as $config) {
                 $generatedId = (int)($config['generated_id'] ?? 0);
@@ -474,6 +496,10 @@ class Sector extends SectorBase {
 
         function handleBrokenIllustration(image) {
             if (!(image instanceof HTMLImageElement) || !image.src.includes('/CustomIllustration/')) {
+                return;
+            }
+            // Só reverte para o padrão se a imagem realmente falhou ao carregar.
+            if (!image.complete || image.naturalWidth > 0) {
                 return;
             }
 
@@ -948,11 +974,11 @@ class Sector extends SectorBase {
         if (str_starts_with($value, 'custom:')) {
             try {
                 $manager = new \Glpi\UI\IllustrationManager();
-                if (!method_exists($manager, 'isKnownIllustrationValue') || !$manager->isKnownIllustrationValue($value)) {
+                if (method_exists($manager, 'isKnownIllustrationValue') && !$manager->isKnownIllustrationValue($value)) {
                     return 'request-service';
                 }
             } catch (\Throwable $e) {
-                return 'request-service';
+                // IllustrationManager indisponível: aceita o valor como está
             }
         }
         return $value;
