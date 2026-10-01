@@ -231,7 +231,7 @@ class Sector extends SectorBase {
                             'name'               => $form['name'],
                             'description'        => $form['description'] ?? '',
                             'forms_categories_id' => (int)($form['forms_categories_id'] ?? 0),
-                            'illustration'       => $form['illustration'] ?? 'request-service',
+                            'illustration'       => self::sanitizeIllustration($form['illustration'] ?? ''),
                             'is_active'          => (int)($form['is_active'] ?? 1),
                         ];
                     }
@@ -457,9 +457,13 @@ class Sector extends SectorBase {
         $ajax_get_template_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/get_template_data.php';
         $ajax_render_richtext_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_richtext.php';
         $ajax_render_form_category_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_form_category.php';
+        $ajax_render_illustration_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_illustration.php';
         $default_illustration_preview = json_encode((new \Glpi\UI\IllustrationManager())->renderIcon('request-service', 100));
+        $needsLegacyIllustrationPicker = (int) GLPI_VERSION < 12;
 
         echo "<script>
+        const useLegacyIllustrationPicker = " . json_encode($needsLegacyIllustrationPicker) . ";
+
         function decodeBase64Utf8(value) {
             let binary = atob(value);
             let bytes = Uint8Array.from(binary, function(character) {
@@ -468,7 +472,42 @@ class Sector extends SectorBase {
             return new TextDecoder('utf-8').decode(bytes);
         }
 
+        function handleBrokenIllustration(image) {
+            if (!(image instanceof HTMLImageElement) || !image.src.includes('/CustomIllustration/')) {
+                return;
+            }
+
+            const container = image.closest('[data-glpi-illustration-picker]');
+            const customPreview = image.closest('[data-glpi-icon-picker-value-preview-custom]');
+            if (customPreview && container) {
+                const input = container.querySelector('[data-glpi-icon-picker-value]');
+                const nativePreview = container.querySelector('[data-glpi-icon-picker-value-preview-native]');
+                if (input) {
+                    input.value = 'request-service';
+                }
+                customPreview.classList.add('d-none');
+                if (nativePreview) {
+                    nativePreview.classList.remove('d-none');
+                    nativePreview.innerHTML = {$default_illustration_preview};
+                }
+                return;
+            }
+
+            const option = image.closest('[data-glpi-icon-picker-value]');
+            if (option) {
+                option.remove();
+            }
+        }
+
+        document.addEventListener('error', function(event) {
+            handleBrokenIllustration(event.target);
+        }, true);
+
         async function initializeIllustrationPickers(scope = document) {
+            if (!useLegacyIllustrationPicker) {
+                return;
+            }
+
             try {
                 const module = await import('{$CFG_GLPI['root_doc']}/js/modules/IllustrationPicker/Controller.js');
                 scope.querySelectorAll('.illustration-wrapper [data-glpi-icon-picker-value]').forEach(function(input) {
@@ -484,6 +523,7 @@ class Sector extends SectorBase {
                     }
 
                     pickerContainer.dataset.glpinewentityIllustrationPicker = 'initialized';
+                    pickerContainer.querySelectorAll('img').forEach(handleBrokenIllustration);
                     new module.GlpiIllustrationPickerController(pickerContainer, modal, 'custom:');
                 });
             } catch (error) {
@@ -508,9 +548,6 @@ class Sector extends SectorBase {
             selects.find('option').removeAttr('data-select2-id');
 
             container.append(template);
-            if (tabnum == 6) {
-                initializeIllustrationPickers(template.get(0));
-            }
             
             // Inicializa Select2
             template.find('.select2-copy-from').select2({ width: '100%' });
@@ -538,6 +575,21 @@ class Sector extends SectorBase {
             
             // Buscar categoria de form via AJAX para tab 6 (mantém macro/botões nativos do GLPI)
             if (tabnum == 6) {
+                // O clone herdaria os IDs do modal do template; renderiza um seletor novo.
+                let illustrationWrapper = template.find('.illustration-wrapper');
+                if (illustrationWrapper.length > 0) {
+                    illustrationWrapper.empty();
+                    $.ajax({
+                        url: '{$ajax_render_illustration_url}',
+                        type: 'POST',
+                        data: { illustration: 'request-service' },
+                        success: function(html) {
+                            illustrationWrapper.html(html);
+                            initializeIllustrationPickers(illustrationWrapper.get(0));
+                        }
+                    });
+                }
+
                 let categoryWrapper = template.find('.form-category-wrapper');
                 if (categoryWrapper.length > 0) {
                     $.ajax({
@@ -672,19 +724,24 @@ class Sector extends SectorBase {
                                 
                                 let container = block.find('.illustration-wrapper');
                                 if (container.length > 0) {
-                                    // A ilustração copiada pertence ao formulário de origem.
+                                    // Do not carry a custom upload between forms. In GLPI 12,
+                                    // that value can refer to a temporary/deleted file and the
+                                    // picker controller keeps it as part of its initial state.
                                     let illustrationVal = response.data.illustration || 'request-service';
+                                    if (illustrationVal.indexOf('custom:') === 0) {
+                                        illustrationVal = 'request-service';
+                                    }
+
                                     let hiddenInput = container.find('[data-glpi-icon-picker-value]');
                                     hiddenInput.val(illustrationVal);
-                                    
+
                                     let nativePreview = container.find('[data-glpi-icon-picker-value-preview-native]');
                                     let customPreview = container.find('[data-glpi-icon-picker-value-preview-custom]');
-                                    
-                                    if (response.data.illustration_preview) {
-                                        nativePreview.html(response.data.illustration_preview);
-                                        nativePreview.removeClass('d-none');
-                                        customPreview.addClass('d-none');
-                                    }
+                                    let placeholderPreview = container.find('[data-glpi-icon-picker-value-preview-placeholder]');
+                                    nativePreview.html(response.data.illustration_preview || {$default_illustration_preview});
+                                    nativePreview.removeClass('d-none');
+                                    customPreview.addClass('d-none');
+                                    placeholderPreview.addClass('d-none');
                                 }
                             }
                         }
@@ -847,6 +904,7 @@ class Sector extends SectorBase {
         // Inicializa Rich Text (TinyMCE) via AJAX para os blocos marcados como pendentes
         // (evita o problema de DOMEval do jQuery ao carregar conteúdo de aba via AJAX)
         $(function() {
+            document.querySelectorAll('[data-glpi-illustration-picker] img').forEach(handleBrokenIllustration);
             $('.richtext-pending').each(function() {
                 let wrapper = $(this);
                 let fieldName = wrapper.data('field-name');
@@ -880,6 +938,24 @@ class Sector extends SectorBase {
         </script>";
 
         return true;
+    }
+
+    public static function sanitizeIllustration($value): string {
+        $value = trim((string)$value);
+        if ($value === '') {
+            return 'request-service';
+        }
+        if (str_starts_with($value, 'custom:')) {
+            try {
+                $manager = new \Glpi\UI\IllustrationManager();
+                if (!method_exists($manager, 'isKnownIllustrationValue') || !$manager->isKnownIllustrationValue($value)) {
+                    return 'request-service';
+                }
+            } catch (\Throwable $e) {
+                return 'request-service';
+            }
+        }
+        return $value;
     }
 
     private static function renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $extraOptions = []) {
@@ -1181,10 +1257,7 @@ TWIG);
             }
             $html .= "      </div>";
 
-            $illustration = trim((string)($config['illustration'] ?? $config['icon'] ?? ''));
-            if ($illustration === '') {
-                $illustration = 'request-service';
-            }
+            $illustration = self::sanitizeIllustration($config['illustration'] ?? $config['icon'] ?? '');
             $illustration = htmlspecialchars($illustration, ENT_QUOTES, 'UTF-8');
 
             $twig_code = "{% import 'components/form/fields_macros.html.twig' as fields %}{{ fields.illustrationField('items_illustration[]', illustration_value, 'Ilustração', {'is_horizontal': false, 'full_width': true}) }}";

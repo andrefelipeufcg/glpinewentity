@@ -66,7 +66,7 @@ if ((int) ($_SESSION['glpiactive_entity'] ?? 0) !== 0) {
     );
     echo Html::scriptBlock("
         $(function () {
-            $('.alert.alert-info .alert-title').first()
+            $('.alert.alert-info .alert-title, .alert.alert-info .alert-description').first()
                 .after($('<div>', { class: 'text-muted', text: {$hint} }));
         });
     ");

@@ -232,7 +232,7 @@ switch ($tabnum) {
                 $data['forms_categories_id'] = $row['forms_categories_id'] ?? $row['plugin_formcreator_categories_id'] ?? 0;
 
                 // A ilustração pertence ao formulário, não à categoria selecionada.
-                $data['illustration'] = $row['illustration'] ?: 'request-service';
+                $data['illustration'] = Sector::sanitizeIllustration($row['illustration'] ?? '');
                 $data['illustration_preview'] = (new \Glpi\UI\IllustrationManager())->renderIcon($data['illustration'], 100);
             }
         }
