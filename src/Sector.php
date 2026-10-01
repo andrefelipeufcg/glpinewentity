@@ -724,9 +724,9 @@ class Sector extends SectorBase {
                                 
                                 let container = block.find('.illustration-wrapper');
                                 if (container.length > 0) {
-                                    // Do not carry a custom upload between forms. In GLPI 12,
-                                    // that value can refer to a temporary/deleted file and the
-                                    // picker controller keeps it as part of its initial state.
+                                    // Não transfere uploads personalizados entre formulários.
+                                    // No GLPI 12, o valor pode apontar para um arquivo temporário/excluído,
+                                    // que o controlador do seletor mantém no estado inicial.
                                     let illustrationVal = response.data.illustration || 'request-service';
                                     if (illustrationVal.indexOf('custom:') === 0) {
                                         illustrationVal = 'request-service';
