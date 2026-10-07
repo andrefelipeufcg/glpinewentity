@@ -130,13 +130,28 @@ class SolutionLibraryBuilder
         $solutiontypesId = (int)($config['solutiontypes_id'] ?? 0);
         $commentText = trim($config['comment'] ?? '');
 
+        $sourceId = (int)($config['copy_from'] ?? 0);
+        $sourceData = [];
+        if ($sourceId > 0 && $item->getFromDB($sourceId)) {
+            $sourceData = $item->fields;
+        }
+
+        $originalTypeId = $solutiontypesId > 0 ? $solutiontypesId : (int)($sourceData['solutiontypes_id'] ?? 0);
+        $localSolutionTypeId = 0;
+        if ($originalTypeId > 0) {
+            $localSolutionTypeId = $this->getOrCreateLocalSolutionType($originalTypeId, $entities_id);
+        }
+        if ($localSolutionTypeId > 0) {
+            $config['solutiontypes_id'] = $localSolutionTypeId;
+        }
+
         if ($generatedId > 0 && $item->getFromDB($generatedId)) {
             $item->update([
                  'id' => $generatedId,
                  'name' => $name,
                  'entities_id' => $entities_id,
                  'content' => !empty($content) ? $content : $item->fields['content'],
-                 'solutiontypes_id' => $solutiontypesId > 0 ? $solutiontypesId : $item->fields['solutiontypes_id'],
+                 'solutiontypes_id' => $localSolutionTypeId > 0 ? $localSolutionTypeId : $item->fields['solutiontypes_id'],
                  'comment' => $commentText !== '' ? $commentText : $item->fields['comment']
             ]);
             return $generatedId;
@@ -147,16 +162,10 @@ class SolutionLibraryBuilder
             return (int) $item->getID();
         }
 
-        $sourceId = (int)($config['copy_from'] ?? 0);
-        $sourceData = [];
-        if ($sourceId > 0 && $item->getFromDB($sourceId)) {
-            $sourceData = $item->fields;
-        }
-
         $insertData = [
             'name' => $name,
             'content' => !empty($content) ? $content : ($sourceData['content'] ?? ''),
-            'solutiontypes_id' => $solutiontypesId > 0 ? $solutiontypesId : ($sourceData['solutiontypes_id'] ?? 0),
+            'solutiontypes_id' => $localSolutionTypeId,
             'comment' => $commentText !== '' ? $commentText : ($sourceData['comment'] ?? ''),
             'entities_id' => $entities_id,
             'is_recursive' => 1,
@@ -165,5 +174,43 @@ class SolutionLibraryBuilder
         $newId = (int) $item->add($insertData);
         $config['generated_id'] = $newId;
         return $newId;
+    }
+
+    private function getOrCreateLocalSolutionType(int $sourceTypeId, int $entities_id): int
+    {
+        if ($sourceTypeId <= 0) {
+            return 0;
+        }
+
+        $sourceType = new SolutionType();
+        if (!$sourceType->getFromDB($sourceTypeId)) {
+            return 0;
+        }
+
+        $name = trim($sourceType->fields['name'] ?? '');
+        if (empty($name)) {
+            return 0;
+        }
+
+        $localType = new SolutionType();
+        
+        // Verifica se já existe um tipo com este nome na entidade alvo
+        if ($localType->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
+            return (int) $localType->getID();
+        }
+
+        // Cria o novo tipo na entidade alvo copiando os dados do original
+        $insertData = [
+            'name' => $name,
+            'comment' => $sourceType->fields['comment'] ?? '',
+            'entities_id' => $entities_id,
+            'is_recursive' => 1, // Para sub-entidades usarem caso seja árvore
+            'is_incident' => $sourceType->fields['is_incident'] ?? 1,
+            'is_request' => $sourceType->fields['is_request'] ?? 1,
+            'is_problem' => $sourceType->fields['is_problem'] ?? 1,
+            'is_change' => $sourceType->fields['is_change'] ?? 1,
+        ];
+
+        return (int) $localType->add($insertData);
     }
 }
