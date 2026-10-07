@@ -283,21 +283,37 @@ class Sector extends SectorBase {
         $existingModels = [];
         $tableName = $tableMapping[$tabnum] ?? '';
         if ($tableName && $DB->tableExists($tableName)) {
+            $entityNames = [];
+            foreach ($DB->request(['SELECT' => ['id', 'name', 'completename'], 'FROM' => 'glpi_entities']) as $entRow) {
+                $entityNames[(int)$entRow['id']] = $entRow['completename'] !== '' && $entRow['completename'] !== null
+                    ? $entRow['completename']
+                    : $entRow['name'];
+            }
+
             $iterator = $DB->request([
-                'SELECT' => ['id', 'name'],
+                'SELECT' => ['id', 'name', 'entities_id'],
                 'FROM'   => $tableName,
                 'ORDER'  => 'name ASC'
             ]);
-            $modelsPadrao = [];
-            $modelsNormal = [];
+            // Agrupado por entidade; modelos "[Padrão]" vêm primeiro dentro de cada grupo.
+            $groupsPadrao = [];
+            $groupsNormal = [];
             foreach ($iterator as $row) {
+                $entityId = (int)($row['entities_id'] ?? 0);
                 if (preg_match('/^\[padr(?:a|ã)o\]/iu', $row['name'])) {
-                    $modelsPadrao[$row['id']] = $row['name'];
+                    $groupsPadrao[$entityId][$row['id']] = $row['name'];
                 } else {
-                    $modelsNormal[$row['id']] = $row['name'];
+                    $groupsNormal[$entityId][$row['id']] = $row['name'];
                 }
             }
-            $existingModels = $modelsPadrao + $modelsNormal;
+            $entityIdsWithModels = array_unique(array_merge(array_keys($groupsPadrao), array_keys($groupsNormal)));
+            usort($entityIdsWithModels, function ($a, $b) use ($entityNames) {
+                return strcasecmp($entityNames[$a] ?? '', $entityNames[$b] ?? '');
+            });
+            foreach ($entityIdsWithModels as $entityId) {
+                $label = $entityNames[$entityId] ?? ('#' . $entityId);
+                $existingModels[$label] = ($groupsPadrao[$entityId] ?? []) + ($groupsNormal[$entityId] ?? []);
+            }
         }
 
         // Determina os campos que serão exibidos baseado na aba
@@ -1088,9 +1104,13 @@ class Sector extends SectorBase {
         $html .= "      <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Copiar de...</label>";
         $html .= "      <select name='items_copy_from[]' class='form-select select2-copy-from' style='width: 100%;' data-tab='{$tabnum}'>";
         $html .= "        <option value='0'>--- Nenhum (Criar Básico) ---</option>";
-        foreach ($existingModels as $id => $mName) {
-            $selected = ($id == $copyFrom) ? 'selected' : '';
-            $html .= "        <option value='{$id}' {$selected}>" . htmlspecialchars(ltrim($mName, '- ')) . "</option>";
+        foreach ($existingModels as $entityLabel => $entityModels) {
+            $html .= "        <optgroup label='" . htmlspecialchars((string)$entityLabel, ENT_QUOTES) . "'>";
+            foreach ($entityModels as $id => $mName) {
+                $selected = ($id == $copyFrom) ? 'selected' : '';
+                $html .= "          <option value='{$id}' {$selected}>" . htmlspecialchars(ltrim($mName, '- ')) . "</option>";
+            }
+            $html .= "        </optgroup>";
         }
         $html .= "      </select>";
         $html .= "  </div>";
