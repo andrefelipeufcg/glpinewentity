@@ -1572,6 +1572,7 @@ TWIG);
 
         global $CFG_GLPI;
         $form_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php';
+        $ajax_user_email_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/search_user_emails.php';
 
         echo "<div class='center' style='margin-top: 20px;'>";
         echo "<style>
@@ -1597,7 +1598,7 @@ TWIG);
         // FORMULÁRIO WIZARD
         // =====================================================================
 
-        echo "<form method='post' action='" . $form_url . "' id='form_wizard'>";
+        echo "<form method='post' action='" . $form_url . "' id='form_wizard' data-email-search-url='" . htmlspecialchars($ajax_user_email_url, ENT_QUOTES) . "'>";
         echo "<input type='hidden' name='_glpi_csrf_token' value='" . \Session::getNewCSRFToken() . "'>";
         echo "<input type='hidden' name='process_wizard' value='1'>";
         if ($isEdit) {
@@ -1695,8 +1696,9 @@ TWIG);
         echo "  </div>";
         echo "  <div>";
         echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-        $adminEmails = htmlspecialchars(implode("\n", $def_profiles['admin']['emails'] ?? []));
-        echo "    <textarea name='users_profile_admin' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$adminEmails}</textarea>";
+        $adminEmails = htmlspecialchars(implode("\n", $def_profiles['admin']['emails'] ?? []), ENT_QUOTES);
+        echo "    <input type='hidden' name='users_profile_admin' class='email-values' value='{$adminEmails}'>";
+        echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
         echo "  </div>";
         echo "</div>";
 
@@ -1726,8 +1728,9 @@ TWIG);
         echo "  </div>";
         echo "  <div>";
         echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-        $supportEmails = htmlspecialchars(implode("\n", $def_profiles['support']['emails'] ?? []));
-        echo "    <textarea name='users_profile_support' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$supportEmails}</textarea>";
+        $supportEmails = htmlspecialchars(implode("\n", $def_profiles['support']['emails'] ?? []), ENT_QUOTES);
+        echo "    <input type='hidden' name='users_profile_support' class='email-values' value='{$supportEmails}'>";
+        echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
         echo "  </div>";
         echo "</div>";
 
@@ -1757,8 +1760,9 @@ TWIG);
         echo "  </div>";
         echo "  <div>";
         echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-        $transferEmails = htmlspecialchars(implode("\n", $def_profiles['transfer']['emails'] ?? []));
-        echo "    <textarea name='users_profile_transfer' class='form-control' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$transferEmails}</textarea>";
+        $transferEmails = htmlspecialchars(implode("\n", $def_profiles['transfer']['emails'] ?? []), ENT_QUOTES);
+        echo "    <input type='hidden' name='users_profile_transfer' class='email-values' value='{$transferEmails}'>";
+        echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
         echo "  </div>";
         echo "</div>";
 
@@ -1795,14 +1799,15 @@ TWIG);
         echo "  </div>";
         echo "  <div style='margin-top: 10px;'>";
         echo "      <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-        echo "      <textarea name='users_profile_custom[]' class='form-control profile-users-input' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'></textarea>";
+        echo "      <input type='hidden' class='email-values profile-users-input' value=''>";
+        echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
         echo "  </div>";
         echo "</div>";
 
         // Renderiza perfis customizados existentes na edição
         if (!empty($def_profiles['custom'])) {
             foreach ($def_profiles['custom'] as $cProf) {
-                $cEmails = htmlspecialchars(implode("\n", $cProf['emails'] ?? []));
+                $cEmails = htmlspecialchars(implode("\n", $cProf['emails'] ?? []), ENT_QUOTES);
                 $cId = $cProf['id'];
 
                 echo "<div class='profile-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
@@ -1829,7 +1834,8 @@ TWIG);
                 echo "  </div>";
                 echo "  <div style='margin-top: 10px;'>";
                 echo "      <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-                echo "      <textarea name='users_profile_custom[]' class='form-control profile-users-input' style='width: 100%; height: 50px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este perfil. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$cEmails}</textarea>";
+                echo "      <input type='hidden' name='users_profile_custom[]' class='email-values profile-users-input' value='{$cEmails}'>";
+                echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
                 echo "  </div>";
                 echo "</div>";
             }
@@ -1858,7 +1864,7 @@ TWIG);
         if (empty($def_subgroups) || count($def_subgroups) <= 1) {
             // Se não tem subgrupos, ou só tem o pai (índice 0), renderiza 1 bloco vazio
             $sg0Name = htmlspecialchars($def_subgroups[0]['name'] ?? '');
-            $sg0Techs = htmlspecialchars($def_subgroups[0]['techs'] ?? '');
+            $sg0Techs = htmlspecialchars($def_subgroups[0]['techs'] ?? '', ENT_QUOTES);
 
             echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
             echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
@@ -1878,7 +1884,8 @@ TWIG);
             echo "  </div>";
             echo "  <div>";
             echo "      <label>E-mails dos Técnicos Atendentes</label>";
-            echo "      <textarea name='subgroups[0][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>" . $sg0Techs . "</textarea>";
+            echo "      <input type='hidden' name='subgroups[0][techs]' class='email-values' value='" . $sg0Techs . "'>";
+            echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione técnicos cadastrados no GLPI'></select>";
             echo "      <small class='text-muted'>Devem estar cadastrados no GLPI. Se informar um subgrupo, os técnicos irão EXCLUSIVAMENTE para ele. Senão, irão para o Grupo Pai <strong>({SIGLA})</strong>.</small>";
             echo "  </div>";
             echo "</div>";
@@ -1892,7 +1899,7 @@ TWIG);
                 } // Pula o grupo pai que só foi salvo no metadata, mas não no form
 
                 $sgName = htmlspecialchars($sg['name']);
-                $sgTechs = htmlspecialchars($sg['techs'] ?? '');
+                $sgTechs = htmlspecialchars($sg['techs'] ?? '', ENT_QUOTES);
 
                 echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
                 echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
@@ -1920,7 +1927,8 @@ TWIG);
                 echo "  </div>";
                 echo "  <div>";
                 echo "      <label>E-mails dos Técnicos Atendentes</label>";
-                echo "      <textarea name='subgroups[{$i}][techs]' class='form-control' style='width: 100%; height: 80px;' placeholder='Insira pelo menos um e-mail para ser adicionado a este subgrupo. Se precisar adicionar mais de um, separe os e-mails com vírgula ou quebra de linha (enter). (ex: nome1@dominio.com, nome2@dominio.com)'>{$sgTechs}</textarea>";
+                echo "      <input type='hidden' name='subgroups[{$i}][techs]' class='email-values' value='{$sgTechs}'>";
+                echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione técnicos cadastrados no GLPI'></select>";
                 echo "      <small class='text-muted'>Na edição, carregamos os e-mails salvos na base da entidade. Se quiser sincronizar, modifique e salve.</small>";
                 echo "  </div>";
                 echo "</div>";
@@ -1998,6 +2006,126 @@ TWIG);
                         }
                         return true;
                     }
+
+                    const emailSearchUrl = $('#form_wizard').data('email-search-url');
+                    const csrfToken = $('#form_wizard input[name=_glpi_csrf_token]').val();
+                    let pendingEmailRequests = 0;
+
+                    function splitEmailList(value) {
+                        return String(value || '').split(/[\s,;]+/).map(function(email) {
+                            return email.trim();
+                        }).filter(Boolean);
+                    }
+
+                    function resolveEmails(emails) {
+                        return $.ajax({
+                            url: emailSearchUrl,
+                            type: 'POST',
+                            dataType: 'json',
+                            data: { action: 'resolve', emails: emails, _glpi_csrf_token: csrfToken }
+                        });
+                    }
+
+                    function initEmailPicker(select) {
+                        const picker = $(select);
+                        if (picker.hasClass('select2-hidden-accessible')) return;
+
+                        const values = picker.prev('.email-values');
+                        picker.select2({
+                            width: '100%',
+                            placeholder: picker.data('placeholder'),
+                            closeOnSelect: false,
+                            minimumInputLength: 2,
+                            ajax: {
+                                url: emailSearchUrl,
+                                type: 'POST',
+                                dataType: 'json',
+                                delay: 250,
+                                data: function(params) {
+                                    return {
+                                        action: 'search',
+                                        term: params.term || '',
+                                        _glpi_csrf_token: csrfToken
+                                    };
+                                },
+                                processResults: function(response) {
+                                    return { results: response.results || [] };
+                                }
+                            }
+                        });
+
+                        picker.on('change', function() {
+                            values.val((picker.val() || []).join('\\n'));
+                        });
+
+                        picker.on('select2:select', function() {
+                            picker.next('.select2-container').find('.select2-search__field').val('');
+                        });
+
+                        const initialEmails = splitEmailList(values.val());
+                        values.val('');
+                        if (initialEmails.length) {
+                            pendingEmailRequests++;
+                            resolveEmails(initialEmails).done(function(response) {
+                                const accepted = response.results || [];
+                                accepted.forEach(function(item) {
+                                    picker.append(new Option(item.text, item.id, true, true));
+                                });
+                                picker.val(accepted.map(function(item) { return item.id; })).trigger('change');
+                            }).always(function() {
+                                pendingEmailRequests--;
+                            });
+                        }
+                    }
+
+                    function initEmailPickers(scope) {
+                        const root = $(scope);
+                        root.filter('.email-autocomplete').add(root.find('.email-autocomplete')).each(function() {
+                            initEmailPicker(this);
+                        });
+                    }
+
+                    initEmailPickers($('#form_wizard').find('#perfis-padrao-section, .profile-block:not(.template), .subgroup-block'));
+
+                    $(document).on('paste', '.select2-search__field', function(event) {
+                        const picker = $(this).closest('.select2-container').prev('select.email-autocomplete');
+                        if (!picker.length) return;
+
+                        const clipboardData = event.originalEvent.clipboardData || window.clipboardData;
+                        if (!clipboardData) return;
+                        const pastedText = clipboardData.getData('text');
+                        const pastedEmails = splitEmailList(pastedText);
+                        if (!pastedEmails.some(function(email) { return email.indexOf('@') !== -1; })) return;
+
+                        event.preventDefault();
+                        pendingEmailRequests++;
+                        resolveEmails(pastedEmails).done(function(response) {
+                            const found = response.results || [];
+                            const foundByEmail = {};
+                            found.forEach(function(item) {
+                                foundByEmail[item.id.toLowerCase()] = item;
+                            });
+
+                            const selected = picker.val() || [];
+                            pastedEmails.forEach(function(email) {
+                                const item = foundByEmail[email.toLowerCase()];
+                                if (item && !selected.some(function(value) { return value.toLowerCase() === item.id.toLowerCase(); })) {
+                                    picker.append(new Option(item.text, item.id, true, true));
+                                    selected.push(item.id);
+                                }
+                            });
+                            picker.val(selected).trigger('change');
+
+                            const rejected = pastedEmails.filter(function(email) {
+                                return !foundByEmail[email.toLowerCase()];
+                            });
+                            if (rejected.length) {
+                                alert('Foram ignorados endereços que não estão cadastrados no GLPI: ' + rejected.join(', '));
+                            }
+                        }).always(function() {
+                            pendingEmailRequests--;
+                        });
+                    });
 
                     let index = $('.subgroup-block').length;
 
@@ -2086,7 +2214,7 @@ TWIG);
                         
                         container.find('.subgroup-block').each(function() {
                             const nameVal = $(this).find('input.sg-name-input').val().trim();
-                            const techsVal = $(this).find('textarea').val().trim();
+                            const techsVal = $(this).find('.email-values').val().trim();
                             const isFirst = $(this).index() === 0;
                             
                             if (isFirst) {
@@ -2114,10 +2242,13 @@ TWIG);
                         const newBlock = firstBlock.clone();
                         
                         newBlock.find('input.sg-name-input').val('');
-                        newBlock.find('textarea').val('');
+                        newBlock.find('.email-values').val('');
+                        newBlock.find('.select2-container').remove();
+                        const emailSelect = newBlock.find('.email-autocomplete');
+                        emailSelect.removeClass('select2-hidden-accessible').removeAttr('data-select2-id tabindex aria-hidden').empty().show();
                         
                         newBlock.find('input.sg-name-input').attr('name', 'subgroups[' + index + '][name]');
-                        newBlock.find('textarea').attr('name', 'subgroups[' + index + '][techs]');
+                        newBlock.find('.email-values').attr('name', 'subgroups[' + index + '][techs]');
                         newBlock.find('.sg-index').text(index + 1);
                         
                         let parentWrapper = newBlock.find('.parent-wrapper');
@@ -2130,6 +2261,7 @@ TWIG);
                         // Evento de remoção agora é delegado globalmente
                         
                         container.append(newBlock);
+                        initEmailPicker(emailSelect);
                         index++;
                         updateAllParentCombos();
                     });
@@ -2164,7 +2296,7 @@ TWIG);
                         let emailsValid = true;
                         container.find('.profile-block:visible').each(function() {
                             const nameVal = $(this).find('.profile-input').val().trim();
-                            const copyVal = $(this).find('select').val();
+                            const copyVal = $(this).find('select.profile-select2').val();
                             const usersVal = $(this).find('.profile-users-input').val().trim();
                             if (nameVal === '' || copyVal === '' || copyVal === null || copyVal === '0' || usersVal === '') {
                                 allFilled = false;
@@ -2182,6 +2314,7 @@ TWIG);
                         newBlock.removeClass('template');
                         newBlock.css('display', 'block');
                         newBlock.find('.profile-input').attr('name', 'name_profile_custom[]');
+                        newBlock.find('.profile-users-input').attr('name', 'users_profile_custom[]');
                         
                         // Limpa o textarea de usuários
                         newBlock.find('.profile-users-input').val('');
@@ -2190,12 +2323,14 @@ TWIG);
                         newBlock.find('.select2-container').remove();
                         
                         // Restaura o select original para inicializar o select2 novamente
-                        let selectEl = newBlock.find('select');
+                        let selectEl = newBlock.find('select.profile-select2');
                         selectEl.removeClass('select2-hidden-accessible')
                                 .removeAttr('data-select2-id')
                                 .removeAttr('tabindex')
                                 .removeAttr('aria-hidden')
                                 .show();
+                        const emailSelect = newBlock.find('.email-autocomplete');
+                        emailSelect.removeClass('select2-hidden-accessible').removeAttr('data-select2-id tabindex aria-hidden').empty().show();
                         
                         // Gera um ID novo e limpa o valor selecionado
                         let newId = 'dropdown_copy_profile_' + Date.now();
@@ -2207,6 +2342,7 @@ TWIG);
                         });
                         
                         container.append(newBlock);
+                        initEmailPicker(emailSelect);
 
                         // Inicializa select2 no novo dropdown com largura total
                         $('#' + newId).select2({ width: '100%' });
@@ -2214,14 +2350,20 @@ TWIG);
 
                     // Validação no Submit do Formulário
                     $('#form_wizard').on('submit', function(e) {
+                        if (pendingEmailRequests > 0) {
+                            e.preventDefault();
+                            alert('Aguarde a validação dos e-mails cadastrados no GLPI antes de enviar o formulário.');
+                            return false;
+                        }
+
                         let standardFilled = true;
                         let standardEmailsValid = true;
-                        $('#perfis-padrao-section select').each(function() {
+                        $('#perfis-padrao-section select.profile-select2').each(function() {
                             if ($(this).val() === '0' || $(this).val() === null) {
                                 standardFilled = false;
                             }
                         });
-                        $('#perfis-padrao-section textarea').each(function() {
+                        $('#perfis-padrao-section .email-values').each(function() {
                             let usersVal = $(this).val().trim();
                             if (usersVal === '') {
                                 standardFilled = false;
@@ -2240,7 +2382,7 @@ TWIG);
                         let customEmailsValid = true;
                         $('#profiles-container .profile-block:visible').each(function() {
                             const nameVal = $(this).find('.profile-input').val().trim();
-                            const copyVal = $(this).find('select').val();
+                            const copyVal = $(this).find('select.profile-select2').val();
                             const usersVal = $(this).find('.profile-users-input').val().trim();
                             
                             if (nameVal === '' || copyVal === '' || copyVal === null || copyVal === '0' || usersVal === '') {
@@ -2262,7 +2404,7 @@ TWIG);
                         
                         $('#subgroups-container .subgroup-block').each(function() {
                             const nameVal = $(this).find('input.sg-name-input').val().trim();
-                            const techsVal = $(this).find('textarea').val().trim();
+                            const techsVal = $(this).find('.email-values').val().trim();
                             const isFirst = $(this).index() === 0;
                             
                             if (isFirst) {
