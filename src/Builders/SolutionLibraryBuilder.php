@@ -127,12 +127,17 @@ class SolutionLibraryBuilder
 
         $item = new SolutionTemplate();
 
+        $solutiontypesId = (int)($config['solutiontypes_id'] ?? 0);
+        $commentText = trim($config['comment'] ?? '');
+
         if ($generatedId > 0 && $item->getFromDB($generatedId)) {
             $item->update([
                  'id' => $generatedId,
                  'name' => $name,
                  'entities_id' => $entities_id,
-                 'content' => !empty($content) ? $content : $item->fields['content']
+                 'content' => !empty($content) ? $content : $item->fields['content'],
+                 'solutiontypes_id' => $solutiontypesId > 0 ? $solutiontypesId : $item->fields['solutiontypes_id'],
+                 'comment' => $commentText !== '' ? $commentText : $item->fields['comment']
             ]);
             return $generatedId;
         }
@@ -151,7 +156,8 @@ class SolutionLibraryBuilder
         $insertData = [
             'name' => $name,
             'content' => !empty($content) ? $content : ($sourceData['content'] ?? ''),
-            'solutiontypes_id' => $sourceData['solutiontypes_id'] ?? 0,
+            'solutiontypes_id' => $solutiontypesId > 0 ? $solutiontypesId : ($sourceData['solutiontypes_id'] ?? 0),
+            'comment' => $commentText !== '' ? $commentText : ($sourceData['comment'] ?? ''),
             'entities_id' => $entities_id,
             'is_recursive' => 1,
         ];

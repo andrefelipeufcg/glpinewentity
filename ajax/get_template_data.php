@@ -97,6 +97,15 @@ switch ($tabnum) {
             }
             $data['name'] = $item->fields['name'] ?? '';
             $data['content'] = $item->fields['content'] ?? '';
+            $data['solutiontypes_id'] = $item->fields['solutiontypes_id'] ?? 0;
+            $data['comment'] = $item->fields['comment'] ?? '';
+
+            if ($data['solutiontypes_id'] > 0 && class_exists('\SolutionType')) {
+                $st = new \SolutionType();
+                if ($st->getFromDB($data['solutiontypes_id'])) {
+                    $data['solutiontypes_name'] = $st->fields['name'] ?? '';
+                }
+            }
         }
         break;
     case 4: // PendingReason
