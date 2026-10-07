@@ -2058,6 +2058,10 @@ TWIG);
                             values.val((picker.val() || []).join('\\n'));
                         });
 
+                        picker.on('select2:select', function() {
+                            picker.data('select2').$container.find('.select2-search__field').val('');
+                        });
+
                         const initialEmails = splitEmailList(values.val());
                         values.val('');
                         if (initialEmails.length) {
