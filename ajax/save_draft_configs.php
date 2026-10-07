@@ -74,6 +74,9 @@ $fbr = $_POST['items_followups_before_resolution'] ?? [];
 $soltpl_id = $_POST['items_solutiontemplates_id'] ?? [];
 $comments = $_POST['items_comment'] ?? [];
 
+// Campos especiais da aba 3
+$solutiontypes_id = $_POST['items_solutiontypes_id'] ?? [];
+
 // Campos especiais da aba 5
 $is_active = $_POST['items_is_active'] ?? [];
 $itemtype = $_POST['items_itemtype'] ?? [];
@@ -107,6 +110,10 @@ foreach ($names as $i => $name) {
         'comment'   => $comments[$i] ?? '',
         'generated_id' => (int)($generated_ids[$i] ?? 0),
     ];
+
+    if ($tabnum == 3) {
+        $itemConfig['solutiontypes_id'] = (int)($solutiontypes_id[$i] ?? 0);
+    }
 
     if ($tabnum == 4) {
         $itemConfig['is_default'] = (int)($is_default[$i] ?? 0);

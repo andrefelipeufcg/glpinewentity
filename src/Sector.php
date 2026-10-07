@@ -283,21 +283,37 @@ class Sector extends SectorBase {
         $existingModels = [];
         $tableName = $tableMapping[$tabnum] ?? '';
         if ($tableName && $DB->tableExists($tableName)) {
+            $entityNames = [];
+            foreach ($DB->request(['SELECT' => ['id', 'name', 'completename'], 'FROM' => 'glpi_entities']) as $entRow) {
+                $entityNames[(int)$entRow['id']] = $entRow['completename'] !== '' && $entRow['completename'] !== null
+                    ? $entRow['completename']
+                    : $entRow['name'];
+            }
+
             $iterator = $DB->request([
-                'SELECT' => ['id', 'name'],
+                'SELECT' => ['id', 'name', 'entities_id'],
                 'FROM'   => $tableName,
                 'ORDER'  => 'name ASC'
             ]);
-            $modelsPadrao = [];
-            $modelsNormal = [];
+            // Agrupado por entidade; modelos "[Padrão]" vêm primeiro dentro de cada grupo.
+            $groupsPadrao = [];
+            $groupsNormal = [];
             foreach ($iterator as $row) {
+                $entityId = (int)($row['entities_id'] ?? 0);
                 if (preg_match('/^\[padr(?:a|ã)o\]/iu', $row['name'])) {
-                    $modelsPadrao[$row['id']] = $row['name'];
+                    $groupsPadrao[$entityId][$row['id']] = $row['name'];
                 } else {
-                    $modelsNormal[$row['id']] = $row['name'];
+                    $groupsNormal[$entityId][$row['id']] = $row['name'];
                 }
             }
-            $existingModels = $modelsPadrao + $modelsNormal;
+            $entityIdsWithModels = array_unique(array_merge(array_keys($groupsPadrao), array_keys($groupsNormal)));
+            usort($entityIdsWithModels, function ($a, $b) use ($entityNames) {
+                return strcasecmp($entityNames[$a] ?? '', $entityNames[$b] ?? '');
+            });
+            foreach ($entityIdsWithModels as $entityId) {
+                $label = $entityNames[$entityId] ?? ('#' . $entityId);
+                $existingModels[$label] = ($groupsPadrao[$entityId] ?? []) + ($groupsNormal[$entityId] ?? []);
+            }
         }
 
         // Determina os campos que serão exibidos baseado na aba
@@ -312,6 +328,14 @@ class Sector extends SectorBase {
             ]);
             foreach ($catIter as $row) {
                 $extraOptions['categories'][$row['id']] = $row['completename'];
+            }
+        }
+        if ($tabnum == 3) {
+            $extraOptions['solutiontypes'] = [];
+            if ($DB->tableExists('glpi_solutiontypes')) {
+                foreach ($DB->request(['SELECT' => ['id', 'name'], 'FROM' => 'glpi_solutiontypes', 'ORDER' => 'name ASC']) as $row) {
+                    $extraOptions['solutiontypes'][$row['id']] = $row['name'];
+                }
             }
         }
         if ($tabnum == 4) {
@@ -481,6 +505,7 @@ class Sector extends SectorBase {
         $ajax_render_richtext_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_richtext.php';
         $ajax_render_form_category_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_form_category.php';
         $ajax_render_illustration_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_illustration.php';
+        $ajax_render_solution_type_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/render_solution_type.php';
         $default_illustration_preview = json_encode((new IllustrationManager())->renderIcon('request-service', 100));
         $needsLegacyIllustrationPicker = (int) GLPI_VERSION < 12;
 
@@ -601,6 +626,20 @@ class Sector extends SectorBase {
             }
             
             // Buscar categoria de form via AJAX para tab 6 (mantém macro/botões nativos do GLPI)
+            if (tabnum == 3) {
+                let solutionTypeWrapper = template.find('.solutiontype-wrapper');
+                if (solutionTypeWrapper.length > 0) {
+                    $.ajax({
+                        url: '{$ajax_render_solution_type_url}',
+                        type: 'POST',
+                        data: { type_id: 0 },
+                        success: function(html) {
+                            solutionTypeWrapper.html(html);
+                        }
+                    });
+                }
+            }
+
             if (tabnum == 6) {
                 // O clone herdaria os IDs do modal do template; renderiza um seletor novo.
                 let illustrationWrapper = template.find('.illustration-wrapper');
@@ -701,6 +740,23 @@ class Sector extends SectorBase {
                                 block.find('.input-category').val('0').trigger('change');
                             }
 
+                            if (tabnum == 3) {
+                                let soltypeSelect = block.find('select[name=\"items_solutiontypes_id[]\"]');
+                                if (soltypeSelect.length > 0) {
+                                    let typeId = response.data.solutiontypes_id || '0';
+                                    let typeName = response.data.solutiontypes_name || '';
+                                    if (typeId != '0' && typeName !== '') {
+                                        if (soltypeSelect.find('option[value=\"' + typeId + '\"]').length === 0) {
+                                            soltypeSelect.append(new Option(typeName, typeId, true, true));
+                                        }
+                                    }
+                                    soltypeSelect.val(typeId).trigger('change');
+                                } else {
+                                    block.find('.input-solutiontypes-id').val(response.data.solutiontypes_id || '0').trigger('change');
+                                }
+                                block.find('.input-comment').val(response.data.comment || '');
+                            }
+
                             if (tabnum == 4) {
                                 block.find('.input-is-default').val(response.data.is_default || '0');
                                 block.find('.input-is-pending-per-default').val(response.data.is_pending_per_default || '0');
@@ -792,6 +848,16 @@ class Sector extends SectorBase {
                 block.find('.input-type').val('1');
                 block.find('.input-category').val('0').trigger('change');
                 
+                if (tabnum == 3) {
+                    let soltypeSelect = block.find('select[name=\"items_solutiontypes_id[]\"]');
+                    if (soltypeSelect.length > 0) {
+                        soltypeSelect.val('0').trigger('change');
+                    } else {
+                        block.find('.input-solutiontypes-id').val('0').trigger('change');
+                    }
+                    block.find('.input-comment').val('');
+                }
+
                 if (tabnum == 4) {
                     block.find('.input-is-default').val('0');
                     block.find('.input-is-pending-per-default').val('0');
@@ -956,6 +1022,7 @@ class Sector extends SectorBase {
             $('.select2-foltpl').select2({ width: '100%' });
             $('.select2-fbr').select2({ width: '100%' });
             $('.select2-soltpl').select2({ width: '100%' });
+            $('.select2-soltype').select2({ width: '100%' });
             $('.select2-itemtype').select2({ width: '100%' });
             $('.select2-event').select2({ width: '100%' });
             $('.select2-tpl').select2({ width: '100%' });
@@ -1004,6 +1071,7 @@ class Sector extends SectorBase {
         $followups_before_resolution = (int)($config['followups_before_resolution'] ?? 0);
         $solutiontemplates_id = (int)($config['solutiontemplates_id'] ?? 0);
         $comment = htmlspecialchars($config['comment'] ?? '');
+        $solutiontypes_id = (int)($config['solutiontypes_id'] ?? 0);
 
         // Variáveis da aba 5
         $is_active = (int)($config['is_active'] ?? 1);
@@ -1036,9 +1104,13 @@ class Sector extends SectorBase {
         $html .= "      <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Copiar de...</label>";
         $html .= "      <select name='items_copy_from[]' class='form-select select2-copy-from' style='width: 100%;' data-tab='{$tabnum}'>";
         $html .= "        <option value='0'>--- Nenhum (Criar Básico) ---</option>";
-        foreach ($existingModels as $id => $mName) {
-            $selected = ($id == $copyFrom) ? 'selected' : '';
-            $html .= "        <option value='{$id}' {$selected}>" . htmlspecialchars(ltrim($mName, '- ')) . "</option>";
+        foreach ($existingModels as $entityLabel => $entityModels) {
+            $html .= "        <optgroup label='" . htmlspecialchars((string)$entityLabel, ENT_QUOTES) . "'>";
+            foreach ($entityModels as $id => $mName) {
+                $selected = ($id == $copyFrom) ? 'selected' : '';
+                $html .= "          <option value='{$id}' {$selected}>" . htmlspecialchars(ltrim($mName, '- ')) . "</option>";
+            }
+            $html .= "        </optgroup>";
         }
         $html .= "      </select>";
         $html .= "  </div>";
@@ -1069,6 +1141,38 @@ class Sector extends SectorBase {
             }
             $html .= "          </select>";
             $html .= "      </div>";
+            $html .= "  </div>";
+        } elseif ($tabnum == 3) {
+            // Campos de SolutionTemplate: Tipo de solução + Comentários
+            $html .= "  <div style='margin-bottom: 10px;'>";
+            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Tipo de solução</label>";
+            if (!$isTemplate && class_exists('\SolutionType')) {
+                $html .= "      <div class='solutiontype-wrapper'>";
+                $html .= \SolutionType::dropdown([
+                    'name'    => 'items_solutiontypes_id[]',
+                    'value'   => $solutiontypes_id,
+                    'display' => false,
+                    'width'   => '100%',
+                    'rand'    => mt_rand()
+                ]);
+                $html .= "      </div>";
+            } elseif ($isTemplate && class_exists('\SolutionType')) {
+                $html .= "      <div class='solutiontype-wrapper'>";
+                $html .= "          <input type='hidden' name='items_solutiontypes_id[]' value='0'>";
+                $html .= "      </div>";
+            } else {
+                $html .= "      <select name='items_solutiontypes_id[]' class='form-select select2-soltype input-solutiontypes-id' style='width: 100%;'>";
+                $html .= "        <option value='0'>--- Nenhum ---</option>";
+                foreach (($extraOptions['solutiontypes'] ?? []) as $stId => $stName) {
+                    $sel = ($stId == $solutiontypes_id) ? 'selected' : '';
+                    $html .= "        <option value='{$stId}' {$sel}>" . htmlspecialchars($stName) . "</option>";
+                }
+                $html .= "      </select>";
+            }
+            $html .= "  </div>";
+            $html .= "  <div style='margin-bottom: 10px;'>";
+            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Comentários</label>";
+            $html .= "      <textarea name='items_comment[]' class='form-control input-comment' style='width: 100%; height: 60px;'>{$comment}</textarea>";
             $html .= "  </div>";
         } elseif ($tabnum == 4) {
             // Campos de PendingReason
