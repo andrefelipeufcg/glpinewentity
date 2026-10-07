@@ -2281,6 +2281,21 @@ TWIG);
                             }
                         });
                         
+                        let blocks = $('#subgroups-container .subgroup-block');
+                        if (blocks.length > 1) {
+                            let emptyNameBlocks = [];
+                            blocks.each(function(i) {
+                                if ($(this).find('input.sg-name-input').val().trim() === '') {
+                                    emptyNameBlocks.push(i + 1);
+                                }
+                            });
+                            if (emptyNameBlocks.length > 0) {
+                                e.preventDefault();
+                                alert('O nome do subgrupo não pode ficar em branco quando há mais de um bloco. Preencha o nome no(s) Bloco(s): ' + emptyNameBlocks.join(', ') + ', ou remova o(s) bloco(s) desnecessário(s).');
+                                return false;
+                            }
+                        }
+
                         if (!subgroupsFilled || !subgroupsEmailsValid) {
                             e.preventDefault();
                             alert('Por favor, preencha o Nome do Subgrupo, Grupo Pai e certifique-se de que todos os e-mails dos técnicos são válidos (ex: nome@dominio.com) em todos os Grupos/Subgrupos.');
