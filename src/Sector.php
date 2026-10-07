@@ -2059,7 +2059,7 @@ TWIG);
                         });
 
                         picker.on('select2:select', function() {
-                            picker.data('select2').$container.find('.select2-search__field').val('');
+                            picker.next('.select2-container').find('.select2-search__field').val('');
                         });
 
                         const initialEmails = splitEmailList(values.val());
