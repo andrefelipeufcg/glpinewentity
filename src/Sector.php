@@ -177,7 +177,7 @@ class Sector extends SectorBase {
         $mainTitle = array_shift($tabs);
         $tabs[-1] = self::createTabEntry(__('All'), 0, null, 'ti ti-layout-list');
         $warning = json_encode(
-            __('Salve a entidade primeiro para acessar as outras abas de configuração.', 'glpinewentity'),
+            __('Crie a estrutura da entidade primeiro, antes de acessar as outras abas de configuração.', 'glpinewentity'),
             JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
         );
 
@@ -238,7 +238,7 @@ class Sector extends SectorBase {
         }
         if ((int)$item->getID() <= 0) {
             echo "<div class='alert alert-warning'>" . htmlspecialchars(
-                __('Salve a entidade primeiro para acessar as abas de configuração.', 'glpinewentity'),
+                __('Crie a estrutura da entidade primeiro, antes de acessar as outras abas de configuração.', 'glpinewentity'),
                 ENT_QUOTES
             ) . "</div>";
             return false;
