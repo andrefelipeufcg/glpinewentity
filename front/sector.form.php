@@ -57,6 +57,7 @@ if ($sectorId > 0) {
 
 if (isset($_POST['process_wizard'])) {
     Session::checkValidSessionId();
+    Session::setActiveTab(Sector::class, Sector::class . '$main');
     if ($isEdit) {
         Session::checkRight("plugin_glpinewentity", UPDATE);
 
@@ -77,7 +78,7 @@ if (isset($_POST['process_wizard'])) {
         }
 
         // Mantém o formulário e o metadata alinhados aos dados já processados.
-        $sectorObj->update([
+        $sectorSaved = $sectorObj->update([
             'id' => $sectorId,
             'entities_id' => (int) $_POST['parent_entity'],
             'sector_name' => $_POST['sector_name'],
@@ -87,6 +88,10 @@ if (isset($_POST['process_wizard'])) {
 
         foreach ($result['warnings'] ?? [] as $warn) {
             Session::addMessageAfterRedirect($warn, false, WARNING);
+        }
+
+        if (!$sectorSaved) {
+            $result['errors'][] = __('A estrutura foi processada, mas não foi possível salvar o registro do setor.', 'glpinewentity');
         }
 
         if (empty($result['errors'])) {
@@ -103,15 +108,19 @@ if (isset($_POST['process_wizard'])) {
         $result = Wizard::processCreation($_POST);
         
         if (empty($result['errors']) && !empty($result['entity_id'])) {
-            $sectorObj->add([
+            $newSectorId = $sectorObj->add([
                 'entities_id' => (int)$_POST['parent_entity'],
                 'sector_name' => $_POST['sector_name'],
                 'sector_abbr' => $_POST['sector_abbr'],
                 'metadata' => json_encode($result)
             ]);
+            if (!$newSectorId) {
+                Session::addMessageAfterRedirect(__('A entidade foi criada, mas não foi possível salvar o registro do setor. Verifique a estrutura no GLPI antes de tentar novamente.', 'glpinewentity'), false, ERROR);
+                Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php');
+            }
             Session::addMessageAfterRedirect(__('Estrutura criada com sucesso!', 'glpinewentity'), true, INFO);
             global $CFG_GLPI;
-            Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php');
+            Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $newSectorId);
         } else {
             // Se houve erro durante a criação, mas a entidade foi criada, salvamos o que deu e redirecionamos para EDIÇÃO
             if (!empty($result['entity_id'])) {
@@ -123,6 +132,10 @@ if (isset($_POST['process_wizard'])) {
                 ]);
                 foreach ($result['errors'] as $err) {
                     Session::addMessageAfterRedirect($err, false, ERROR);
+                }
+                if (!$newSectorId) {
+                    Session::addMessageAfterRedirect(__('A entidade foi criada, mas não foi possível salvar o registro do setor. Verifique a estrutura no GLPI antes de tentar novamente.', 'glpinewentity'), false, ERROR);
+                    Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php');
                 }
                 Session::addMessageAfterRedirect(__('Estrutura criada parcialmente. Verifique os erros.', 'glpinewentity'), false, WARNING);
                 global $CFG_GLPI;

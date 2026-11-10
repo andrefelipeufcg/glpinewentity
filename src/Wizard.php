@@ -18,11 +18,22 @@ use User;
 
 class Wizard {
 
-    private static function checkProfileReauthentication(): void {
-        if (method_exists(Profile_User::class, 'isUserReauthenticationNeeded')
-            && Profile_User::isUserReauthenticationNeeded()) {
-            Profile_User::redirectToReauthPrompt();
+    private static function checkStructureReauthentication(): void {
+        foreach ([Entity::class, Profile::class, Profile_User::class, User::class, Group::class, Group_User::class, ITILCategory::class] as $itemType) {
+            if (method_exists($itemType, 'isUserReauthenticationNeeded')
+                && $itemType::isUserReauthenticationNeeded()) {
+                $itemType::redirectToReauthPrompt();
+            }
         }
+    }
+
+    private static function canPurgeProfile(Profile $profile, int $id, &$reauthNeeded): bool {
+        $reauthNeeded = null;
+        if (method_exists(Profile::class, 'redirectToReauthPrompt')) {
+            $profileInput = null;
+            return $profile->can($id, PURGE, $profileInput, $reauthNeeded);
+        }
+        return $profile->can($id, PURGE);
     }
 
     private static function canCreateProfileLink(Profile_User $profileUser, array &$input, array &$errors, string $profileName, string $email): bool {
@@ -149,14 +160,8 @@ class Wizard {
                 $errors[] = sprintf(__('O perfil #%d não está vinculado à entidade deste setor.', 'glpinewentity'), $id);
                 continue;
             }
-            $reauthNeeded = false;
-            if (method_exists(Profile::class, 'redirectToReauthPrompt')) {
-                $profileInput = null;
-                $reauthNeeded = null;
-                $canPurge = $profile->can($id, PURGE, $profileInput, $reauthNeeded);
-            } else {
-                $canPurge = $profile->can($id, PURGE);
-            }
+            $reauthNeeded = null;
+            $canPurge = self::canPurgeProfile($profile, $id, $reauthNeeded);
             if (!$canPurge) {
                 if ($reauthNeeded && $allowReauthRedirect) {
                     Profile::redirectToReauthPrompt();
@@ -301,13 +306,22 @@ class Wizard {
             return $result;
         }
 
+        self::checkStructureReauthentication();
+
         $entityInput = ['entities_id' => $parentEntity];
-        if (!$entity->can(-1, CREATE, $entityInput)) {
+        $reauthNeeded = null;
+        if (method_exists(Entity::class, 'redirectToReauthPrompt')) {
+            $canCreateEntity = $entity->can(-1, CREATE, $entityInput, $reauthNeeded);
+        } else {
+            $canCreateEntity = $entity->can(-1, CREATE, $entityInput);
+        }
+        if (!$canCreateEntity) {
+            if ($reauthNeeded) {
+                Entity::redirectToReauthPrompt();
+            }
             $result['errors'][] = __('Você não tem permissão para criar uma entidade sob a entidade pai selecionada.', 'glpinewentity');
             return $result;
         }
-
-        self::checkProfileReauthentication();
 
         $entityId = $entity->add([
             'name'        => $entityName,
@@ -707,7 +721,7 @@ class Wizard {
             return $result;
         }
 
-        self::checkProfileReauthentication();
+        self::checkStructureReauthentication();
 
         $removedProfiles = self::validateRemovedProfiles($input, (int)$entityId, $result['errors']);
         if ($result['errors']) {
@@ -1138,8 +1152,12 @@ class Wizard {
                     break;
                 }
                 $profile = new Profile();
-                if (!$profile->can($id, PURGE) || self::isSuperAdminProfile($id)
-                    || !$profile->delete(['id' => $id], true)) {
+                $reauthNeeded = null;
+                if (!self::canPurgeProfile($profile, $id, $reauthNeeded)) {
+                    $result['errors'][] = $reauthNeeded
+                        ? __('É necessário confirmar sua identidade para excluir perfis. Tente salvar novamente.', 'glpinewentity')
+                        : sprintf(__('Você não tem permissão para excluir o perfil #%d.', 'glpinewentity'), $id);
+                } elseif (self::isSuperAdminProfile($id) || !$profile->delete(['id' => $id], true)) {
                     $result['errors'][] = sprintf(__('Não foi possível excluir o perfil \'%s\'.', 'glpinewentity'), htmlspecialchars($name, ENT_QUOTES));
                 }
             }
