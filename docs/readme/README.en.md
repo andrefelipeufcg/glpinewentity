@@ -89,6 +89,8 @@ The system will iterate and provision the entire environment, displaying descrip
    *   **Notifications:** Adjust or override sector e-mail alerts.
    *   **Standard Forms:** Manage forms (from Formcreator) linked to the sector.
 
+In each configuration tab, click **Save** to save and apply changes to the entity.
+
 ## ⚙️ Technical Structure and Classes
 
 *   `setup.php`: Initialization, hooks, and GLPI core registration.

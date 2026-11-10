@@ -3,8 +3,8 @@
  * -----------------------------------------------------------------------
  * GLPI New Entity — ajax/generate_configs.php
  *
- * Este script é um endpoint AJAX acionado pelo botão "Aplicar Padronização".
- * Ele lê o rascunho salvo no banco de dados e repassa para as classes
+ * Este script é um endpoint AJAX acionado pelo botão "Salvar".
+ * Ele lê as configurações salvas no banco de dados e repassa para as classes
  * Builder corretas (TicketTemplateBuilder, WaitReasonBuilder, etc.), que
  * farão a criação final dos modelos e registros na Entidade do sistema.
  * -----------------------------------------------------------------------
@@ -93,14 +93,14 @@ $tabKey = 'tab_' . $tabnum;
 $savedConfigs = $meta['configs'][$tabKey] ?? [];
 
 if (empty($savedConfigs)) {
-    echo json_encode(['success' => false, 'error' => 'Nenhuma configuração definida para esta aba. Salve o rascunho primeiro.']);
+    echo json_encode(['success' => false, 'error' => 'Nenhuma configuração definida para esta aba.']);
     exit;
 }
 
 $managedIds = $meta['managed_ids'][$tabKey] ?? [];
 $externalIds = $meta['external_ids'][$tabKey] ?? [];
 
-// Prevenção de IDOR: Valida todos os IDs referenciados no rascunho antes de processar
+// Prevenção de IDOR: Valida todos os IDs referenciados nas configurações antes de processar
 $classMap = [
     1 => \TicketTemplate::class,
     2 => \ITILFollowupTemplate::class,

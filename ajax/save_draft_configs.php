@@ -3,11 +3,8 @@
  * -----------------------------------------------------------------------
  * GLPI New Entity — ajax/save_draft_configs.php
  * 
- * Este script é um endpoint AJAX que recebe os dados do formulário 
- * preenchidos na tela (nome, calendários, frequências, etc.) e salva 
- * um rascunho em formato JSON no campo "metadata" da tabela de Setores. 
- * Isso permite que o usuário salve seu progresso antes de rodar a 
- * padronização completa, sem perder dados caso a aba seja recarregada.
+ * Recebe os dados da aba e os salva no metadata do setor antes de
+ * aplicar as configurações à entidade.
  * -----------------------------------------------------------------------
  */
 
@@ -205,7 +202,6 @@ if ($sector->update([
     'id'       => $sectorId,
     'metadata' => json_encode($meta)
 ])) {
-    Session::addMessageAfterRedirect(__('Rascunho salvo com sucesso!', 'glpinewentity'), true, INFO);
     echo json_encode(['success' => true]);
 } else {
     echo json_encode(['success' => false, 'error' => __('Falha ao atualizar o banco de dados.', 'glpinewentity')]);

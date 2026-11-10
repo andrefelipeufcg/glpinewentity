@@ -89,6 +89,8 @@ O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descrit
    *   **Notificações:** Ajuste ou sobrescreva os alertas de e-mail do setor.
   *   **Formulários:** Gerencie formulários (do Formcreator) vinculados ao setor.
 
+Em cada aba de configuração, clique em **Salvar** para salvar e aplicar as alterações à entidade.
+
 ## ⚙️ Estrutura Técnica e Classes
 
 *   `setup.php`: Inicialização, ganchos (hooks) e registro no núcleo do GLPI.

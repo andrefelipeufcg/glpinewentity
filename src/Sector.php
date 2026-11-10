@@ -536,7 +536,7 @@ class Sector extends SectorBase {
         // Template oculto para adicionar novos
         echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $extraOptions);
 
-        // Renderiza existentes (salvos no rascunho)
+        // Renderiza as configurações existentes.
         foreach ($savedConfigs as $idx => $config) {
             echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions);
         }
@@ -551,12 +551,8 @@ class Sector extends SectorBase {
         // Botões de Ação
         echo "<tr class='tab_bg_2'><td class='center' colspan='2' style='padding: 20px;'>";
 
-        echo "<button type='button' id='btn_save_draft_{$tabnum}' class='btn btn-primary' onclick='saveDraftConfigs({$tabnum})' style='margin-right: 15px;'>";
-        echo "<i class='fas fa-save' style='margin-right: 5px;'></i> Salvar Rascunho";
-        echo "</button>";
-
-        echo "<button type='button' id='btn_generate_{$tabnum}' class='btn btn-success' style='color: white !important;' onclick='generateSectorConfigs({$item->getID()}, {$tabnum})'>";
-        echo "<i class='fas fa-magic' style='margin-right: 5px;'></i> Aplicar Padronização para esta Entidade";
+        echo "<button type='button' id='btn_generate_{$tabnum}' class='btn btn-primary' onclick='generateSectorConfigs({$item->getID()}, {$tabnum})'>";
+        echo "<i class='fas fa-save' style='margin-right: 5px;'></i> Salvar";
         echo "</button>";
 
         echo "</td></tr>";
@@ -973,48 +969,19 @@ class Sector extends SectorBase {
             }
         });
 
-        function saveDraftConfigs(tabnum) {
-            let btn = $('#btn_save_draft_' + tabnum);
-            let originalHtml = btn.html();
-            btn.prop('disabled', true);
-            btn.html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Salvando...');
-
-            if (typeof tinymce !== 'undefined') {
-                tinymce.triggerSave();
-            }
-            let formData = $('#form_configs_tab_' + tabnum).serialize();
-            $.ajax({
-                url: '{$ajax_save_url}',
-                type: 'POST',
-                data: formData,
-                success: function(response) {
-                    if(response.success) {
-                        window.location.reload();
-                    } else {
-                        btn.prop('disabled', false).html(originalHtml);
-                        alert('Erro ao salvar rascunho: ' + (response.error || 'Erro desconhecido'));
-                    }
-                },
-                error: function() {
-                    btn.prop('disabled', false).html(originalHtml);
-                    alert('Erro na requisição.');
-                }
-            });
-        }
-
         function generateSectorConfigs(sectorId, tabnum) {
-            let confirmMsg = 'Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?';
+            let confirmMsg = 'Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade.\\nDeseja prosseguir?';
             if (tabnum === 6) {
-                confirmMsg = 'Atenção! A padronização irá criar, atualizar e remover formulários conforme as seguintes configurações:\\nFormulários não gerenciados pelo plugin (externos) que forem removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos desta tela serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\\nO rascunho atual será salvo automaticamente.\\nDeseja prosseguir com a sincronização?';
+                confirmMsg = 'Atenção! O salvamento irá criar, atualizar e remover formulários conforme as seguintes configurações:\\nFormulários não gerenciados pelo plugin (externos) que forem removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos desta tela serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\\nDeseja prosseguir com a sincronização?';
             }
             if(confirm(confirmMsg)) {
                 
                 let btn = $('#btn_generate_' + tabnum);
                 let originalHtml = btn.html();
                 btn.prop('disabled', true);
-                btn.html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Aplicando...');
+                btn.html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Salvando...');
 
-                // Primeiro salva o rascunho, depois gera
+                // Salva as configurações antes de aplicá-las à entidade.
                 if (typeof tinymce !== 'undefined') {
                     tinymce.triggerSave();
                 }
@@ -1038,17 +1005,17 @@ class Sector extends SectorBase {
                                         window.location.reload();
                                     } else {
                                         btn.prop('disabled', false).html(originalHtml);
-                                        alert('Erro ao gerar configurações: ' + (genResp.error || 'Erro desconhecido'));
+                                        alert('As configurações foram salvas, mas não puderam ser aplicadas: ' + (genResp.error || 'Erro desconhecido'));
                                     }
                                 },
                                 error: function() {
                                     btn.prop('disabled', false).html(originalHtml);
-                                    alert('Erro na requisição de geração.');
+                                    alert('As configurações foram salvas, mas houve um erro na requisição para aplicá-las.');
                                 }
                             });
                         } else {
                             btn.prop('disabled', false).html(originalHtml);
-                            alert('Erro ao salvar rascunho antes de aplicar.');
+                            alert('Erro ao salvar configurações: ' + (saveResp.error || 'Erro desconhecido'));
                         }
                     },
                     error: function() {
