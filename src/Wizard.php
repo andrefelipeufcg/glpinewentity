@@ -181,15 +181,6 @@ class Wizard {
                 'label'             => 'Atendimento'
             ];
         }
-        // Transferência
-        if (!empty($input['copy_profile_transfer']) && $input['copy_profile_transfer'] > 0 && !empty(trim($input['users_profile_transfer'] ?? ''))) {
-            $profileAssignments[] = [
-                'source_profile_id' => (int)$input['copy_profile_transfer'],
-                'new_name'          => trim($profileNames[2] ?? ($sectorAbbr . ' - Transferência de Chamados')),
-                'users'             => trim($input['users_profile_transfer']),
-                'label'             => 'Transferência de Chamados'
-            ];
-        }
         // Customizados
         if (!empty($input['copy_profile_custom']) && is_array($input['copy_profile_custom'])) {
             foreach ($input['copy_profile_custom'] as $idx => $pId) {
@@ -626,15 +617,6 @@ class Wizard {
                 'new_name'          => trim($profileNames[1] ?? ($sectorAbbr . ' - Atendimento')),
                 'users'             => trim($input['users_profile_support'] ?? ''),
                 'label'             => 'Atendimento'
-            ];
-        }
-        // Transferência
-        if (!empty($input['copy_profile_transfer']) && $input['copy_profile_transfer'] > 0) {
-            $profileAssignments[] = [
-                'source_profile_id' => (int)$input['copy_profile_transfer'],
-                'new_name'          => trim($profileNames[2] ?? ($sectorAbbr . ' - Transferência de Chamados')),
-                'users'             => trim($input['users_profile_transfer'] ?? ''),
-                'label'             => 'Transferência de Chamados'
             ];
         }
         // Customizados

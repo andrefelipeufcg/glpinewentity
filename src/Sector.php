@@ -1507,7 +1507,6 @@ TWIG);
         $def_profiles = [
             'admin' => ['id' => 0, 'emails' => []],
             'support' => ['id' => 0, 'emails' => []],
-            'transfer' => ['id' => 0, 'emails' => []],
             'custom' => []
         ];
 
@@ -1700,11 +1699,10 @@ TWIG);
                             $profile_map[$pid] = 'admin';
                         } elseif (str_ends_with($pname, ' - Atendimento')) {
                             $profile_map[$pid] = 'support';
-                        } elseif (str_ends_with($pname, ' - Transferência de Chamados')) {
-                            $profile_map[$pid] = 'transfer';
                         } else {
                             $def_profiles['custom'][] = [
                                 'id' => $pid,
+                                'name' => $pname,
                                 'emails' => []
                             ];
                             $profile_map[$pid] = 'custom_' . (count($def_profiles['custom']) - 1);
@@ -1861,7 +1859,7 @@ TWIG);
         echo "</div>";
 
         // Atendimento
-        echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
+        echo "<div style='display: flex; flex-direction: column; gap: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
         echo "  <div style='display: flex; gap: 10px;'>";
         echo "    <div style='flex: 1;'>";
         echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
@@ -1892,41 +1890,9 @@ TWIG);
         echo "  </div>";
         echo "</div>";
 
-        // Transferência de Chamados
-        echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;'>";
-        echo "  <div style='display: flex; gap: 10px;'>";
-        echo "    <div style='flex: 1;'>";
-        echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
-        $transferVal = $def_sector_abbr ? htmlspecialchars($def_sector_abbr) . ' - Transferência de Chamados' : '';
-        echo "      <input type='text' id='profile_transfer' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$transferVal}'>";
-        echo "    </div>";
-        echo "    <div style='flex: 1;'>";
-        echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
-        echo "      <select name='copy_profile_transfer' class='form-select profile-select2' style='width: 100%;'>";
-        echo "        <option value='0'>-----</option>";
-        $transferId = $def_profiles['transfer']['id'] ?? 0;
-        foreach ($profiles as $pid => $pname) {
-            if ($transferId > 0) {
-                $selected = ($pid == $transferId) ? 'selected' : '';
-            } else {
-                $selected = (strpos($pname, '[Padrão] Transferência de Chamados') !== false) ? 'selected' : '';
-            }
-            echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
-        }
-        echo "      </select>";
-        echo "    </div>";
-        echo "  </div>";
-        echo "  <div>";
-        echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-        $transferEmails = htmlspecialchars(implode("\n", $def_profiles['transfer']['emails'] ?? []), ENT_QUOTES);
-        echo "    <input type='hidden' name='users_profile_transfer' class='email-values' value='{$transferEmails}'>";
-        echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
-        echo "  </div>";
-        echo "</div>";
-
         echo "</div>"; // fecha #perfis-padrao-section
 
-        echo "<br><small class='text-muted'>Os 'Perfis Padrão' são criados automaticamente com base na SIGLA e não podem ser apagados, mas você pode adicionar um novo em 'Adicionar Perfil'.</small>";
+        echo "<small class='text-muted' style='display: block; margin-top: 8px;'>Os 'Perfis Padrão' são criados automaticamente com base na SIGLA e não podem ser apagados, mas você pode adicionar um novo em 'Adicionar Perfil'.</small>";
         echo "</td>";
         echo "</tr>";
 
@@ -1977,7 +1943,6 @@ TWIG);
                 echo "      <div style='flex: 1;'>";
                 echo "          <label style='display: block; margin-bottom: 5px; '>Nome do Perfil</label>";
                 echo "          <input type='text' class='form-control profile-input' name='name_profile_custom[]' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' value='" . htmlspecialchars($cProf['name']) . "'>";
-                echo "          <small class='text-muted'>O nome original não é carregado na edição, preencha novamente se desejar salvar outro.</small>";
                 echo "      </div>";
                 echo "      <div style='flex: 1;'>";
                 echo "          <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
@@ -2168,6 +2133,21 @@ TWIG);
                     const emailSearchUrl = $('#form_wizard').data('email-search-url');
                     const csrfToken = $('#form_wizard input[name=_glpi_csrf_token]').val();
                     let pendingEmailRequests = 0;
+
+                    function validateStandardProfiles() {
+                        let valid = true;
+                        $('#perfis-padrao-section select.profile-select2').each(function() {
+                            if ($(this).val() === '0' || $(this).val() === null || $(this).val() === '') {
+                                valid = false;
+                            }
+                        });
+                        $('#perfis-padrao-section .email-values').each(function() {
+                            if (!validateEmailsStr($(this).val())) {
+                                valid = false;
+                            }
+                        });
+                        return valid;
+                    }
 
                     function splitEmailList(value) {
                         return String(value || '').split(/[\s,;]+/).map(function(email) {
@@ -2430,11 +2410,9 @@ TWIG);
                         if (abbr === '') {
                             $('#profile_admin').val('');
                             $('#profile_support').val('');
-                            $('#profile_transfer').val('');
                         } else {
                             $('#profile_admin').val(abbr + ' - Admin');
                             $('#profile_support').val(abbr + ' - Atendimento');
-                            $('#profile_transfer').val(abbr + ' - Transferência de Chamados');
                         }
                         updateAllParentCombos();
                     });
@@ -2446,6 +2424,15 @@ TWIG);
 
                     // ── Lógica para Adicionar Perfis Customizados ──
                     $('#btn-add-profile').on('click', function() {
+                        if (pendingEmailRequests > 0) {
+                            alert('Aguarde a validação dos e-mails cadastrados no GLPI antes de adicionar um novo perfil.');
+                            return;
+                        }
+                        if (!validateStandardProfiles()) {
+                            alert('Por favor, selecione de qual perfil copiar e certifique-se de que todos os e-mails informados são válidos (ex: nome@dominio.com) para todos os Perfis Padrão antes de adicionar um novo.');
+                            return;
+                        }
+
                         const container = $('#profiles-container');
                         const template = container.find('.profile-block.template');
                         
@@ -2514,23 +2501,7 @@ TWIG);
                             return false;
                         }
 
-                        let standardFilled = true;
-                        let standardEmailsValid = true;
-                        $('#perfis-padrao-section select.profile-select2').each(function() {
-                            if ($(this).val() === '0' || $(this).val() === null) {
-                                standardFilled = false;
-                            }
-                        });
-                        $('#perfis-padrao-section .email-values').each(function() {
-                            let usersVal = $(this).val().trim();
-                            if (usersVal === '') {
-                                standardFilled = false;
-                            } else if (!validateEmailsStr(usersVal)) {
-                                standardEmailsValid = false;
-                            }
-                        });
-                        
-                        if (!standardFilled || !standardEmailsValid) {
+                        if (!validateStandardProfiles()) {
                             e.preventDefault();
                             alert('Por favor, selecione de qual perfil copiar e certifique-se de que todos os e-mails informados são válidos (ex: nome@dominio.com) para todos os Perfis Padrão.');
                             return false;
