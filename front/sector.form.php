@@ -175,7 +175,8 @@ Html::header(
     strtolower(Menu::class)
 );
 
-echo Html::script(\Plugin::getPhpDir('glpinewentity', false) . '/js/unsaved-changes.js', [], false);
+$assetPath = version_compare(GLPI_VERSION, '11.0', '<') ? '/public/js/unsaved-changes.js' : '/js/unsaved-changes.js';
+echo Html::script(\Plugin::getPhpDir('glpinewentity', false) . $assetPath, [], false);
 
 $options = ['id' => $sectorId];
 if ($sectorId > 0 && isset($sectorObj->fields['metadata'])) {

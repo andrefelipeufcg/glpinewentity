@@ -2395,8 +2395,13 @@ TWIG);
                         newBlock.find('input.sg-name-input').val('');
                         newBlock.find('.email-values').val('');
                         newBlock.find('.select2-container').remove();
-                        const emailSelect = newBlock.find('.email-autocomplete');
-                        emailSelect.removeClass('select2-hidden-accessible').removeAttr('data-select2-id tabindex aria-hidden').empty().show();
+                        const oldEmailSelect = newBlock.find('.email-autocomplete');
+                        const emailSelect = $('<select>', {
+                            multiple: true,
+                            class: 'form-control email-autocomplete',
+                            'data-placeholder': oldEmailSelect.attr('data-placeholder')
+                        });
+                        oldEmailSelect.replaceWith(emailSelect);
                         
                         newBlock.find('input.sg-name-input').attr('name', 'subgroups[' + index + '][name]');
                         newBlock.find('.email-values').attr('name', 'subgroups[' + index + '][techs]');
