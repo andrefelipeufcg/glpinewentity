@@ -20,7 +20,7 @@ Instead of navigating through several GLPI screens to create entities, configure
 *   **Fast Entity Creation:** Instantly creates a new entity under a chosen parent entity.
 *   **Native Profile Cloning:** Allows you to select supported pre-existing profiles (such as Admin or Technician) and clone them, automatically naming them using the new sector's acronym prefix (e.g., `[DC] - Admin`). Super-Admin profiles are intentionally excluded for security reasons.
 *   **Direct E-mail Linking:** Just paste a list of e-mails, separated by commas or line breaks. The plugin searches for the user in the database and automatically links the profile to the new entity with recursive scope.
-    *   Optionally, enable the default-profile switch on one profile to set that profile and the new entity as defaults for its users. With no selection, existing preferences remain unchanged for retained assignments.
+    *   Optionally, enable the default-profile switch on one or more profiles. For each user, a selected Admin profile takes priority; otherwise the most recent assignment among the selected profiles wins. The entity is also set as the default. With no selection, existing preferences remain unchanged for retained assignments.
 *   **Smart Group and Subgroup Management:**
     *   Automatically creates a "Parent Group" named with the sector's acronym `(ACRONYM)`.
     *   Allows the dynamic creation of multiple nested Subgroups.

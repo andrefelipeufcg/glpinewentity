@@ -1514,7 +1514,7 @@ TWIG);
         $def_parent_entity = 0;
         $def_category_names = '';
         $def_subgroups = [];
-        $defaultProfileId = 0;
+        $defaultProfileIds = [];
         // A inclusão usa a mesma estrutura consumida pela edição ao montar os perfis.
         $def_profiles = [
             'admin' => ['id' => 0, 'emails' => []],
@@ -1524,7 +1524,9 @@ TWIG);
 
         if ($isEdit) {
             $meta = json_decode($sectorObj->fields['metadata'], true) ?: [];
-            $defaultProfileId = (int)($meta['default_profile_id'] ?? 0);
+            $defaultProfileIds = array_key_exists('default_profile_ids', $meta)
+                ? (is_array($meta['default_profile_ids']) ? array_map('intval', $meta['default_profile_ids']) : [])
+                : [(int)($meta['default_profile_id'] ?? 0)];
             $def_sector_name = $sectorObj->fields['sector_name'];
             $def_sector_abbr = $sectorObj->fields['sector_abbr'];
             $def_parent_entity = $sectorObj->fields['entities_id'];
@@ -1868,7 +1870,7 @@ TWIG);
         $adminEmails = htmlspecialchars(implode("\n", $def_profiles['admin']['emails'] ?? []), ENT_QUOTES);
         echo "    <input type='hidden' name='users_profile_admin' class='email-values' value='{$adminEmails}'>";
         echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
-        echo self::renderDefaultProfileSwitch('admin', $defaultProfileId > 0 && $defaultProfileId === (int)$adminId);
+        echo self::renderDefaultProfileSwitch('admin', $adminId > 0 && in_array($adminId, $defaultProfileIds, true));
         echo "  </div>";
         echo "</div>";
 
@@ -1901,7 +1903,7 @@ TWIG);
         $supportEmails = htmlspecialchars(implode("\n", $def_profiles['support']['emails'] ?? []), ENT_QUOTES);
         echo "    <input type='hidden' name='users_profile_support' class='email-values' value='{$supportEmails}'>";
         echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
-        echo self::renderDefaultProfileSwitch('support', $defaultProfileId > 0 && $defaultProfileId === (int)$supportId);
+        echo self::renderDefaultProfileSwitch('support', $supportId > 0 && in_array($supportId, $defaultProfileIds, true));
         echo "  </div>";
         echo "</div>";
 
@@ -1967,7 +1969,7 @@ TWIG);
                 echo "      <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
                 echo "      <input type='hidden' name='users_profile_custom[]' class='email-values profile-users-input' value='{$cEmails}'>";
                 echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
-                echo self::renderDefaultProfileSwitch('custom:' . $customIndex, $defaultProfileId > 0 && $defaultProfileId === (int)$cId);
+                echo self::renderDefaultProfileSwitch('custom:' . $customIndex, in_array((int)$cId, $defaultProfileIds, true));
                 echo "  </div>";
                 echo "</div>";
             }
@@ -2437,12 +2439,6 @@ TWIG);
                             $(this).find('.profile-default-switch').val('custom:' + index);
                         });
                     }
-
-                    $('#form_wizard').on('change', '.profile-default-switch', function() {
-                        if (this.checked) {
-                            $('#form_wizard .profile-default-switch').not(this).prop('checked', false);
-                        }
-                    });
 
                     $('#profiles-container').on('click', '.btn-remove-profile', function() {
                         const block = $(this).closest('.profile-block');

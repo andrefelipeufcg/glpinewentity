@@ -20,7 +20,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 *   **Criação Rápida de Entidade:** Cria imediatamente uma nova entidade sob uma entidade-pai escolhida.
 *   **Clonagem de Perfis Nativos:** Permite selecionar perfis preexistentes suportados (como Admin ou Atendimento) e cloná-los, nomeando-os automaticamente com o prefixo da sigla do novo setor (Ex: `[DC] - Admin`). Perfis com privilégios globais (Super-Admin) são intencionalmente bloqueados por segurança.
 *   **Vinculação Direta por E-mail:** Basta colar uma lista de e-mails, separados por vírgula ou quebra de linha. O plugin busca o usuário no banco de dados e automaticamente vincula o perfil à nova entidade em escopo recursivo.
-    *   Opcionalmente, ative **Este deve ser o Perfil Padrão destes usuários** em um único perfil para definir esse perfil e a nova entidade como padrões dos usuários vinculados. Sem seleção, as preferências existentes são mantidas para os vínculos preservados.
+    *   Opcionalmente, ative **Este deve ser o Perfil Padrão destes usuários** em um ou mais perfis. Para cada usuário, o perfil Admin marcado tem prioridade; caso contrário, prevalece o vínculo mais recente entre os perfis marcados. A entidade também é definida como padrão. Sem seleção, as preferências existentes são mantidas para os vínculos preservados.
 *   **Gerenciamento Inteligente de Grupos e Subgrupos:**
     *   Cria automaticamente um "Grupo Pai" nomeado com a sigla do setor `(SIGLA)`.
     *   Permite a criação de múltiplos Subgrupos aninhados de forma dinâmica.
