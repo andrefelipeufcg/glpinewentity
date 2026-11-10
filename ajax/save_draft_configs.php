@@ -94,17 +94,18 @@ $removed_generated_ids = $_POST['removed_items_generated_id'] ?? [];
 
 $configsToSave = [];
 foreach ($names as $i => $name) {
+    $name = trim($name);
     if (empty($name) && empty($copyFrom[$i])) {
         continue;
     }
 
     $itemConfig = [
         'name'      => $name,
-        'content'   => $contents[$i] ?? '',
+        'content'   => trim($contents[$i] ?? ''),
         'copy_from' => (int)($copyFrom[$i] ?? 0),
         'type'      => (int)($types[$i] ?? 1),
         'itilcategories_id' => (int)($categories[$i] ?? 0),
-        'comment'   => $comments[$i] ?? '',
+        'comment'   => trim($comments[$i] ?? ''),
         'generated_id' => (int)($generated_ids[$i] ?? 0),
     ];
 
@@ -124,21 +125,21 @@ foreach ($names as $i => $name) {
     
     if ($tabnum == 5) {
         $itemConfig['is_active'] = (int)($is_active[$i] ?? 1);
-        $itemConfig['itemtype'] = $itemtype[$i] ?? 'Ticket';
-        $itemConfig['event'] = $event[$i] ?? 'new';
+        $itemConfig['itemtype'] = trim($itemtype[$i] ?? 'Ticket');
+        $itemConfig['event'] = trim($event[$i] ?? 'new');
         $itemConfig['attach_documents'] = (int)($attach_documents[$i] ?? -2);
         $itemConfig['allow_response'] = (int)($allow_response[$i] ?? 1);
         $itemConfig['notificationtemplates_id'] = (int)($notiftpl_id[$i] ?? 0);
-        $itemConfig['target'] = $target_val[$i] ?? '';
-        $itemConfig['exclusion'] = $exclusion_val[$i] ?? '';
+        $itemConfig['target'] = trim($target_val[$i] ?? '');
+        $itemConfig['exclusion'] = trim($exclusion_val[$i] ?? '');
     }
 
     if ($tabnum == 6) {
         $itemConfig['is_active'] = (int)($is_active[$i] ?? 1);
-        $itemConfig['description'] = $descriptions[$i] ?? '';
+        $itemConfig['description'] = trim($descriptions[$i] ?? '');
         $itemConfig['forms_categories_id'] = (int)($forms_categories_id[$i] ?? 0);
         // Mantém a ilustração escolhida ao salvar ou aplicar a padronização.
-        $itemConfig['illustration'] = $illustrations[$i] ?? 'request-service';
+        $itemConfig['illustration'] = trim($illustrations[$i] ?? 'request-service');
     }
 
     $configsToSave[] = $itemConfig;

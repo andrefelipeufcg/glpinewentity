@@ -38,6 +38,27 @@ class Sector extends SectorBase {
         parent::__construct();
     }
 
+    private static function trimSectorFields(array $input): array|false {
+        foreach (['sector_name', 'sector_abbr'] as $field) {
+            if (isset($input[$field]) && is_string($input[$field])) {
+                $input[$field] = trim($input[$field]);
+                if ($input[$field] === '') {
+                    Session::addMessageAfterRedirect(__('O nome do setor e a sigla são obrigatórios.', 'glpinewentity'), false, ERROR);
+                    return false;
+                }
+            }
+        }
+        return $input;
+    }
+
+    public function prepareInputForAdd($input) {
+        return self::trimSectorFields(parent::prepareInputForAdd($input));
+    }
+
+    public function prepareInputForUpdate($input) {
+        return self::trimSectorFields(parent::prepareInputForUpdate($input));
+    }
+
     /**
      * Valida se o perfil ativo do usuário atual é um perfil de Super-Admin
      * nativo do GLPI (id 4 ou perfis criados a partir dele marcados internamente).
@@ -2150,7 +2171,7 @@ TWIG);
                         picker.select2({
                             width: '100%',
                             placeholder: picker.data('placeholder'),
-                            closeOnSelect: false,
+                            closeOnSelect: true,
                             minimumInputLength: 2,
                             ajax: {
                                 url: emailSearchUrl,
@@ -2176,6 +2197,7 @@ TWIG);
 
                         picker.on('select2:select', function() {
                             picker.next('.select2-container').find('.select2-search__field').val('');
+                            picker.select2('close');
                         });
 
                         const initialEmails = splitEmailList(values.val());
@@ -2231,6 +2253,10 @@ TWIG);
                                 }
                             });
                             picker.val(selected).trigger('change');
+                            if (found.length) {
+                                picker.next('.select2-container').find('.select2-search__field').val('');
+                                picker.select2('close');
+                            }
 
                             const rejected = pastedEmails.filter(function(email) {
                                 return !foundByEmail[email.toLowerCase()];

@@ -1024,7 +1024,6 @@ class Wizard {
                 }
             }
 
-            $sectorAbbr = $input['sector_abbr'] ?? '';
             $result['groups'] = [['id' => $parentGroupId, 'name' => "({$sectorAbbr})"]];
             $result['technicians'] = [];
 

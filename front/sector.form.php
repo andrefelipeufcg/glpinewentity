@@ -58,6 +58,13 @@ if ($sectorId > 0) {
 if (isset($_POST['process_wizard'])) {
     Session::checkValidSessionId();
     Session::setActiveTab(Sector::class, Sector::class . '$main');
+    $sectorName = trim($_POST['sector_name'] ?? '');
+    $sectorAbbr = trim($_POST['sector_abbr'] ?? '');
+    if (empty($sectorName) || empty($sectorAbbr)) {
+        Session::addMessageAfterRedirect(__('O nome do setor e a sigla são obrigatórios.', 'glpinewentity'), false, ERROR);
+        $formUrl = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php';
+        Html::redirect($formUrl . ($isEdit ? '?id=' . $sectorId : ''));
+    }
     if ($isEdit) {
         Session::checkRight("plugin_glpinewentity", UPDATE);
 
@@ -81,8 +88,8 @@ if (isset($_POST['process_wizard'])) {
         $sectorSaved = $sectorObj->update([
             'id' => $sectorId,
             'entities_id' => (int) $_POST['parent_entity'],
-            'sector_name' => $_POST['sector_name'],
-            'sector_abbr' => $_POST['sector_abbr'],
+            'sector_name' => $sectorName,
+            'sector_abbr' => $sectorAbbr,
             'metadata' => json_encode($result)
         ]);
 
@@ -110,8 +117,8 @@ if (isset($_POST['process_wizard'])) {
         if (empty($result['errors']) && !empty($result['entity_id'])) {
             $newSectorId = $sectorObj->add([
                 'entities_id' => (int)$_POST['parent_entity'],
-                'sector_name' => $_POST['sector_name'],
-                'sector_abbr' => $_POST['sector_abbr'],
+                'sector_name' => $sectorName,
+                'sector_abbr' => $sectorAbbr,
                 'metadata' => json_encode($result)
             ]);
             if (!$newSectorId) {
@@ -126,8 +133,8 @@ if (isset($_POST['process_wizard'])) {
             if (!empty($result['entity_id'])) {
                 $newSectorId = $sectorObj->add([
                     'entities_id' => (int)$_POST['parent_entity'],
-                    'sector_name' => $_POST['sector_name'],
-                    'sector_abbr' => $_POST['sector_abbr'],
+                    'sector_name' => $sectorName,
+                    'sector_abbr' => $sectorAbbr,
                     'metadata' => json_encode($result)
                 ]);
                 foreach ($result['errors'] as $err) {
