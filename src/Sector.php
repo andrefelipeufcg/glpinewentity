@@ -529,7 +529,7 @@ class Sector extends SectorBase {
         $ajax_generate_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/generate_configs.php';
 
         echo "<div class='center' style='margin-top: 20px;'>";
-        echo "<form id='form_configs_tab_{$tabnum}'>";
+        echo "<form id='form_configs_tab_{$tabnum}' data-track-changes='true' data-glpinewentity-track='true'>";
         echo "<input type='hidden' name='action' value='save_draft'>";
         echo "<input type='hidden' name='sector_id' value='{$item->getID()}'>";
         echo "<input type='hidden' name='tabnum' value='{$tabnum}'>";
@@ -682,6 +682,7 @@ class Sector extends SectorBase {
             selects.find('option').removeAttr('data-select2-id');
 
             container.append(template);
+            glpinewentityUnsaved.mark(document.getElementById('form_configs_tab_' + tabnum));
             
             // Inicializa Select2
             template.find('.select2-copy-from').select2({ width: '100%' });
@@ -770,6 +771,7 @@ class Sector extends SectorBase {
 
         $(document).on('click', '.btn-remove-config', function() {
             let block = $(this).closest('.config-block');
+            glpinewentityUnsaved.mark(block.closest('form').get(0));
             let generatedId = parseInt(block.find('.input-generated-id').val(), 10) || 0;
             let tabnum = $('#form_configs_tab_6').length ? 6 : 0;
             if (tabnum === 6 && generatedId > 0) {
@@ -996,6 +998,8 @@ class Sector extends SectorBase {
                 confirmMsg = 'Atenção! O salvamento irá criar, atualizar e remover formulários conforme as seguintes configurações:\\nFormulários não gerenciados pelo plugin (externos) que forem removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos desta tela serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\\nDeseja prosseguir com a sincronização?';
             }
             if(confirm(confirmMsg)) {
+                const form = document.getElementById('form_configs_tab_' + tabnum);
+                if (!glpinewentityUnsaved.confirmOtherChanges(form)) return;
                 
                 let btn = $('#btn_generate_' + tabnum);
                 let originalHtml = btn.html();
@@ -1007,6 +1011,7 @@ class Sector extends SectorBase {
                     tinymce.triggerSave();
                 }
                 let formData = $('#form_configs_tab_' + tabnum).serialize();
+                const savedRevision = glpinewentityUnsaved.snapshot();
                 $.ajax({
                     url: '{$ajax_save_url}',
                     type: 'POST',
@@ -1023,6 +1028,7 @@ class Sector extends SectorBase {
                                 },
                                 success: function(genResp) {
                                     if(genResp.success) {
+                                        glpinewentityUnsaved.clearThrough(savedRevision);
                                         window.location.reload();
                                     } else {
                                         btn.prop('disabled', false).html(originalHtml);
@@ -1757,7 +1763,7 @@ TWIG);
         // FORMULÁRIO WIZARD
         // =====================================================================
 
-        echo "<form method='post' action='" . $form_url . "' id='form_wizard' data-email-search-url='" . htmlspecialchars($ajax_user_email_url, ENT_QUOTES) . "'>";
+        echo "<form method='post' action='" . $form_url . "' id='form_wizard' data-track-changes='true' data-glpinewentity-track='true' data-email-search-url='" . htmlspecialchars($ajax_user_email_url, ENT_QUOTES) . "'>";
         echo "<input type='hidden' name='_glpi_csrf_token' value='" . \Session::getNewCSRFToken() . "'>";
         echo "<input type='hidden' name='process_wizard' value='1'>";
         if ($isEdit) {
@@ -2209,7 +2215,9 @@ TWIG);
                                 accepted.forEach(function(item) {
                                     picker.append(new Option(item.text, item.id, true, true));
                                 });
-                                picker.val(accepted.map(function(item) { return item.id; })).trigger('change');
+                                const acceptedEmails = accepted.map(function(item) { return item.id; });
+                                values.val(acceptedEmails.join('\\n'));
+                                picker.val(acceptedEmails).trigger('change.select2');
                             }).always(function() {
                                 pendingEmailRequests--;
                             });
@@ -2339,6 +2347,7 @@ TWIG);
                         let match = block.find('input.sg-name-input').attr('name').match(/\d+/);
                         let removedIndex = match ? match[0] : null;
                         block.remove();
+                        glpinewentityUnsaved.mark(document.getElementById('form_wizard'));
                         updateAllParentCombos(removedIndex);
                     });
 
@@ -2403,6 +2412,7 @@ TWIG);
                         // Evento de remoção agora é delegado globalmente
                         
                         container.append(newBlock);
+                        glpinewentityUnsaved.mark(document.getElementById('form_wizard'));
                         initEmailPicker(emailSelect);
                         index++;
                         updateAllParentCombos();
@@ -2421,7 +2431,7 @@ TWIG);
                         updateAllParentCombos();
                     });
                     // Inicializa ao carregar (se houver valor padrão)
-                    $('input[name=\'sector_abbr\']').trigger('input');
+                    $('input[name=\'sector_abbr\']').triggerHandler('input');
 
                     // Inicializa o select2 explicitamente com 100% de largura
                     $('.profile-select2').select2({ width: '100%' });
@@ -2444,6 +2454,7 @@ TWIG);
                             }).attr('data-profile-name', block.attr('data-existing-profile-name')).appendTo('#removed-profiles');
                         }
                         block.remove();
+                        glpinewentityUnsaved.mark(document.getElementById('form_wizard'));
                         syncCustomProfileDefaults();
                     });
 
@@ -2509,6 +2520,7 @@ TWIG);
                         selectEl.find('option').removeAttr('data-select2-id');
 
                         container.append(newBlock);
+                        glpinewentityUnsaved.mark(document.getElementById('form_wizard'));
                         syncCustomProfileDefaults();
                         initEmailPicker(emailSelect);
 
@@ -2612,6 +2624,10 @@ TWIG);
                             return $(this).attr('data-profile-name');
                         }).get();
                         if (removedProfiles.length && !confirm('Atenção: ao salvar, os perfis abaixo serão excluídos do GLPI, incluindo seus vínculos com usuários em todas as entidades:\\n\\n' + removedProfiles.join('\\n') + '\\n\\nDeseja continuar?')) {
+                            e.preventDefault();
+                            return false;
+                        }
+                        if (!glpinewentityUnsaved.confirmOtherChanges(this)) {
                             e.preventDefault();
                             return false;
                         }

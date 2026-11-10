@@ -175,6 +175,8 @@ Html::header(
     strtolower(Menu::class)
 );
 
+echo Html::script(\Plugin::getPhpDir('glpinewentity', false) . '/js/unsaved-changes.js', [], false);
+
 $options = ['id' => $sectorId];
 if ($sectorId > 0 && isset($sectorObj->fields['metadata'])) {
     $meta = json_decode($sectorObj->fields['metadata'], true);
