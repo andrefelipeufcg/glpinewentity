@@ -18,6 +18,29 @@ use User;
 
 class Wizard {
 
+    private static function checkProfileReauthentication(): void {
+        if (method_exists(Profile_User::class, 'isUserReauthenticationNeeded')
+            && Profile_User::isUserReauthenticationNeeded()) {
+            Profile_User::redirectToReauthPrompt();
+        }
+    }
+
+    private static function canCreateProfileLink(Profile_User $profileUser, array &$input, array &$errors, string $profileName, string $email): bool {
+        $reauthNeeded = null;
+        if (method_exists(Profile_User::class, 'redirectToReauthPrompt')) {
+            $allowed = $profileUser->can(-1, CREATE, $input, $reauthNeeded);
+        } else {
+            $allowed = $profileUser->can(-1, CREATE, $input);
+        }
+        if (!$allowed) {
+            $message = $reauthNeeded
+                ? __('É necessário confirmar sua identidade para atribuir o perfil \'%1$s\' ao usuário \'%2$s\'. Tente salvar novamente.', 'glpinewentity')
+                : __('Você não tem permissão para atribuir o perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity');
+            $errors[] = sprintf($message, htmlspecialchars($profileName, ENT_QUOTES), htmlspecialchars($email, ENT_QUOTES));
+        }
+        return $allowed;
+    }
+
     private static function getDefaultProfileSelection(array $input) {
         $selected = $input['default_profile'] ?? [];
         if (!is_array($selected)) {
@@ -284,6 +307,8 @@ class Wizard {
             return $result;
         }
 
+        self::checkProfileReauthentication();
+
         $entityId = $entity->add([
             'name'        => $entityName,
             'entities_id' => $parentEntity,
@@ -418,8 +443,7 @@ class Wizard {
                 ];
 
                 $profileUser = new Profile_User();
-                if (!$profileUser->can(-1, CREATE, $puInput)) {
-                    $result['errors'][] = sprintf(__('Você não tem permissão para atribuir o perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
+                if (!self::canCreateProfileLink($profileUser, $puInput, $result['errors'], $assignment['new_name'], $userEmail)) {
                     continue;
                 }
 
@@ -683,6 +707,8 @@ class Wizard {
             return $result;
         }
 
+        self::checkProfileReauthentication();
+
         $removedProfiles = self::validateRemovedProfiles($input, (int)$entityId, $result['errors']);
         if ($result['errors']) {
             $result['_invalid_removed_profiles'] = true;
@@ -930,12 +956,16 @@ class Wizard {
                 $puId = $existingUsers[$userToAssign['id']] ?? 0;
                 if (!$puId) {
                     $profileUser = new Profile_User();
-                    $puId = $profileUser->add([
+                    $puInput = [
                         'users_id'     => $userToAssign['id'],
                         'profiles_id'  => $profileId,
                         'entities_id'  => $entityId,
                         'is_recursive' => 1,
-                    ]);
+                    ];
+                    if (!self::canCreateProfileLink($profileUser, $puInput, $result['errors'], $newName, $userToAssign['email'])) {
+                        continue;
+                    }
+                    $puId = $profileUser->add($puInput);
                 }
                 if (!$puId) {
                     $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userToAssign['email'], ENT_QUOTES));
