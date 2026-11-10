@@ -17,6 +17,122 @@ use ITILCategory;
 use User;
 
 class Wizard {
+
+    private static function getDefaultProfileSelection(array $input) {
+        $selected = $input['default_profile'] ?? [];
+        if (!is_array($selected) || count($selected) > 1) {
+            return false;
+        }
+        if (!$selected) {
+            return null;
+        }
+        $selection = reset($selected);
+        if (!is_string($selection)) {
+            return false;
+        }
+        if ($selection === 'admin' || $selection === 'support') {
+            $profile = $input['copy_profile_' . $selection] ?? null;
+            $users = $input['users_profile_' . $selection] ?? null;
+        } elseif (preg_match('/^custom:(0|[1-9][0-9]*)$/D', $selection, $matches)) {
+            $index = (int)$matches[1];
+            $profiles = $input['copy_profile_custom'] ?? null;
+            $names = $input['name_profile_custom'] ?? null;
+            $userLists = $input['users_profile_custom'] ?? null;
+            if (!is_array($profiles) || !is_array($names) || !is_array($userLists)
+                || !isset($profiles[$index], $names[$index], $userLists[$index])
+                || !is_string($names[$index]) || trim($names[$index]) === '') {
+                return false;
+            }
+            $profile = $profiles[$index];
+            $users = $userLists[$index];
+        } else {
+            return false;
+        }
+        if (!is_scalar($profile) || (int)$profile <= 0 || !is_string($users) || trim($users) === '') {
+            return false;
+        }
+        return $selection;
+    }
+
+    private static function validateRemovedProfiles(array $input, int $entityId, array &$errors, bool $allowReauthRedirect = true): array {
+        global $DB;
+        $ids = $input['removed_profile_ids'] ?? [];
+        if (!is_array($ids)) {
+            $errors[] = __('Lista de perfis a excluir inválida.', 'glpinewentity');
+            return [];
+        }
+        $names = array_merge(
+            is_array($input['profiles_default'] ?? null) ? $input['profiles_default'] : [],
+            is_array($input['name_profile_custom'] ?? null) ? $input['name_profile_custom'] : []
+        );
+        $sources = array_merge(
+            [$input['copy_profile_admin'] ?? 0, $input['copy_profile_support'] ?? 0],
+            is_array($input['copy_profile_custom'] ?? null) ? $input['copy_profile_custom'] : []
+        );
+        $profiles = [];
+        foreach ($ids as $rawId) {
+            if (!is_scalar($rawId) || !preg_match('/^[1-9][0-9]*$/D', (string)$rawId)) {
+                $errors[] = __('Identificador de perfil a excluir inválido.', 'glpinewentity');
+                continue;
+            }
+            $id = (int)$rawId;
+            if (isset($profiles[$id])) {
+                continue;
+            }
+            $profile = new Profile();
+            if (!$profile->getFromDB($id) || !Profile::currentUserHaveMoreRightThan([$id])
+                || self::isSuperAdminProfile($id)) {
+                $errors[] = sprintf(__('Não é permitido excluir o perfil #%d.', 'glpinewentity'), $id);
+                continue;
+            }
+            $name = $profile->fields['name'] ?? '';
+            if (str_ends_with($name, ' - Admin') || str_ends_with($name, ' - Atendimento')) {
+                $errors[] = sprintf(__('O perfil padrão \'%s\' não pode ser removido.', 'glpinewentity'), htmlspecialchars($name, ENT_QUOTES));
+                continue;
+            }
+            $linked = $DB->request([
+                'SELECT' => 'id',
+                'FROM' => 'glpi_profiles_users',
+                'WHERE' => ['profiles_id' => $id, 'entities_id' => $entityId],
+                'LIMIT' => 1,
+            ]);
+            if (count($linked) === 0) {
+                $errors[] = sprintf(__('O perfil #%d não está vinculado à entidade deste setor.', 'glpinewentity'), $id);
+                continue;
+            }
+            $reauthNeeded = false;
+            if (method_exists(Profile::class, 'redirectToReauthPrompt')) {
+                $profileInput = null;
+                $reauthNeeded = null;
+                $canPurge = $profile->can($id, PURGE, $profileInput, $reauthNeeded);
+            } else {
+                $canPurge = $profile->can($id, PURGE);
+            }
+            if (!$canPurge) {
+                if ($reauthNeeded && $allowReauthRedirect) {
+                    Profile::redirectToReauthPrompt();
+                }
+                $errors[] = $reauthNeeded
+                    ? __('É necessário confirmar sua identidade para excluir perfis. Tente salvar novamente.', 'glpinewentity')
+                    : sprintf(__('Você não tem permissão para excluir o perfil #%d.', 'glpinewentity'), $id);
+                continue;
+            }
+            foreach ($sources as $source) {
+                if (is_scalar($source) && (int)$source === $id) {
+                    $errors[] = sprintf(__('O perfil \'%s\' ainda está selecionado como origem de outro perfil.', 'glpinewentity'), htmlspecialchars($name, ENT_QUOTES));
+                    continue 2;
+                }
+            }
+            foreach ($names as $retainedName) {
+                if (is_string($retainedName) && strcasecmp(trim($retainedName), $name) === 0) {
+                    $errors[] = sprintf(__('O perfil \'%s\' ainda está presente no formulário.', 'glpinewentity'), htmlspecialchars($name, ENT_QUOTES));
+                    continue 2;
+                }
+            }
+            $profiles[$id] = $name;
+        }
+        return $profiles;
+    }
     
     /**
      * Verifica dinamicamente se um perfil possui poderes de configuração globais (Super-Admin)
@@ -70,6 +186,12 @@ class Wizard {
             'categories'     => [],
             'errors'         => [],
         ];
+
+        $defaultProfile = self::getDefaultProfileSelection($input);
+        if ($defaultProfile === false) {
+            $result['errors'][] = __('Selecione no máximo um perfil válido com usuários para definir como padrão.', 'glpinewentity');
+            return $result;
+        }
 
         // ── Sanitização dos inputs ──
         $sectorName   = trim($input['sector_name'] ?? '');
@@ -167,6 +289,7 @@ class Wizard {
         if (!empty($input['copy_profile_admin']) && $input['copy_profile_admin'] > 0 && !empty(trim($input['users_profile_admin'] ?? ''))) {
             $profileAssignments[] = [
                 'source_profile_id' => (int)$input['copy_profile_admin'],
+                'is_default'        => $defaultProfile === 'admin',
                 'new_name'          => trim($profileNames[0] ?? ($sectorAbbr . ' - Admin')),
                 'users'             => trim($input['users_profile_admin']),
                 'label'             => 'Admin'
@@ -176,6 +299,7 @@ class Wizard {
         if (!empty($input['copy_profile_support']) && $input['copy_profile_support'] > 0 && !empty(trim($input['users_profile_support'] ?? ''))) {
             $profileAssignments[] = [
                 'source_profile_id' => (int)$input['copy_profile_support'],
+                'is_default'        => $defaultProfile === 'support',
                 'new_name'          => trim($profileNames[1] ?? ($sectorAbbr . ' - Atendimento')),
                 'users'             => trim($input['users_profile_support']),
                 'label'             => 'Atendimento'
@@ -188,6 +312,7 @@ class Wizard {
                     $customName = trim($input['name_profile_custom'][$idx] ?? ('Customizado ' . ($idx + 1)));
                     $profileAssignments[] = [
                         'source_profile_id' => (int)$pId,
+                        'is_default'        => $defaultProfile === 'custom:' . $idx,
                         'new_name'          => $customName,
                         'users'             => trim($input['users_profile_custom'][$idx]),
                         'label'             => 'Customizado ' . ($idx + 1)
@@ -226,6 +351,9 @@ class Wizard {
                 'id'   => $newProfileId,
                 'name' => $assignment['new_name'],
             ];
+            if ($assignment['is_default']) {
+                $result['default_profile_id'] = $newProfileId;
+            }
 
             // Associar usuários ao NOVO perfil na entidade criada
             $usersList = array_filter(array_map('trim', preg_split('/[\n,;]+/', $assignment['users'])));
@@ -264,15 +392,16 @@ class Wizard {
 
                 if (!$puId) {
                     $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userEmail, ENT_QUOTES));
-                } else {
+                } elseif ($assignment['is_default']) {
                     // Define a nova entidade e o perfil atrelado como os padrões do usuário nas preferências.
-                    // Se o usuário passar por várias atribuições em diferentes blocos (Admin, Atendimento, etc.), o último será o padrão definitivo.
                     $userObj = new User();
-                    $userObj->update([
+                    if (!$userObj->update([
                         'id'          => $userId,
                         'entities_id' => $entityId,
                         'profiles_id' => $newProfileId
-                    ]);
+                    ])) {
+                        $result['errors'][] = sprintf(__('Não foi possível definir o perfil padrão para o usuário \'%s\'.', 'glpinewentity'), htmlspecialchars($userEmail, ENT_QUOTES));
+                    }
                 }
             }
         }
@@ -478,6 +607,12 @@ class Wizard {
         $result = json_decode($existingFields['metadata'] ?? '{}', true) ?: [];
         // Limpa erros antigos carregados do metadata
         $result['errors'] = [];
+        $defaultProfile = self::getDefaultProfileSelection($input);
+        if ($defaultProfile === false) {
+            $result['errors'][] = __('Selecione no máximo um perfil válido com usuários para definir como padrão.', 'glpinewentity');
+            $result['_invalid_default_profile'] = true;
+            return $result;
+        }
         
         $sectorName   = trim($input['sector_name'] ?? '');
         $sectorAbbr   = trim($input['sector_abbr'] ?? '');
@@ -517,6 +652,12 @@ class Wizard {
         $entity = new Entity();
         if (!$entity->getFromDB($entityId)) {
             $result['errors'][] = __('A entidade gerenciada não foi encontrada. A edição foi cancelada para evitar vínculos inconsistentes.', 'glpinewentity');
+            return $result;
+        }
+
+        $removedProfiles = self::validateRemovedProfiles($input, (int)$entityId, $result['errors']);
+        if ($result['errors']) {
+            $result['_invalid_removed_profiles'] = true;
             return $result;
         }
 
@@ -600,11 +741,13 @@ class Wizard {
         // =================================================================
         $profileNames = $input['profiles_default'] ?? [];
         $profileAssignments = [];
+        unset($result['default_profile_id']);
 
         // Admin
         if (!empty($input['copy_profile_admin']) && $input['copy_profile_admin'] > 0) {
             $profileAssignments[] = [
                 'source_profile_id' => (int)$input['copy_profile_admin'],
+                'is_default'        => $defaultProfile === 'admin',
                 'new_name'          => trim($profileNames[0] ?? ($sectorAbbr . ' - Admin')),
                 'users'             => trim($input['users_profile_admin'] ?? ''),
                 'label'             => 'Admin'
@@ -614,6 +757,7 @@ class Wizard {
         if (!empty($input['copy_profile_support']) && $input['copy_profile_support'] > 0) {
             $profileAssignments[] = [
                 'source_profile_id' => (int)$input['copy_profile_support'],
+                'is_default'        => $defaultProfile === 'support',
                 'new_name'          => trim($profileNames[1] ?? ($sectorAbbr . ' - Atendimento')),
                 'users'             => trim($input['users_profile_support'] ?? ''),
                 'label'             => 'Atendimento'
@@ -626,6 +770,7 @@ class Wizard {
                     $customName = trim($input['name_profile_custom'][$idx] ?? ('Customizado ' . ($idx + 1)));
                     $profileAssignments[] = [
                         'source_profile_id' => (int)$pId,
+                        'is_default'        => $defaultProfile === 'custom:' . $idx,
                         'new_name'          => $customName,
                         'users'             => trim($input['users_profile_custom'][$idx] ?? ''),
                         'label'             => 'Customizado ' . ($idx + 1)
@@ -692,6 +837,9 @@ class Wizard {
                 'id'   => $profileId,
                 'name' => $newName,
             ];
+            if ($assignment['is_default']) {
+                $result['default_profile_id'] = $profileId;
+            }
 
             // Separa e-mails válidos para não descartar os demais por um erro isolado.
             $usersToAssign = [];
@@ -710,17 +858,17 @@ class Wizard {
                         continue;
                     }
 
-                    $usersToAssign[] = [
+                    $usersToAssign[$userId] = [
                         'id' => $userId,
                         'email' => $userEmail,
                     ];
                 }
             }
 
-            // Sincronizar usuários: remover os antigos da entidade e adicionar os novos.
+            // Preserva vínculos existentes para não alterar as preferências dos usuários.
             global $DB;
             $iterator = $DB->request([
-                'SELECT' => 'id',
+                'SELECT' => ['id', 'users_id', 'is_recursive'],
                 'FROM'   => 'glpi_profiles_users',
                 'WHERE'  => [
                     'profiles_id' => $profileId,
@@ -728,29 +876,42 @@ class Wizard {
                 ]
             ]);
             $profileUser = new Profile_User();
+            $existingUsers = [];
             foreach ($iterator as $row) {
-                $profileUser->delete(['id' => $row['id']]);
+                $existingUserId = (int)$row['users_id'];
+                if (isset($usersToAssign[$existingUserId])) {
+                    $existingUsers[$existingUserId] = true;
+                    if (empty($row['is_recursive']) && !$profileUser->update(['id' => $row['id'], 'is_recursive' => 1])) {
+                        $result['errors'][] = sprintf(__('Falha ao tornar recursivo o vínculo de perfil do usuário #%d.', 'glpinewentity'), $existingUserId);
+                    }
+                } elseif (!$profileUser->delete(['id' => $row['id']])) {
+                    $result['errors'][] = sprintf(__('Falha ao remover o vínculo de perfil do usuário #%d.', 'glpinewentity'), $existingUserId);
+                }
             }
 
             foreach ($usersToAssign as $userToAssign) {
-                $profileUser = new Profile_User();
-                $puId = $profileUser->add([
-                    'users_id'     => $userToAssign['id'],
-                    'profiles_id'  => $profileId,
-                    'entities_id'  => $entityId,
-                    'is_recursive' => 1,
-                ]);
+                $puId = isset($existingUsers[$userToAssign['id']]);
+                if (!$puId) {
+                    $profileUser = new Profile_User();
+                    $puId = $profileUser->add([
+                        'users_id'     => $userToAssign['id'],
+                        'profiles_id'  => $profileId,
+                        'entities_id'  => $entityId,
+                        'is_recursive' => 1,
+                    ]);
+                }
                 if (!$puId) {
                     $result['errors'][] = sprintf(__('Falha ao atribuir perfil \'%1$s\' ao usuário \'%2$s\'.', 'glpinewentity'), htmlspecialchars($assignment['new_name'], ENT_QUOTES), htmlspecialchars($userToAssign['email'], ENT_QUOTES));
-                } else {
+                } elseif ($assignment['is_default']) {
                     // Define a nova entidade e o perfil atrelado como os padrões do usuário nas preferências.
-                    // Se o usuário passar por várias atribuições em diferentes blocos (Admin, Atendimento, etc.), o último será o padrão definitivo.
                     $userObj = new User();
-                    $userObj->update([
+                    if (!$userObj->update([
                         'id'          => $userToAssign['id'],
                         'entities_id' => $entityId,
                         'profiles_id' => $profileId
-                    ]);
+                    ])) {
+                        $result['errors'][] = sprintf(__('Não foi possível definir o perfil padrão para o usuário \'%s\'.', 'glpinewentity'), htmlspecialchars($userToAssign['email'], ENT_QUOTES));
+                    }
                 }
             }
         }
@@ -906,6 +1067,25 @@ class Wizard {
 
         if ($oldCatString !== $newCatString) {
             self::reconcileCategories((int)$entityId, $newCatString, $result);
+        }
+
+        if (!$result['errors']) {
+            $removedProfiles = self::validateRemovedProfiles($input, (int)$entityId, $result['errors'], false);
+            if ($result['errors']) {
+                $result['errors'][] = __('Os perfis solicitados não foram excluídos.', 'glpinewentity');
+            }
+            foreach ($removedProfiles as $id => $name) {
+                if ($result['errors']) {
+                    break;
+                }
+                $profile = new Profile();
+                if (!$profile->can($id, PURGE) || self::isSuperAdminProfile($id)
+                    || !$profile->delete(['id' => $id], true)) {
+                    $result['errors'][] = sprintf(__('Não foi possível excluir o perfil \'%s\'.', 'glpinewentity'), htmlspecialchars($name, ENT_QUOTES));
+                }
+            }
+        } elseif ($removedProfiles) {
+            $result['errors'][] = __('Os perfis solicitados não foram excluídos porque houve erros ao salvar a estrutura.', 'glpinewentity');
         }
 
         return $result;

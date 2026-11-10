@@ -20,6 +20,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 *   **Criação Rápida de Entidade:** Cria imediatamente uma nova entidade sob uma entidade-pai escolhida.
 *   **Clonagem de Perfis Nativos:** Permite selecionar perfis preexistentes suportados (como Admin ou Atendimento) e cloná-los, nomeando-os automaticamente com o prefixo da sigla do novo setor (Ex: `[DC] - Admin`). Perfis com privilégios globais (Super-Admin) são intencionalmente bloqueados por segurança.
 *   **Vinculação Direta por E-mail:** Basta colar uma lista de e-mails, separados por vírgula ou quebra de linha. O plugin busca o usuário no banco de dados e automaticamente vincula o perfil à nova entidade em escopo recursivo.
+    *   Opcionalmente, ative **Este deve ser o Perfil Padrão destes usuários** em um único perfil para definir esse perfil e a nova entidade como padrões dos usuários vinculados. Sem seleção, as preferências existentes são mantidas para os vínculos preservados.
 *   **Gerenciamento Inteligente de Grupos e Subgrupos:**
     *   Cria automaticamente um "Grupo Pai" nomeado com a sigla do setor `(SIGLA)`.
     *   Permite a criação de múltiplos Subgrupos aninhados de forma dinâmica.
@@ -67,6 +68,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 ![Preenchimento do Wizard](./docs/images/screenshot4.png)
    *   **Entidade-Pai e Sigla:** Indique a localização na árvore corporativa e a sigla (que dará nome à entidade e aos grupos).
    *   **Perfis:** Determine de onde clonar o perfil e quais os e-mails dos encarregados daquele setor para herdarem esse acesso de forma recursiva.
+       Na edição, remover um perfil adicional e salvar exclui o perfil do GLPI e seus vínculos em todas as entidades, após confirmação. Perfis padrão do assistente não podem ser removidos.
    *   **Subgrupos e Técnicos:** Adicione quantos subgrupos precisar, e cole todos os e-mails dos técnicos responsáveis.
    *   **Catálogo (Categorias):** Cole ou escreva sua árvore de categorias usando "-" para subníveis.
 6. Clique em **Salvar**.

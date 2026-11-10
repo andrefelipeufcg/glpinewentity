@@ -69,6 +69,13 @@ if (isset($_POST['process_wizard'])) {
 
         $result = Wizard::processUpdate($_POST, $sectorObj->fields);
 
+        if (!empty($result['_invalid_default_profile']) || !empty($result['_invalid_removed_profiles'])) {
+            foreach ($result['errors'] as $err) {
+                Session::addMessageAfterRedirect($err, false, ERROR);
+            }
+            Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $sectorId);
+        }
+
         // Mantém o formulário e o metadata alinhados aos dados já processados.
         $sectorObj->update([
             'id' => $sectorId,

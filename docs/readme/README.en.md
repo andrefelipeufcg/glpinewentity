@@ -20,6 +20,7 @@ Instead of navigating through several GLPI screens to create entities, configure
 *   **Fast Entity Creation:** Instantly creates a new entity under a chosen parent entity.
 *   **Native Profile Cloning:** Allows you to select supported pre-existing profiles (such as Admin or Technician) and clone them, automatically naming them using the new sector's acronym prefix (e.g., `[DC] - Admin`). Super-Admin profiles are intentionally excluded for security reasons.
 *   **Direct E-mail Linking:** Just paste a list of e-mails, separated by commas or line breaks. The plugin searches for the user in the database and automatically links the profile to the new entity with recursive scope.
+    *   Optionally, enable the default-profile switch on one profile to set that profile and the new entity as defaults for its users. With no selection, existing preferences remain unchanged for retained assignments.
 *   **Smart Group and Subgroup Management:**
     *   Automatically creates a "Parent Group" named with the sector's acronym `(ACRONYM)`.
     *   Allows the dynamic creation of multiple nested Subgroups.
@@ -67,6 +68,7 @@ Instead of navigating through several GLPI screens to create entities, configure
 ![Wizard Filling](../images/screenshot4.png)
    *   **Parent Entity and Acronym:** Indicate the location in the corporate tree and the acronym (which will name the entity and groups).
    *   **Profiles:** Determine where to clone the profile from and the e-mails of the sector managers to inherit this access recursively.
+       When editing, removing an additional profile and saving deletes the GLPI profile and its assignments across all entities, after confirmation. The wizard's standard profiles cannot be removed.
    *   **Subgroups and Technicians:** Add as many subgroups as needed, and paste all the e-mails of the responsible technicians.
    *   **Catalog (Categories):** Paste or write your category tree using "-" for sublevels.
 6. Click **Save**.

@@ -232,6 +232,17 @@ class Sector extends SectorBase {
         return '';
     }
 
+    private static function renderDefaultProfileSwitch(string $value, bool $checked = false, bool $template = false): string {
+        $name = $template ? '' : " name='default_profile[]'";
+        $checkedAttr = $checked ? ' checked' : '';
+        return "<label class='form-check form-switch' style='margin-top: 10px;'>"
+            . "<input class='form-check-input profile-default-switch' type='checkbox'{$name} value='"
+            . htmlspecialchars($value, ENT_QUOTES) . "'{$checkedAttr}>"
+            . "<span class='form-check-label'>"
+            . htmlspecialchars(__('Este deve ser o Perfil Padrão destes usuários', 'glpinewentity'), ENT_QUOTES)
+            . "</span></label>";
+    }
+
     public static function displayTabContentForItem(\CommonGLPI $item, $tabnum = 1, $withtemplate = 0) {
         if ($item->getType() != __CLASS__) {
             return false;
@@ -1503,6 +1514,7 @@ TWIG);
         $def_parent_entity = 0;
         $def_category_names = '';
         $def_subgroups = [];
+        $defaultProfileId = 0;
         // A inclusão usa a mesma estrutura consumida pela edição ao montar os perfis.
         $def_profiles = [
             'admin' => ['id' => 0, 'emails' => []],
@@ -1512,6 +1524,7 @@ TWIG);
 
         if ($isEdit) {
             $meta = json_decode($sectorObj->fields['metadata'], true) ?: [];
+            $defaultProfileId = (int)($meta['default_profile_id'] ?? 0);
             $def_sector_name = $sectorObj->fields['sector_name'];
             $def_sector_abbr = $sectorObj->fields['sector_abbr'];
             $def_parent_entity = $sectorObj->fields['entities_id'];
@@ -1855,6 +1868,7 @@ TWIG);
         $adminEmails = htmlspecialchars(implode("\n", $def_profiles['admin']['emails'] ?? []), ENT_QUOTES);
         echo "    <input type='hidden' name='users_profile_admin' class='email-values' value='{$adminEmails}'>";
         echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
+        echo self::renderDefaultProfileSwitch('admin', $defaultProfileId > 0 && $defaultProfileId === (int)$adminId);
         echo "  </div>";
         echo "</div>";
 
@@ -1887,6 +1901,7 @@ TWIG);
         $supportEmails = htmlspecialchars(implode("\n", $def_profiles['support']['emails'] ?? []), ENT_QUOTES);
         echo "    <input type='hidden' name='users_profile_support' class='email-values' value='{$supportEmails}'>";
         echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
+        echo self::renderDefaultProfileSwitch('support', $defaultProfileId > 0 && $defaultProfileId === (int)$supportId);
         echo "  </div>";
         echo "</div>";
 
@@ -1898,6 +1913,7 @@ TWIG);
 
         echo "<tr class='tab_bg_1'>";
         echo "<td colspan='2' style='padding: 0;'>";
+        echo "<div id='removed-profiles'></div>";
         echo "<div id='profiles-container'>";
 
         // Template oculto para adicionar perfis customizados
@@ -1909,11 +1925,11 @@ TWIG);
         echo "  <div style='display: flex; gap: 10px; align-items: flex-start;'>";
         echo "      <div style='flex: 1;'>";
         echo "          <label style='display: block; margin-bottom: 5px; '>Nome do Perfil</label>";
-        echo "          <input type='text' class='form-control profile-input' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' name='name_profile_custom[]'>";
+        echo "          <input type='text' class='form-control profile-input' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador'>";
         echo "      </div>";
         echo "      <div style='flex: 1;'>";
         echo "          <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
-        echo "          <select name='copy_profile_custom[]' class='form-select profile-select2' style='width: 100%;'>";
+        echo "          <select class='form-select profile-select2' style='width: 100%;'>";
         echo "            <option value='0'>-----</option>";
         foreach ($profiles as $pid => $pname) {
             echo "            <option value='{$pid}'>" . htmlspecialchars($pname) . "</option>";
@@ -1925,16 +1941,17 @@ TWIG);
         echo "      <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
         echo "      <input type='hidden' class='email-values profile-users-input' value=''>";
         echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
+        echo self::renderDefaultProfileSwitch('', false, true);
         echo "  </div>";
         echo "</div>";
 
         // Renderiza perfis customizados existentes na edição
         if (!empty($def_profiles['custom'])) {
-            foreach ($def_profiles['custom'] as $cProf) {
+            foreach ($def_profiles['custom'] as $customIndex => $cProf) {
                 $cEmails = htmlspecialchars(implode("\n", $cProf['emails'] ?? []), ENT_QUOTES);
                 $cId = $cProf['id'];
 
-                echo "<div class='profile-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
+                echo "<div class='profile-block' data-existing-profile-id='" . (int)$cId . "' data-existing-profile-name='" . htmlspecialchars($cProf['name'], ENT_QUOTES) . "' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
                 echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
                 echo "      <strong>Perfil Adicional</strong>";
                 echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-profile' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
@@ -1959,6 +1976,7 @@ TWIG);
                 echo "      <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
                 echo "      <input type='hidden' name='users_profile_custom[]' class='email-values profile-users-input' value='{$cEmails}'>";
                 echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
+                echo self::renderDefaultProfileSwitch('custom:' . $customIndex, $defaultProfileId > 0 && $defaultProfileId === (int)$cId);
                 echo "  </div>";
                 echo "</div>";
             }
@@ -2423,6 +2441,32 @@ TWIG);
                     $('.profile-select2').select2({ width: '100%' });
 
                     // ── Lógica para Adicionar Perfis Customizados ──
+                    function syncCustomProfileDefaults() {
+                        $('#profiles-container .profile-block:not(.template)').each(function(index) {
+                            $(this).find('.profile-default-switch').val('custom:' + index);
+                        });
+                    }
+
+                    $('#form_wizard').on('change', '.profile-default-switch', function() {
+                        if (this.checked) {
+                            $('#form_wizard .profile-default-switch').not(this).prop('checked', false);
+                        }
+                    });
+
+                    $('#profiles-container').on('click', '.btn-remove-profile', function() {
+                        const block = $(this).closest('.profile-block');
+                        const profileId = block.attr('data-existing-profile-id');
+                        if (profileId) {
+                            $('<input>', {
+                                type: 'hidden',
+                                name: 'removed_profile_ids[]',
+                                value: profileId
+                            }).attr('data-profile-name', block.attr('data-existing-profile-name')).appendTo('#removed-profiles');
+                        }
+                        block.remove();
+                        syncCustomProfileDefaults();
+                    });
+
                     $('#btn-add-profile').on('click', function() {
                         if (pendingEmailRequests > 0) {
                             alert('Aguarde a validação dos e-mails cadastrados no GLPI antes de adicionar um novo perfil.');
@@ -2460,6 +2504,7 @@ TWIG);
                         newBlock.css('display', 'block');
                         newBlock.find('.profile-input').attr('name', 'name_profile_custom[]');
                         newBlock.find('.profile-users-input').attr('name', 'users_profile_custom[]');
+                        newBlock.find('.profile-default-switch').attr('name', 'default_profile[]').prop('checked', false);
                         
                         // Limpa o textarea de usuários
                         newBlock.find('.profile-users-input').val('');
@@ -2469,6 +2514,7 @@ TWIG);
                         
                         // Restaura o select original para inicializar o select2 novamente
                         let selectEl = newBlock.find('select.profile-select2');
+                        selectEl.attr('name', 'copy_profile_custom[]');
                         selectEl.removeClass('select2-hidden-accessible')
                                 .removeAttr('data-select2-id')
                                 .removeAttr('tabindex')
@@ -2482,11 +2528,8 @@ TWIG);
                         selectEl.attr('id', newId).val('0');
                         selectEl.find('option').removeAttr('data-select2-id');
 
-                        newBlock.find('.btn-remove-profile').on('click', function() {
-                            newBlock.remove();
-                        });
-                        
                         container.append(newBlock);
+                        syncCustomProfileDefaults();
                         initEmailPicker(emailSelect);
 
                         // Inicializa select2 no novo dropdown com largura total
@@ -2495,6 +2538,7 @@ TWIG);
 
                     // Validação no Submit do Formulário
                     $('#form_wizard').on('submit', function(e) {
+                        syncCustomProfileDefaults();
                         if (pendingEmailRequests > 0) {
                             e.preventDefault();
                             alert('Aguarde a validação dos e-mails cadastrados no GLPI antes de enviar o formulário.');
@@ -2584,6 +2628,13 @@ TWIG);
                                 }
                             }
                         }                        
+                        const removedProfiles = $('#removed-profiles input').map(function() {
+                            return $(this).attr('data-profile-name');
+                        }).get();
+                        if (removedProfiles.length && !confirm('Atenção: ao salvar, os perfis abaixo serão excluídos do GLPI, incluindo seus vínculos com usuários em todas as entidades:\\n\\n' + removedProfiles.join('\\n') + '\\n\\nDeseja continuar?')) {
+                            e.preventDefault();
+                            return false;
+                        }
                         // Se chegou até aqui, todas as validações passaram.
                         // Troca o texto do botão para Salvando...
                         $('#btn-submit-wizard').html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Salvando...').css('pointer-events', 'none').css('opacity', '0.7');
