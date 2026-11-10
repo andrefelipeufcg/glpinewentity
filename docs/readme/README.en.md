@@ -63,7 +63,7 @@ Instead of navigating through several GLPI screens to create entities, configure
 ![Empty Sector List](../images/screenshot2.png)
 4. Click **Add** (or the "+" button depending on your theme).
 ![Add Button](../images/screenshot3.png)
-5. Follow the Wizard instructions:
+5. Follow the Wizard instructions. The configuration tabs are also visible when adding a sector, but can only be opened after the entity is saved:
 ![Wizard Filling](../images/screenshot4.png)
    *   **Parent Entity and Acronym:** Indicate the location in the corporate tree and the acronym (which will name the entity and groups).
    *   **Profiles:** Determine where to clone the profile from and the e-mails of the sector managers to inherit this access recursively.
@@ -75,7 +75,7 @@ The system will iterate and provision the entire environment, displaying descrip
 
 ![Sector List](../images/screenshot5.png)
 
-7. **Advanced Adjustments and Configurations:** After saving, return to the list and click on the name of the newly created sector to edit it. You will notice that new configuration tabs are now available, allowing you to exclusively customize the entire operation for this entity:
+7. **Advanced Adjustments and Configurations:** After saving, return to the list and click on the name of the newly created sector to edit it. The configuration tabs allow you to exclusively customize the entire operation for this entity:
 
 ![Configuration Tabs](../images/screenshot6.png)
 

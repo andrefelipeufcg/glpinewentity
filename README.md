@@ -63,7 +63,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 ![Lista de Setores Vazia](./docs/images/screenshot2.png)
 4. Clique em **Adicionar** (ou botão "+" dependendo do seu tema).
 ![Botão de Adicionar](./docs/images/screenshot3.png)
-5. Siga as instruções do Wizard:
+5. Siga as instruções do Wizard. As abas de configuração também são exibidas na inclusão, mas só podem ser acessadas depois que a entidade for salva:
 ![Preenchimento do Wizard](./docs/images/screenshot4.png)
    *   **Entidade-Pai e Sigla:** Indique a localização na árvore corporativa e a sigla (que dará nome à entidade e aos grupos).
    *   **Perfis:** Determine de onde clonar o perfil e quais os e-mails dos encarregados daquele setor para herdarem esse acesso de forma recursiva.
@@ -75,7 +75,7 @@ O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descrit
 
 ![Lista de Setores](./docs/images/screenshot5.png)
 
-7. **Ajustes e Configurações Avançadas:** Após salvar, retorne à lista e clique no nome do setor que acabou de criar para editá-lo. Você notará que agora estão disponíveis novas abas de configuração, permitindo personalizar toda a operação de forma exclusiva para esta entidade:
+7. **Ajustes e Configurações Avançadas:** Após salvar, retorne à lista e clique no nome do setor que acabou de criar para editá-lo. As abas de configuração permitem personalizar toda a operação de forma exclusiva para esta entidade:
 
 ![Abas de Configuração](./docs/images/screenshot6.png)
 

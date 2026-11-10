@@ -160,15 +160,62 @@ class Sector extends SectorBase {
     public function defineTabs($options = []) {
         $ong = [];
         $this->addDefaultFormTab($ong); // Aba principal
-        if ($this->fields['id'] > 0) {
-            $ong['GlpiPlugin\Glpinewentity\Sector$1'] = self::createTabEntry(__('Modelos de Chamado', 'glpinewentity'), 0, __CLASS__, 'ti ti-ticket');
-            $ong['GlpiPlugin\Glpinewentity\Sector$2'] = self::createTabEntry(__('Respostas Básicas', 'glpinewentity'), 0, __CLASS__, 'ti ti-messages');
-            $ong['GlpiPlugin\Glpinewentity\Sector$3'] = self::createTabEntry(__('Soluções Básicas', 'glpinewentity'), 0, __CLASS__, 'ti ti-bulb');
-            $ong['GlpiPlugin\Glpinewentity\Sector$4'] = self::createTabEntry(__('Motivos de Pendências', 'glpinewentity'), 0, __CLASS__, 'ti ti-clock-pause');
-            $ong['GlpiPlugin\Glpinewentity\Sector$5'] = self::createTabEntry(__('Notificações', 'glpinewentity'), 0, __CLASS__, 'ti ti-bell');
-            $ong['GlpiPlugin\Glpinewentity\Sector$6'] = self::createTabEntry(__('Formulários', 'glpinewentity'), 0, __CLASS__, 'ti ti-clipboard-list');
+        foreach ($this->getTabNameForItem($this) as $number => $title) {
+            $ong[__CLASS__ . '$' . $number] = $title;
         }
         return $ong;
+    }
+
+    public function showTabsContent($options = []) {
+        if ((int)($options['id'] ?? $this->getID()) > 0) {
+            parent::showTabsContent($options);
+            return;
+        }
+
+        // O GLPI limita itens novos à aba principal em defineAllTabs().
+        $tabs = $this->defineTabs($options);
+        $mainTitle = array_shift($tabs);
+        $tabs[-1] = self::createTabEntry(__('All'), 0, null, 'ti ti-layout-list');
+        $warning = json_encode(
+            __('Salve a entidade primeiro para acessar as outras abas de configuração.', 'glpinewentity'),
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        );
+
+        echo "<div class='d-flex card-tabs flex-column flex-md-row vertical'>";
+        echo "<ul class='nav nav-tabs flex-row flex-md-column d-none d-md-block' id='tabspanel' style='min-width: 200px' role='tablist'>";
+        echo "<li class='nav-item ms-0'><a href='#' class='nav-link justify-content-between pe-1 active' id='glpinewentity-new-main-tab' role='tab' aria-selected='true'>{$mainTitle}</a></li>";
+        foreach ($tabs as $title) {
+            echo "<li class='nav-item ms-0'><a href='#' class='nav-link justify-content-between pe-1' role='tab' aria-selected='false' data-requires-entity>{$title}</a></li>";
+        }
+        echo "</ul>";
+        echo "<select class='form-select border-2 rounded-0 rounded-top d-md-none mb-2' id='glpinewentity-new-tabs-select' aria-label='" . htmlspecialchars(__('Selecionar uma aba', 'glpinewentity'), ENT_QUOTES) . "'>";
+        echo "<option value='main'>" . htmlspecialchars(strip_tags($mainTitle), ENT_QUOTES) . "</option>";
+        foreach ($tabs as $key => $title) {
+            echo "<option value='" . htmlspecialchars((string)$key, ENT_QUOTES) . "'>" . htmlspecialchars(strip_tags($title), ENT_QUOTES) . "</option>";
+        }
+        echo "</select>";
+        echo "<div class='tab-content p-2 flex-grow-1 card border-start-0' style='min-height: 150px'>";
+        echo "<div class='tab-pane active show' role='tabpanel'>";
+        $this->showForm(0, $options);
+        echo "</div></div></div>";
+
+        echo Html::scriptBlock("
+            document.getElementById('glpinewentity-new-main-tab').addEventListener('click', function (event) {
+                event.preventDefault();
+            });
+            document.querySelectorAll('#tabspanel [data-requires-entity]').forEach(function (tab) {
+                tab.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    alert({$warning});
+                });
+            });
+            document.getElementById('glpinewentity-new-tabs-select').addEventListener('change', function () {
+                if (this.value !== 'main') {
+                    this.value = 'main';
+                    alert({$warning});
+                }
+            });
+        ");
     }
 
     public function getTabNameForItem(\CommonGLPI $item, $withtemplate = 0) {
@@ -187,6 +234,13 @@ class Sector extends SectorBase {
 
     public static function displayTabContentForItem(\CommonGLPI $item, $tabnum = 1, $withtemplate = 0) {
         if ($item->getType() != __CLASS__) {
+            return false;
+        }
+        if ((int)$item->getID() <= 0) {
+            echo "<div class='alert alert-warning'>" . htmlspecialchars(
+                __('Salve a entidade primeiro para acessar as abas de configuração.', 'glpinewentity'),
+                ENT_QUOTES
+            ) . "</div>";
             return false;
         }
 
