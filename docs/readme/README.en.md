@@ -67,7 +67,7 @@ Instead of navigating through several GLPI screens to create entities, configure
 5. Follow the Wizard instructions. The configuration tabs are also visible when adding a sector, but can only be opened after the entity is saved:
 ![Wizard Filling](../images/screenshot4.png)
    *   **Parent Entity and Acronym:** Indicate the location in the corporate tree and the acronym (which will name the entity and groups).
-   *   **Profiles:** Determine where to clone the profile from and the e-mails of the sector managers to inherit this access recursively.
+   *   **Profiles:** When creating a profile, select its source and the e-mails of the sector managers to inherit this access recursively. When editing, the source selector is shown only for new profiles.
        When editing, removing an additional profile and saving deletes the GLPI profile and its assignments across all entities, after confirmation. The wizard's standard profiles cannot be removed.
    *   **Subgroups and Technicians:** Add as many subgroups as needed, and paste all the e-mails of the responsible technicians.
    *   **Catalog (Categories):** Paste or write your category tree using "-" for sublevels.

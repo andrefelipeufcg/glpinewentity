@@ -1847,21 +1847,21 @@ TWIG);
         $adminVal = $def_sector_abbr ? htmlspecialchars($def_sector_abbr) . ' - Admin' : '';
         echo "      <input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$adminVal}'>";
         echo "    </div>";
-        echo "    <div style='flex: 1;'>";
-        echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
-        echo "      <select name='copy_profile_admin' class='form-select profile-select2' style='width: 100%;'>";
-        echo "        <option value='0'>-----</option>";
-        $adminId = $def_profiles['admin']['id'] ?? 0;
-        foreach ($profiles as $pid => $pname) {
-            if ($adminId > 0) {
-                $selected = ($pid == $adminId) ? 'selected' : '';
-            } else {
+        $adminId = (int)($def_profiles['admin']['id'] ?? 0);
+        if ($adminId > 0) {
+            echo "    <input type='hidden' name='copy_profile_admin' class='profile-source' value='{$adminId}'>";
+        } else {
+            echo "    <div style='flex: 1;'>";
+            echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
+            echo "      <select name='copy_profile_admin' class='form-select profile-select2 profile-source' style='width: 100%;'>";
+            echo "        <option value='0'>-----</option>";
+            foreach ($profiles as $pid => $pname) {
                 $selected = (strpos($pname, '[Padrão] Admin') !== false) ? 'selected' : '';
+                echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
             }
-            echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
+            echo "      </select>";
+            echo "    </div>";
         }
-        echo "      </select>";
-        echo "    </div>";
         echo "  </div>";
         echo "  <div>";
         echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
@@ -1880,21 +1880,21 @@ TWIG);
         $supportVal = $def_sector_abbr ? htmlspecialchars($def_sector_abbr) . ' - Atendimento' : '';
         echo "      <input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$supportVal}'>";
         echo "    </div>";
-        echo "    <div style='flex: 1;'>";
-        echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
-        echo "      <select name='copy_profile_support' class='form-select profile-select2' style='width: 100%;'>";
-        echo "        <option value='0'>-----</option>";
-        $supportId = $def_profiles['support']['id'] ?? 0;
-        foreach ($profiles as $pid => $pname) {
-            if ($supportId > 0) {
-                $selected = ($pid == $supportId) ? 'selected' : '';
-            } else {
+        $supportId = (int)($def_profiles['support']['id'] ?? 0);
+        if ($supportId > 0) {
+            echo "    <input type='hidden' name='copy_profile_support' class='profile-source' value='{$supportId}'>";
+        } else {
+            echo "    <div style='flex: 1;'>";
+            echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
+            echo "      <select name='copy_profile_support' class='form-select profile-select2 profile-source' style='width: 100%;'>";
+            echo "        <option value='0'>-----</option>";
+            foreach ($profiles as $pid => $pname) {
                 $selected = (strpos($pname, '[Padrão] Atendimento') !== false) ? 'selected' : '';
+                echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
             }
-            echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
+            echo "      </select>";
+            echo "    </div>";
         }
-        echo "      </select>";
-        echo "    </div>";
         echo "  </div>";
         echo "  <div>";
         echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
@@ -1929,7 +1929,7 @@ TWIG);
         echo "      </div>";
         echo "      <div style='flex: 1;'>";
         echo "          <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
-        echo "          <select class='form-select profile-select2' style='width: 100%;'>";
+        echo "          <select class='form-select profile-select2 profile-source' style='width: 100%;'>";
         echo "            <option value='0'>-----</option>";
         foreach ($profiles as $pid => $pname) {
             echo "            <option value='{$pid}'>" . htmlspecialchars($pname) . "</option>";
@@ -1961,16 +1961,7 @@ TWIG);
                 echo "          <label style='display: block; margin-bottom: 5px; '>Nome do Perfil</label>";
                 echo "          <input type='text' class='form-control profile-input' name='name_profile_custom[]' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' value='" . htmlspecialchars($cProf['name']) . "'>";
                 echo "      </div>";
-                echo "      <div style='flex: 1;'>";
-                echo "          <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
-                echo "          <select name='copy_profile_custom[]' class='form-select profile-select2' style='width: 100%;'>";
-                echo "            <option value='0'>-----</option>";
-                foreach ($profiles as $pid => $pname) {
-                    $selected = ($pid == $cId) ? 'selected' : '';
-                    echo "            <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
-                }
-                echo "          </select>";
-                echo "      </div>";
+                echo "      <input type='hidden' name='copy_profile_custom[]' class='profile-source' value='" . (int)$cId . "'>";
                 echo "  </div>";
                 echo "  <div style='margin-top: 10px;'>";
                 echo "      <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
@@ -2154,7 +2145,7 @@ TWIG);
 
                     function validateStandardProfiles() {
                         let valid = true;
-                        $('#perfis-padrao-section select.profile-select2').each(function() {
+                        $('#perfis-padrao-section .profile-source').each(function() {
                             if ($(this).val() === '0' || $(this).val() === null || $(this).val() === '') {
                                 valid = false;
                             }
@@ -2485,7 +2476,7 @@ TWIG);
                         let emailsValid = true;
                         container.find('.profile-block:visible').each(function() {
                             const nameVal = $(this).find('.profile-input').val().trim();
-                            const copyVal = $(this).find('select.profile-select2').val();
+                            const copyVal = $(this).find('.profile-source').val();
                             const usersVal = $(this).find('.profile-users-input').val().trim();
                             if (nameVal === '' || copyVal === '' || copyVal === null || copyVal === '0' || usersVal === '') {
                                 allFilled = false;
@@ -2555,7 +2546,7 @@ TWIG);
                         let customEmailsValid = true;
                         $('#profiles-container .profile-block:visible').each(function() {
                             const nameVal = $(this).find('.profile-input').val().trim();
-                            const copyVal = $(this).find('select.profile-select2').val();
+                            const copyVal = $(this).find('.profile-source').val();
                             const usersVal = $(this).find('.profile-users-input').val().trim();
                             
                             if (nameVal === '' || copyVal === '' || copyVal === null || copyVal === '0' || usersVal === '') {

@@ -67,7 +67,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 5. Siga as instruções do Wizard. As abas de configuração também são exibidas na inclusão, mas só podem ser acessadas depois que a entidade for salva:
 ![Preenchimento do Wizard](./docs/images/screenshot4.png)
    *   **Entidade-Pai e Sigla:** Indique a localização na árvore corporativa e a sigla (que dará nome à entidade e aos grupos).
-   *   **Perfis:** Determine de onde clonar o perfil e quais os e-mails dos encarregados daquele setor para herdarem esse acesso de forma recursiva.
+   *   **Perfis:** Ao criar um perfil, determine de onde cloná-lo e quais os e-mails dos encarregados daquele setor para herdarem esse acesso de forma recursiva. Na edição, o seletor de origem aparece somente para perfis novos.
        Na edição, remover um perfil adicional e salvar exclui o perfil do GLPI e seus vínculos em todas as entidades, após confirmação. Perfis padrão do assistente não podem ser removidos.
    *   **Subgrupos e Técnicos:** Adicione quantos subgrupos precisar, e cole todos os e-mails dos técnicos responsáveis.
    *   **Catálogo (Categorias):** Cole ou escreva sua árvore de categorias usando "-" para subníveis.
