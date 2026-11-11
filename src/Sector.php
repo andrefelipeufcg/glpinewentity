@@ -576,6 +576,17 @@ class Sector extends SectorBase {
             .config-block .select2-selection--single {
                 max-width: none !important;
             }
+            .glpinewentity-copy-overlay {
+                align-items: center; background: rgba(0, 0, 0, .65); color: #fff;
+                display: flex; flex-direction: column; font-size: 1.1rem; gap: 12px;
+                inset: 0; justify-content: center; position: fixed; z-index: 2000;
+            }
+            .glpinewentity-copy-spinner {
+                animation: glpinewentity-copy-spin .8s linear infinite;
+                border: 5px solid rgba(255, 255, 255, .3); border-radius: 50%;
+                border-top-color: #fff; height: 42px; width: 42px;
+            }
+            @keyframes glpinewentity-copy-spin { to { transform: rotate(360deg); } }
         </style>";
 
         echo "<div id='items-container-tab-{$tabnum}'>";
@@ -708,6 +719,8 @@ class Sector extends SectorBase {
             selects.find('option').removeAttr('data-select2-id');
 
             container.append(template);
+            const pendingControls = [];
+            template.data('pending-controls', pendingControls);
             template.find('[data-bs-toggle=tooltip]').each(function() {
                 bootstrap.Tooltip.getOrCreateInstance(this);
             });
@@ -723,14 +736,14 @@ class Sector extends SectorBase {
                     let wrapper = $('<div class=\"input-content-wrapper\"></div>');
                     plainTextarea.replaceWith(wrapper);
                     
-                    $.ajax({
+                    pendingControls.push($.ajax({
                         url: '{$ajax_render_richtext_url}',
                         type: 'POST',
                         data: { name: 'items_content[]', value: '' },
                         success: function(html) {
                             wrapper.html(html);
                         }
-                    });
+                    }));
                 }
             }
             
@@ -738,14 +751,14 @@ class Sector extends SectorBase {
             if (tabnum == 3) {
                 let solutionTypeWrapper = template.find('.solutiontype-wrapper');
                 if (solutionTypeWrapper.length > 0) {
-                    $.ajax({
+                    pendingControls.push($.ajax({
                         url: '{$ajax_render_solution_type_url}',
                         type: 'POST',
                         data: { type_id: 0 },
                         success: function(html) {
                             solutionTypeWrapper.html(html);
                         }
-                    });
+                    }));
                 }
             }
 
@@ -754,7 +767,7 @@ class Sector extends SectorBase {
                 let illustrationWrapper = template.find('.illustration-wrapper');
                 if (illustrationWrapper.length > 0) {
                     illustrationWrapper.empty();
-                    $.ajax({
+                    pendingControls.push($.ajax({
                         url: '{$ajax_render_illustration_url}',
                         type: 'POST',
                         data: { illustration: 'request-service' },
@@ -762,19 +775,19 @@ class Sector extends SectorBase {
                             illustrationWrapper.html(html);
                             initializeIllustrationPickers(illustrationWrapper.get(0));
                         }
-                    });
+                    }));
                 }
 
                 let categoryWrapper = template.find('.form-category-wrapper');
                 if (categoryWrapper.length > 0) {
-                    $.ajax({
+                    pendingControls.push($.ajax({
                         url: '{$ajax_render_form_category_url}',
                         type: 'POST',
                         data: { category_id: 0 },
                         success: function(html) {
                             categoryWrapper.html(html);
                         }
-                    });
+                    }));
                 }
                 
                 // Inicializa Rich Text para a descrição
@@ -783,14 +796,14 @@ class Sector extends SectorBase {
                     let descWrapper = $('<div class=\"input-description-wrapper\"></div>');
                     plainDesc.replaceWith(descWrapper);
                     
-                    $.ajax({
+                    pendingControls.push($.ajax({
                         url: '{$ajax_render_richtext_url}',
                         type: 'POST',
                         data: { name: 'items_description[]', value: '' },
                         success: function(html) {
                             descWrapper.html(html);
                         }
-                    });
+                    }));
                 }
             }
         }
@@ -816,13 +829,23 @@ class Sector extends SectorBase {
             let id = $(this).val();
             let tabnum = $(this).data('tab');
             let block = $(this).closest('.config-block');
-            
+            const selectionVersion = (block.data('copy-selection-version') || 0) + 1;
+            block.data('copy-selection-version', selectionVersion);
+            const previousRequest = block.data('copy-request');
+            if (previousRequest) previousRequest.abort();
+
             if (id > 0) {
-                $.ajax({
+                const overlay = $('<div class=\"glpinewentity-copy-overlay\" role=\"status\" aria-live=\"polite\"><div class=\"glpinewentity-copy-spinner\"></div><div>Carregando...</div></div>');
+                $('body').append(overlay);
+                const hideOverlay = function() { overlay.remove(); };
+                const request = $.ajax({
                     url: '{$ajax_get_template_url}',
                     type: 'POST',
                     data: { id: id, tabnum: tabnum },
                     success: function(response) {
+                        $.when.apply($, block.data('pending-controls') || []).done(function() {
+                        hideOverlay();
+                        if (block.data('copy-selection-version') !== selectionVersion || !block.closest('body').length) return;
                         if (response.success && response.data) {
                             block.find('.input-name').val(response.data.name || '');
                             
@@ -937,9 +960,24 @@ class Sector extends SectorBase {
                                     placeholderPreview.addClass('d-none');
                                 }
                             }
+                        } else {
+                            alert(response.error || 'Não foi possível carregar o modelo selecionado.');
+                        }
+                        }).fail(function() {
+                            hideOverlay();
+                            if (block.data('copy-selection-version') === selectionVersion) {
+                                alert('Não foi possível preparar os campos do modelo. Recarregue a página e tente novamente.');
+                            }
+                        });
+                    },
+                    error: function(xhr, status) {
+                        hideOverlay();
+                        if (status !== 'abort' && block.data('copy-selection-version') === selectionVersion) {
+                            alert('Não foi possível carregar o modelo selecionado. Tente novamente.');
                         }
                     }
                 });
+                block.data('copy-request', request);
             } else {
                 block.find('.input-name').val('');
                 
@@ -1090,7 +1128,10 @@ class Sector extends SectorBase {
                 let decodedValue = '';
                 try { decodedValue = decodeBase64Utf8(encodedValue); } catch(e) { decodedValue = ''; }
 
-                $.ajax({
+                const block = wrapper.closest('.config-block');
+                const pendingControls = block.data('pending-controls') || [];
+                block.data('pending-controls', pendingControls);
+                pendingControls.push($.ajax({
                     url: '{$ajax_render_richtext_url}',
                     type: 'POST',
                     data: { name: fieldName, value: decodedValue },
@@ -1098,7 +1139,7 @@ class Sector extends SectorBase {
                         wrapper.html(html);
                         wrapper.removeClass('richtext-pending');
                     }
-                });
+                }));
             });
             $('.select2-copy-from').select2({ width: '100%' });
             $('.select2-cat').select2({ width: '100%' });
