@@ -55,7 +55,7 @@ $out = \Html::textarea([
     'value'           => $value,
     'enable_richtext' => true,
     'rand'            => $rand,
-    'rows'            => 4
+    'rows'            => $name === 'items_content_html[]' ? 15 : 4
 ]);
 $buffered = ob_get_clean();
 

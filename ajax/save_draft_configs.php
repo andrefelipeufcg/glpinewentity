@@ -15,6 +15,8 @@ if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/inc/inclu
 if (!file_exists($inc)) { $inc = ($_SERVER['DOCUMENT_ROOT'] ?? '') . '/../inc/includes.php'; }
 include $inc;
 
+global $CFG_GLPI;
+
 use GlpiPlugin\Glpinewentity\Sector;
 
 header('Content-Type: application/json');
@@ -132,6 +134,21 @@ foreach ($names as $i => $name) {
         $itemConfig['notificationtemplates_id'] = (int)($notiftpl_id[$i] ?? 0);
         $itemConfig['target'] = trim($target_val[$i] ?? '');
         $itemConfig['exclusion'] = trim($exclusion_val[$i] ?? '');
+    }
+
+    if ($tabnum == 7) {
+        $itemConfig['itemtype'] = trim($itemtype[$i] ?? 'Ticket');
+        $itemConfig['language'] = (string)($_POST['items_language'][$i] ?? '');
+        $itemConfig['subject'] = (string)($_POST['items_subject'][$i] ?? '');
+        $itemConfig['content_html'] = (string)($_POST['items_content_html'][$i] ?? '');
+        $itemConfig['content_text'] = (string)($_POST['items_content_text'][$i] ?? '');
+        $itemConfig['translations'] = json_decode($_POST['items_translations'][$i] ?? '{}', true) ?: [];
+        $allowedTypes = $CFG_GLPI['notificationtemplates_types'] ?? [];
+        if (!in_array($itemConfig['itemtype'], $allowedTypes, true)
+            || ($itemConfig['language'] !== '' && !isset($CFG_GLPI['languages'][$itemConfig['language']]))) {
+            echo json_encode(['success' => false, 'error' => 'Tipo ou idioma inválido.']);
+            exit;
+        }
     }
 
     if ($tabnum == 6) {

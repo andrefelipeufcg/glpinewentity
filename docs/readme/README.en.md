@@ -33,6 +33,7 @@ Instead of navigating through several GLPI screens to create entities, configure
     *   **Standard Follow-ups**
     *   **Standard Solutions**
     *   **Pending Reasons**
+    *   **Notification Templates:** Immediately above Notifications, with native template copying, type, all GLPI languages, subject and the HTML editor with source-code viewing. Other translations and source CSS are preserved. The read-only Notification field shows saved associations from Notifications > Notification Template. Templates are global in GLPI: editing a saved template affects every notification using it; copying creates a separate template without changing its source.
     *   **Notifications**
     *   **Standard Forms**
 *   **Native Security and Access Control:** Developed following GLPI's strictest secure development standards. The interface and all creation flows (endpoints) are protected by the system's dynamic rights matrix (ACL). The installation intelligently grants access to all Super-Admin profiles natively and agnostically, without depending on hardcoded IDs and avoiding visual pollution for other users.

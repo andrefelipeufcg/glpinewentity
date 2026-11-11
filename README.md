@@ -33,6 +33,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
     *   **Respostas Básicas**
     *   **Soluções Básicas**
     *   **Motivos de Pendências**
+    *   **Modelos de Notificação:** Aba imediatamente anterior a Notificações, com cópia dos modelos nativos, tipo, todos os idiomas do GLPI, assunto e editor HTML com visualização do código-fonte. As demais traduções e o CSS da origem são preservados. O campo Notificação é somente leitura e mostra as associações salvas na aba Notificações, em Padrão (Modelo de Notificação). Os modelos são globais no GLPI: editar um modelo já salvo afeta todas as notificações que o utilizam; copiar cria outro modelo sem alterar a origem.
     *   **Notificações**
     *   **Formulários Padrões**
 *   **Controle de Acesso e Segurança Nativos:** Desenvolvido seguindo os padrões mais rígidos de desenvolvimento seguro do GLPI. A interface e todos os fluxos de criação (endpoints) são protegidos pela matriz dinâmica de direitos do sistema (ACL). A instalação concede acesso de forma inteligente a todos os perfis com nível de Super-Admin de forma nativa e agnóstica, não dependendo de IDs engessados e não gerando poluição visual para os demais usuários.

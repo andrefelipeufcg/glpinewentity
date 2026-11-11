@@ -40,6 +40,9 @@ if ($id <= 0 || $tabnum <= 0) {
 $data = [];
 
 switch ($tabnum) {
+    case 7:
+        $data = \GlpiPlugin\Glpinewentity\Builders\NotificationTemplateBuilder::read($id);
+        break;
     case 1: // TicketTemplate
         $item = new TicketTemplate();
         if ($item->getFromDB($id)) {

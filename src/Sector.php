@@ -246,6 +246,7 @@ class Sector extends SectorBase {
             $ong[2] = self::createTabEntry(__('Respostas Básicas', 'glpinewentity'), 0, $item::class, 'ti ti-messages');
             $ong[3] = self::createTabEntry(__('Soluções Básicas', 'glpinewentity'), 0, $item::class, 'ti ti-bulb');
             $ong[4] = self::createTabEntry(__('Motivos de Pendências', 'glpinewentity'), 0, $item::class, 'ti ti-clock-pause');
+            $ong[7] = self::createTabEntry(__('Modelos de Notificação', 'glpinewentity'), 0, $item::class, 'ti ti-mail');
             $ong[5] = self::createTabEntry(__('Notificações', 'glpinewentity'), 0, $item::class, 'ti ti-bell');
             $ong[6] = self::createTabEntry(__('Formulários', 'glpinewentity'), 0, $item::class, 'ti ti-clipboard-list');
             return $ong;
@@ -281,6 +282,7 @@ class Sector extends SectorBase {
             2 => 'Respostas Básicas',
             3 => 'Soluções Básicas',
             4 => 'Motivos de Pendências',
+            7 => 'Modelos de Notificação',
             5 => 'Notificações',
             6 => 'Formulários',
         ];
@@ -348,12 +350,39 @@ class Sector extends SectorBase {
             }
         }
 
+        if ($tabnum == 7) {
+            foreach ($savedConfigs as &$config) {
+                $generatedId = (int)($config['generated_id'] ?? 0);
+                if ($generatedId > 0) {
+                    $config = array_replace($config, Builders\NotificationTemplateBuilder::read($generatedId));
+                }
+                $notificationNames = [];
+                if ($generatedId > 0) {
+                    foreach ($DB->request([
+                        'SELECT' => ['glpi_notifications.name'],
+                        'FROM' => 'glpi_notifications',
+                        'INNER JOIN' => ['glpi_notifications_notificationtemplates' => [
+                            'ON' => ['glpi_notifications_notificationtemplates' => 'notifications_id', 'glpi_notifications' => 'id'],
+                        ]],
+                        'WHERE' => ['glpi_notifications_notificationtemplates.notificationtemplates_id' => $generatedId,
+                                    'glpi_notifications.entities_id' => (int)($meta['entity_id'] ?? 0)],
+                        'ORDER' => 'glpi_notifications.name ASC',
+                    ]) as $notification) {
+                        $notificationNames[] = $notification['name'];
+                    }
+                }
+                $config['notification_names'] = implode(', ', array_unique($notificationNames));
+            }
+            unset($config);
+        }
+
         // Definições por aba
         $tableMapping = [
             1 => 'glpi_tickettemplates',
             2 => 'glpi_itilfollowuptemplates',
             3 => 'glpi_solutiontemplates',
             4 => 'glpi_pendingreasons',
+            7 => 'glpi_notificationtemplates',
             5 => 'glpi_notifications', // Para notificações, copiamos de outras notifications
             6 => 'glpi_plugin_formcreator_forms', // Se tiver Formcreator (mas no Builder usamos nativo glpi_forms, entao testamos)
         ];
@@ -377,7 +406,7 @@ class Sector extends SectorBase {
             }
 
             $iterator = $DB->request([
-                'SELECT' => ['id', 'name', 'entities_id'],
+                'SELECT' => $tabnum == 7 ? ['id', 'name'] : ['id', 'name', 'entities_id'],
                 'FROM'   => $tableName,
                 'ORDER'  => 'name ASC'
             ]);
@@ -385,6 +414,10 @@ class Sector extends SectorBase {
             $groupsPadrao = [];
             $groupsNormal = [];
             foreach ($iterator as $row) {
+                if ($tabnum == 7) {
+                    $existingModels[$row['id']] = $row['name'];
+                    continue;
+                }
                 $entityId = (int)($row['entities_id'] ?? 0);
                 if (preg_match('/^\[padr(?:a|ã)o\]/iu', $row['name'])) {
                     $groupsPadrao[$entityId][$row['id']] = $row['name'];
@@ -406,6 +439,15 @@ class Sector extends SectorBase {
         $hasContentField = in_array($tabnum, [1, 2, 3]); // Modelos, Respostas, Soluções
 
         $extraOptions = [];
+        if ($tabnum == 7) {
+            $extraOptions['itemtypes'] = [];
+            foreach ($CFG_GLPI['notificationtemplates_types'] ?? [] as $notificationType) {
+                if (class_exists($notificationType)) {
+                    $extraOptions['itemtypes'][$notificationType] = $notificationType::getTypeName(1);
+                }
+            }
+            asort($extraOptions['itemtypes']);
+        }
         if ($tabnum == 1 && $DB->tableExists('glpi_itilcategories')) {
             $categoryEntityNames = [];
             foreach ($DB->request(['SELECT' => ['id', 'name', 'completename'], 'FROM' => 'glpi_entities']) as $entityRow) {
@@ -747,6 +789,21 @@ class Sector extends SectorBase {
                 }
             }
             
+            if (tabnum == 7) {
+                template.find('.input-translations').val('{}');
+                template.find('.input-language').val('').trigger('change');
+                template.find('.input-itemtype').val('Ticket').trigger('change');
+                template.find('.select2-language').select2({ width: '100%' });
+                const plainHtml = template.find('textarea.input-content-html');
+                const htmlWrapper = $('<div class=\"input-html-wrapper\"></div>');
+                plainHtml.replaceWith(htmlWrapper);
+                pendingControls.push($.ajax({
+                    url: '{$ajax_render_richtext_url}', type: 'POST',
+                    data: { name: 'items_content_html[]', value: '' },
+                    success: function(html) { htmlWrapper.html(html); }
+                }));
+            }
+
             // Buscar categoria de form via AJAX para tab 6 (mantém macro/botões nativos do GLPI)
             if (tabnum == 3) {
                 let solutionTypeWrapper = template.find('.solutiontype-wrapper');
@@ -901,6 +958,19 @@ class Sector extends SectorBase {
                                 block.find('.input-comment').val(response.data.comment || '');
                             }
 
+                            if (tabnum == 7) {
+                                block.find('.input-itemtype').val(response.data.itemtype || 'Ticket').trigger('change');
+                                block.removeData('translation-language');
+                                block.find('.input-translations').val(JSON.stringify(Object.assign({}, response.data.translations || {})));
+                                block.find('.input-language').val(response.data.language || '').trigger('change');
+                                block.find('.input-subject').val(response.data.subject || '');
+                                block.find('.input-content-text').val(response.data.content_text || '');
+                                const textarea = block.find('.input-html-wrapper textarea');
+                                const editor = typeof tinymce !== 'undefined' && textarea.attr('id') ? tinymce.get(textarea.attr('id')) : null;
+                                if (editor) { editor.setContent(response.data.content_html || ''); }
+                                else { textarea.val(response.data.content_html || ''); }
+                            }
+
                             if (tabnum == 5) {
                                 block.find('.input-is-active').val(response.data.is_active !== undefined ? response.data.is_active : '1');
                                 block.find('.input-itemtype').val(response.data.itemtype || 'Ticket').trigger('change');
@@ -979,6 +1049,12 @@ class Sector extends SectorBase {
                 });
                 block.data('copy-request', request);
             } else {
+                if (tabnum == 7) {
+                    block.removeData('translation-language');
+                    block.find('.input-translations').val('{}');
+                    block.find('.input-language').val('').trigger('change');
+                    block.find('.input-itemtype').val('Ticket').trigger('change');
+                }
                 block.find('.input-name').val('');
                 
                 // Limpar editor das abas 1, 2 e 3 se existir
@@ -1058,6 +1134,9 @@ class Sector extends SectorBase {
 
         function generateSectorConfigs(sectorId, tabnum) {
             let confirmMsg = 'Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade.\\nDeseja prosseguir?';
+            if (tabnum === 7) {
+                confirmMsg = 'Os modelos de notificação são globais no GLPI. Alterações em um modelo já salvo afetam todas as notificações que o utilizam. Deseja prosseguir?';
+            }
             if (tabnum === 6) {
                 confirmMsg = 'Atenção! O salvamento irá criar, atualizar e remover formulários conforme as seguintes configurações:\\nFormulários não gerenciados pelo plugin (externos) que forem removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos desta tela serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\\nDeseja prosseguir com a sincronização?';
             }
@@ -1073,6 +1152,11 @@ class Sector extends SectorBase {
                 // Salva as configurações antes de aplicá-las à entidade.
                 if (typeof tinymce !== 'undefined') {
                     tinymce.triggerSave();
+                }
+                if (tabnum == 7) {
+                    $('#form_configs_tab_7 .config-block:not(.template)').each(function() {
+                        storeNotificationTranslation($(this));
+                    });
                 }
                 let formData = $('#form_configs_tab_' + tabnum).serialize();
                 const savedRevision = glpinewentityUnsaved.snapshot();
@@ -1117,6 +1201,34 @@ class Sector extends SectorBase {
             }
         }
 
+        function storeNotificationTranslation(block) {
+            const language = block.data('translation-language');
+            if (language === undefined) { return; }
+            const translations = JSON.parse(block.find('.input-translations').val() || '{}');
+            const textarea = block.find('.input-html-wrapper textarea');
+            const editor = typeof tinymce !== 'undefined' && textarea.attr('id') ? tinymce.get(textarea.attr('id')) : null;
+            translations[language] = {
+                subject: block.find('.input-subject').val() || '',
+                content_html: editor ? editor.getContent() : (textarea.val() || ''),
+                content_text: block.find('.input-content-text').val() || ''
+            };
+            block.find('.input-translations').val(JSON.stringify(translations));
+        }
+        $(document).off('change.glpinewentityLanguage', '.input-language').on('change.glpinewentityLanguage', '.input-language', function() {
+            const block = $(this).closest('.config-block');
+            storeNotificationTranslation(block);
+            const language = $(this).val() || '';
+            const translations = JSON.parse(block.find('.input-translations').val() || '{}');
+            const translation = translations[language] || {};
+            block.find('.input-subject').val(translation.subject || '');
+            block.find('.input-content-text').val(translation.content_text || '');
+            const textarea = block.find('.input-html-wrapper textarea');
+            const editor = typeof tinymce !== 'undefined' && textarea.attr('id') ? tinymce.get(textarea.attr('id')) : null;
+            if (editor) { editor.setContent(translation.content_html || ''); }
+            else { textarea.val(translation.content_html || ''); }
+            block.data('translation-language', language);
+        });
+
         // Inicializa Rich Text (TinyMCE) via AJAX para os blocos marcados como pendentes
         // (evita o problema de DOMEval do jQuery ao carregar conteúdo de aba via AJAX)
         $(function() {
@@ -1140,6 +1252,10 @@ class Sector extends SectorBase {
                         wrapper.removeClass('richtext-pending');
                     }
                 }));
+            });
+            $('.select2-language').select2({ width: '100%' });
+            $('.input-language').each(function() {
+                $(this).closest('.config-block').data('translation-language', $(this).val() || '');
             });
             $('.select2-copy-from').select2({ width: '100%' });
             $('.select2-cat').select2({ width: '100%' });
@@ -1225,13 +1341,18 @@ class Sector extends SectorBase {
         $html .= "  </div>";
         $html .= "  <input type='hidden' name='items_generated_id[]' class='input-generated-id' value='{$generated_id}'>";
 
-        // Copiar de... (apenas visível se for template OU for um bloco único como no Tab 6)
+        // Copiar de... (apenas visível se for template OU for um bloco único)
         $showCopyFrom = ($isTemplate || $isSingleBlock) ? "block" : "none";
         $html .= "  <div style='display: {$showCopyFrom}; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd;'>";
         $html .= "      <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Copiar de...</label>";
         $html .= "      <select name='items_copy_from[]' class='form-select select2-copy-from' style='width: 100%;' data-tab='{$tabnum}'>";
         $html .= "        <option value='0'>--- Nenhum (Criar Básico) ---</option>";
         foreach ($existingModels as $entityLabel => $entityModels) {
+            if ($tabnum == 7) {
+                $selected = ($entityLabel == $copyFrom) ? 'selected' : '';
+                $html .= "          <option value='" . (int)$entityLabel . "' {$selected}>" . htmlspecialchars($entityModels) . "</option>";
+                continue;
+            }
             $html .= "        <optgroup label='" . htmlspecialchars((string)$entityLabel, ENT_QUOTES) . "'>";
             foreach ($entityModels as $id => $mName) {
                 $selected = ($id == $copyFrom) ? 'selected' : '';
@@ -1398,6 +1519,36 @@ class Sector extends SectorBase {
             $html .= "      <textarea name='items_comment[]' class='form-control input-comment' style='width: 100%; height: 60px;'>{$comment}</textarea>";
             $html .= "  </div>";
 
+        } elseif ($tabnum == 7) {
+            $html .= "<div class='mb-3'><label class='form-label fw-bold'>Tipo</label><select name='items_itemtype[]' class='form-select select2-itemtype input-itemtype'>";
+            foreach ($extraOptions['itemtypes'] ?? [] as $value => $label) {
+                $selected = ($value === ($config['itemtype'] ?? 'Ticket')) ? ' selected' : '';
+                $html .= "<option value='" . htmlspecialchars($value, ENT_QUOTES) . "'{$selected}>" . htmlspecialchars($label) . "</option>";
+            }
+            $html .= "</select></div>";
+            $html .= "<div class='mb-3'><label class='form-label fw-bold'>" . __('Language') . "</label>";
+            global $CFG_GLPI;
+            $html .= "<select name='items_language[]' class='form-select select2-language input-language'><option value=''>" . __('Default translation') . "</option>";
+            foreach (\Dropdown::getLanguages() as $languageCode => $languageLabel) {
+                $selected = ($languageCode === ($config['language'] ?? '')) ? ' selected' : '';
+                $html .= "<option value='" . htmlspecialchars($languageCode, ENT_QUOTES) . "'{$selected}>" . htmlspecialchars($languageLabel) . "</option>";
+            }
+            $html .= "</select>";
+            $html .= "</div><div class='mb-3'><label class='form-label fw-bold'>" . __('Subject') . "</label>";
+            $html .= "<input type='text' name='items_subject[]' class='form-control input-subject' value='" . htmlspecialchars($config['subject'] ?? '', ENT_QUOTES) . "'></div>";
+            $html .= "<div class='mb-3'><label class='form-label fw-bold'>" . __('Email HTML body') . "</label>";
+            $htmlValue = $config['content_html'] ?? '';
+            if ($isTemplate) {
+                $html .= "<textarea name='items_content_html[]' class='form-control input-content-html' rows='15'></textarea>";
+            } else {
+                $html .= "<div class='input-html-wrapper richtext-pending' data-field-name='items_content_html[]' data-field-value='" . base64_encode($htmlValue) . "'><textarea name='items_content_html[]' rows='15'>" . htmlspecialchars($htmlValue) . "</textarea></div>";
+            }
+            $translations = htmlspecialchars(json_encode((object)($config['translations'] ?? [])), ENT_QUOTES);
+            $html .= "</div><input type='hidden' name='items_translations[]' class='input-translations' value='{$translations}'>";
+            $html .= "<input type='hidden' name='items_content_text[]' class='input-content-text' value='" . htmlspecialchars($config['content_text'] ?? '', ENT_QUOTES) . "'>";
+            $help = htmlspecialchars(__('Campo somente leitura: mostra as notificações desta entidade associadas a este modelo em Notificações > Padrão (Modelo de Notificação). Salve as notificações para atualizar a associação.', 'glpinewentity'), ENT_QUOTES);
+            $html .= "<div class='mb-3'><label class='form-label fw-bold'>Notificação <span class='form-help' data-bs-toggle='tooltip' data-bs-title='{$help}'>?</span></label>";
+            $html .= "<input type='text' class='form-control input-notification-names' readonly value='" . htmlspecialchars($config['notification_names'] ?? '', ENT_QUOTES) . "'></div>";
         } elseif ($tabnum == 5) {
             // Campos de Notification
             $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";

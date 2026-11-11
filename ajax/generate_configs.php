@@ -108,6 +108,7 @@ $classMap = [
     4 => \PendingReason::class,
     5 => \Notification::class,
     6 => \Glpi\Form\Form::class,
+    7 => \NotificationTemplate::class,
 ];
 $itemClass = $classMap[$tabnum] ?? null;
 
@@ -117,7 +118,7 @@ if ($itemClass && class_exists($itemClass)) {
         if ($generatedId > 0) {
             $item = new $itemClass();
             if ($item->getFromDB($generatedId)) {
-                if ($item->fields['entities_id'] != $new_entity_id) {
+                if ($tabnum != 7 && $item->fields['entities_id'] != $new_entity_id) {
                     echo json_encode(['success' => false, 'error' => "Violação de segurança: O item gerado #$generatedId não pertence à entidade gerenciada."]);
                     exit;
                 }
@@ -176,6 +177,10 @@ try {
             break;
         case 4:
             $builder = new WaitReasonBuilder();
+            $result = $builder->build($new_entity_id, $savedConfigs);
+            break;
+        case 7:
+            $builder = new \GlpiPlugin\Glpinewentity\Builders\NotificationTemplateBuilder();
             $result = $builder->build($new_entity_id, $savedConfigs);
             break;
         case 5:
