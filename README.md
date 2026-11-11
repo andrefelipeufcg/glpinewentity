@@ -68,7 +68,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 ![Preenchimento do Wizard](./docs/images/screenshot4.png)
    *   **Entidade-Pai e Sigla:** Indique a localização na árvore corporativa e a sigla (que dará nome à entidade e aos grupos).
    *   **Perfis:** Ao criar um perfil, determine de onde cloná-lo e quais os e-mails dos encarregados daquele setor para herdarem esse acesso de forma recursiva. Na edição, o seletor de origem aparece somente para perfis novos.
-       Na edição, remover um perfil adicional e salvar exclui o perfil do GLPI e seus vínculos em todas as entidades, após confirmação. Perfis padrão do assistente não podem ser removidos.
+       Os perfis padrão (Admin e Atendimento) e adicionais possuem o botão **Remover**, com o mesmo ícone de lixeira dos grupos. A remoção altera apenas a tela até salvar. Na criação, perfis removidos não são criados; na edição, salvar e confirmar exclui definitivamente o perfil existente do GLPI e seus vínculos de usuários em todas as entidades, mesmo que existam usuários associados. É obrigatório manter pelo menos um perfil.
    *   **Subgrupos e Técnicos:** Adicione quantos subgrupos precisar, e cole todos os e-mails dos técnicos responsáveis.
    *   **Catálogo (Categorias):** Cole ou escreva sua árvore de categorias usando "-" para subníveis.
 6. Clique em **Salvar**.

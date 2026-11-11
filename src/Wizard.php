@@ -114,6 +114,56 @@ class Wizard {
         }
     }
 
+    private static function hasProfile(array $input, bool $creation): bool {
+        $removedIds = !$creation && is_array($input['removed_profile_ids'] ?? null)
+            ? array_filter($input['removed_profile_ids'], static fn($id) => is_scalar($id) && preg_match('/^[1-9][0-9]*$/D', (string)$id))
+            : [];
+        $removedNames = [];
+        foreach ($removedIds as $id) {
+            $profile = new Profile();
+            if ($profile->getFromDB((int)$id)) {
+                $removedNames[] = trim((string)($profile->fields['name'] ?? ''));
+            }
+        }
+        $isRetained = static function ($source, $name) use ($removedIds, $removedNames): bool {
+            if (!is_scalar($source) || !preg_match('/^[1-9][0-9]*$/D', (string)$source)
+                || in_array((int)$source, array_map('intval', $removedIds), true)) {
+                return false;
+            }
+            foreach ($removedNames as $removedName) {
+                if (is_string($name) && strcasecmp(trim($name), $removedName) === 0) {
+                    return false;
+                }
+            }
+            return true;
+        };
+        foreach (['admin', 'support'] as $type) {
+            $source = $input['copy_profile_' . $type] ?? null;
+            $users = $input['users_profile_' . $type] ?? '';
+            $index = $type === 'admin' ? 0 : 1;
+            $suffix = $type === 'admin' ? 'Admin' : 'Atendimento';
+            $name = $input['profiles_default'][$index] ?? (trim((string)($input['sector_abbr'] ?? '')) . ' - ' . $suffix);
+            if ($isRetained($source, $name)
+                && (!$creation || (is_string($users) && trim($users) !== ''))) {
+                return true;
+            }
+        }
+        $sources = $input['copy_profile_custom'] ?? [];
+        $names = $input['name_profile_custom'] ?? [];
+        $users = $input['users_profile_custom'] ?? [];
+        if (!is_array($sources) || !is_array($names) || !is_array($users)) {
+            return false;
+        }
+        foreach ($sources as $index => $source) {
+            if ($isRetained($source, $names[$index] ?? null)
+                && isset($names[$index]) && is_string($names[$index]) && trim($names[$index]) !== ''
+                && (!$creation || (isset($users[$index]) && is_string($users[$index]) && trim($users[$index]) !== ''))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static function validateRemovedProfiles(array $input, int $entityId, array &$errors, bool $allowReauthRedirect = true): array {
         global $DB;
         $ids = $input['removed_profile_ids'] ?? [];
@@ -125,6 +175,13 @@ class Wizard {
             is_array($input['profiles_default'] ?? null) ? $input['profiles_default'] : [],
             is_array($input['name_profile_custom'] ?? null) ? $input['name_profile_custom'] : []
         );
+        $abbr = trim((string)($input['sector_abbr'] ?? ''));
+        foreach (['admin' => 'Admin', 'support' => 'Atendimento'] as $type => $suffix) {
+            $index = $type === 'admin' ? 0 : 1;
+            if (!empty($input['copy_profile_' . $type]) && !isset($input['profiles_default'][$index])) {
+                $names[] = $abbr . ' - ' . $suffix;
+            }
+        }
         $sources = array_merge(
             [$input['copy_profile_admin'] ?? 0, $input['copy_profile_support'] ?? 0],
             is_array($input['copy_profile_custom'] ?? null) ? $input['copy_profile_custom'] : []
@@ -146,10 +203,6 @@ class Wizard {
                 continue;
             }
             $name = $profile->fields['name'] ?? '';
-            if (str_ends_with($name, ' - Admin') || str_ends_with($name, ' - Atendimento')) {
-                $errors[] = sprintf(__('O perfil padrão \'%s\' não pode ser removido.', 'glpinewentity'), htmlspecialchars($name, ENT_QUOTES));
-                continue;
-            }
             $linked = $DB->request([
                 'SELECT' => 'id',
                 'FROM' => 'glpi_profiles_users',
@@ -244,6 +297,11 @@ class Wizard {
         $defaultProfile = self::getDefaultProfileSelection($input);
         if ($defaultProfile === false) {
             $result['errors'][] = __('Selecione apenas perfis válidos com usuários para definir como padrão.', 'glpinewentity');
+            return $result;
+        }
+
+        if (!self::hasProfile($input, true)) {
+            $result['errors'][] = __('Informe pelo menos um perfil padrão ou adicional.', 'glpinewentity');
             return $result;
         }
 
@@ -676,6 +734,12 @@ class Wizard {
         $defaultProfile = self::getDefaultProfileSelection($input);
         if ($defaultProfile === false) {
             $result['errors'][] = __('Selecione apenas perfis válidos com usuários para definir como padrão.', 'glpinewentity');
+            $result['_invalid_default_profile'] = true;
+            return $result;
+        }
+
+        if (!self::hasProfile($input, false)) {
+            $result['errors'][] = __('Informe pelo menos um perfil padrão ou adicional.', 'glpinewentity');
             $result['_invalid_default_profile'] = true;
             return $result;
         }

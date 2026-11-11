@@ -1836,14 +1836,16 @@ TWIG);
         echo "<div id='perfis-padrao-section'>";
 
         // Admin
-        echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
+        $adminId = (int)($def_profiles['admin']['id'] ?? 0);
+        if (!$isEdit || $adminId > 0) {
+        echo "<div class='profile-block standard-profile-block' data-existing-profile-id='" . ($adminId ?: '') . "' data-existing-profile-name='" . htmlspecialchars($def_sector_abbr . ' - Admin', ENT_QUOTES) . "' style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
+        echo "  <div style='display:flex; justify-content:space-between;'><strong>Administrador da Entidade</strong><button type='button' class='btn btn-sm btn-danger btn-remove-profile' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button></div>";
         echo "  <div style='display: flex; gap: 10px;'>";
         echo "    <div style='flex: 1;'>";
         echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
         $adminVal = $def_sector_abbr ? htmlspecialchars($def_sector_abbr) . ' - Admin' : '';
-        echo "      <input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$adminVal}'>";
+        echo "      <input type='text' id='profile_admin' name='profiles_default[0]' class='form-control' style='width: 100%; border: none; ' readonly value='{$adminVal}'>";
         echo "    </div>";
-        $adminId = (int)($def_profiles['admin']['id'] ?? 0);
         if ($adminId > 0) {
             echo "    <input type='hidden' name='copy_profile_admin' class='profile-source' value='{$adminId}'>";
         } else {
@@ -1868,15 +1870,19 @@ TWIG);
         echo "  </div>";
         echo "</div>";
 
+        }
+
         // Atendimento
-        echo "<div style='display: flex; flex-direction: column; gap: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
+        $supportId = (int)($def_profiles['support']['id'] ?? 0);
+        if (!$isEdit || $supportId > 0) {
+        echo "<div class='profile-block standard-profile-block' data-existing-profile-id='" . ($supportId ?: '') . "' data-existing-profile-name='" . htmlspecialchars($def_sector_abbr . ' - Atendimento', ENT_QUOTES) . "' style='display: flex; flex-direction: column; gap: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
+        echo "  <div style='display:flex; justify-content:space-between;'><strong>Atendente da Entidade</strong><button type='button' class='btn btn-sm btn-danger btn-remove-profile' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button></div>";
         echo "  <div style='display: flex; gap: 10px;'>";
         echo "    <div style='flex: 1;'>";
         echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
         $supportVal = $def_sector_abbr ? htmlspecialchars($def_sector_abbr) . ' - Atendimento' : '';
-        echo "      <input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$supportVal}'>";
+        echo "      <input type='text' id='profile_support' name='profiles_default[1]' class='form-control' style='width: 100%; border: none; ' readonly value='{$supportVal}'>";
         echo "    </div>";
-        $supportId = (int)($def_profiles['support']['id'] ?? 0);
         if ($supportId > 0) {
             echo "    <input type='hidden' name='copy_profile_support' class='profile-source' value='{$supportId}'>";
         } else {
@@ -1901,9 +1907,10 @@ TWIG);
         echo "  </div>";
         echo "</div>";
 
+        }
         echo "</div>"; // fecha #perfis-padrao-section
 
-        echo "<small class='text-muted' style='display: block; margin-top: 8px;'>Os 'Perfis Padrão' são criados automaticamente com base na SIGLA e não podem ser apagados, mas você pode adicionar um novo em 'Adicionar Perfil'.</small>";
+        echo "<small class='text-muted' style='display: block; margin-top: 8px;'>Os 'Perfis Padrão' são criados automaticamente com base na SIGLA, mas você pode adicionar um novo em 'Adicionar Perfil'.</small>";
         echo "</td>";
         echo "</tr>";
 
@@ -2448,7 +2455,7 @@ TWIG);
                         });
                     }
 
-                    $('#profiles-container').on('click', '.btn-remove-profile', function() {
+                    $('#perfis-padrao-section, #profiles-container').on('click', '.btn-remove-profile', function() {
                         const block = $(this).closest('.profile-block');
                         const profileId = block.attr('data-existing-profile-id');
                         if (profileId) {
@@ -2536,6 +2543,11 @@ TWIG);
                     // Validação no Submit do Formulário
                     $('#form_wizard').on('submit', function(e) {
                         syncCustomProfileDefaults();
+                        if (!$('#perfis-padrao-section .standard-profile-block, #profiles-container .profile-block:not(.template)').length) {
+                            e.preventDefault();
+                            alert('Mantenha pelo menos um perfil padrão ou adicional.');
+                            return false;
+                        }
                         if (pendingEmailRequests > 0) {
                             e.preventDefault();
                             alert('Aguarde a validação dos e-mails cadastrados no GLPI antes de enviar o formulário.');
