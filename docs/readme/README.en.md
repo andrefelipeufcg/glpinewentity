@@ -84,7 +84,7 @@ The system will iterate and provision the entire environment, displaying descrip
    *   **Entity Infrastructure:** Returns to the Wizard form to edit members, groups, and categories.
    *   **Ticket Templates:** Create and associate specific ticket templates.
    *   **Standard Follow-ups:** Configure standardized texts for support replies.
-   *   **Standard Solutions:** Standardize frequent solutions for ticket closure.
+   *   **Standard Solutions:** Standardize frequent solutions for ticket closure. The selected solution type is created in the sector's entity even if it belongs to another entity; an existing type with the same name in that entity is reused.
    *   **Pending Reasons:** Define customized reasons for pausing tickets.
    *   **Notifications:** Adjust or override sector e-mail alerts.
    *   **Standard Forms:** Manage forms (from Formcreator) linked to the sector.

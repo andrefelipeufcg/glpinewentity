@@ -84,7 +84,7 @@ O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descrit
    *   **Estrutura da entidade:** Retorna ao formulário do Wizard para edição de membros, grupos e categorias.
    *   **Modelos de Chamado:** Crie e associe templates de chamados específicos.
    *   **Respostas Básicas:** Configure textos padronizados para os atendimentos.
-   *   **Soluções Básicas:** Padronize soluções frequentes para o fechamento.
+   *   **Soluções Básicas:** Padronize soluções frequentes para o fechamento. O tipo de solução selecionado é criado na entidade do setor, mesmo quando pertence a outra entidade; um tipo de mesmo nome já existente na entidade é reutilizado.
    *   **Motivos de Pendências:** Defina motivos customizados para pausar os chamados.
    *   **Notificações:** Ajuste ou sobrescreva os alertas de e-mail do setor.
   *   **Formulários:** Gerencie formulários (do Formcreator) vinculados ao setor.

@@ -407,13 +407,28 @@ class Sector extends SectorBase {
 
         $extraOptions = [];
         if ($tabnum == 1 && $DB->tableExists('glpi_itilcategories')) {
+            $categoryEntityNames = [];
+            foreach ($DB->request(['SELECT' => ['id', 'name', 'completename'], 'FROM' => 'glpi_entities']) as $entityRow) {
+                $categoryEntityNames[(int)$entityRow['id']] = $entityRow['completename'] ?: $entityRow['name'];
+            }
+            $categoriesByEntity = [];
             $catIter = $DB->request([
-                'SELECT' => ['id', 'completename'],
+                'SELECT' => ['id', 'completename', 'entities_id'],
                 'FROM' => 'glpi_itilcategories',
                 'ORDER' => 'completename ASC'
             ]);
             foreach ($catIter as $row) {
-                $extraOptions['categories'][$row['id']] = $row['completename'];
+                $categoriesByEntity[(int)$row['entities_id']][$row['id']] = $row['completename'];
+            }
+            $categoryEntityIds = array_keys($categoriesByEntity);
+            usort($categoryEntityIds, static function ($a, $b) use ($categoryEntityNames) {
+                return strcasecmp($categoryEntityNames[$a] ?? ('#' . $a), $categoryEntityNames[$b] ?? ('#' . $b));
+            });
+            foreach ($categoryEntityIds as $entityId) {
+                $extraOptions['categories'][] = [
+                    'label' => $categoryEntityNames[$entityId] ?? ('#' . $entityId),
+                    'items' => $categoriesByEntity[$entityId],
+                ];
             }
         }
         if ($tabnum == 3) {
@@ -682,6 +697,9 @@ class Sector extends SectorBase {
             selects.find('option').removeAttr('data-select2-id');
 
             container.append(template);
+            template.find('[data-bs-toggle=tooltip]').each(function() {
+                bootstrap.Tooltip.getOrCreateInstance(this);
+            });
             glpinewentityUnsaved.mark(document.getElementById('form_configs_tab_' + tabnum));
             
             // Inicializa Select2
@@ -1194,9 +1212,13 @@ class Sector extends SectorBase {
             $html .= "          <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Categoria ITIL</label>";
             $html .= "          <select name='items_category[]' class='form-select select2-cat input-category' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhuma ---</option>";
-            foreach (($extraOptions['categories'] ?? []) as $id => $cName) {
-                $selected = ($id == $itilcategoryId) ? 'selected' : '';
-                $html .= "            <option value='{$id}' {$selected}>" . htmlspecialchars($cName) . "</option>";
+            foreach (($extraOptions['categories'] ?? []) as $categoryGroup) {
+                $html .= "            <optgroup label='" . htmlspecialchars((string)$categoryGroup['label'], ENT_QUOTES) . "'>";
+                foreach ($categoryGroup['items'] as $id => $cName) {
+                    $selected = ($id == $itilcategoryId) ? 'selected' : '';
+                    $html .= "              <option value='{$id}' {$selected}>" . htmlspecialchars($cName) . "</option>";
+                }
+                $html .= "            </optgroup>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -1204,7 +1226,7 @@ class Sector extends SectorBase {
         } elseif ($tabnum == 3) {
             // Campos de SolutionTemplate: Tipo de solução + Comentários
             $html .= "  <div style='margin-bottom: 10px;'>";
-            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Tipo de solução</label>";
+            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Tipo de solução <span class='form-help' data-bs-toggle='tooltip' data-bs-placement='top' data-bs-html='true' data-bs-title='O tipo de solução selecionado será criado na entidade deste setor, mesmo que pertença a outra entidade. Se já existir um tipo com o mesmo nome nessa entidade, ele será reutilizado.'>?</span></label>";
             if (!$isTemplate && class_exists('\SolutionType')) {
                 $html .= "      <div class='solutiontype-wrapper'>";
                 $html .= \SolutionType::dropdown([
@@ -1212,6 +1234,8 @@ class Sector extends SectorBase {
                     'value'   => $solutiontypes_id,
                     'display' => false,
                     'width'   => '100%',
+                    'comments' => false,
+                    'addicon' => false,
                     'rand'    => mt_rand()
                 ]);
                 $html .= "      </div>";
