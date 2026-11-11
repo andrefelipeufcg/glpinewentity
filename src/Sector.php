@@ -727,7 +727,7 @@ class Sector extends SectorBase {
             glpinewentityUnsaved.mark(document.getElementById('form_configs_tab_' + tabnum));
             
             // Inicializa Select2
-            template.find('.select2-copy-from, .select2-cat, .select2-calendar, .select2-freq, .select2-foltpl, .select2-fbr, .select2-soltpl, .select2-soltype, .select2-itemtype, .select2-event, .select2-tpl, .select2-target').select2({ width: '100%' });
+            template.find('.select2-copy-from, .select2-cat, .select2-calendar, .select2-freq, .select2-foltpl, .select2-fbr, .select2-soltpl, .select2-soltype, .select2-itemtype, .select2-event, .select2-tpl, .select2-target, .select2-exclusion').select2({ width: '100%' });
 
             // Substituir textarea simples por Rich Text (abas 1, 2, 3)
             if ([1, 2, 3].indexOf(tabnum) !== -1) {
@@ -1153,6 +1153,7 @@ class Sector extends SectorBase {
             $('.select2-event').select2({ width: '100%' });
             $('.select2-tpl').select2({ width: '100%' });
             $('.select2-target').select2({ width: '100%' });
+            $('.select2-exclusion').select2({ width: '100%' });
             initializeIllustrationPickers();
         });
         </script>";
