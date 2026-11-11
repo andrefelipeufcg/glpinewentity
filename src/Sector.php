@@ -446,16 +446,27 @@ class Sector extends SectorBase {
                     $extraOptions['calendars'][$row['id']] = $row['name'];
                 }
             }
-            $extraOptions['itilfollowuptemplates'] = [];
-            if ($DB->tableExists('glpi_itilfollowuptemplates')) {
-                foreach ($DB->request(['FROM' => 'glpi_itilfollowuptemplates']) as $row) {
-                    $extraOptions['itilfollowuptemplates'][$row['id']] = $row['name'];
-                }
+            $templateEntityNames = [];
+            foreach ($DB->request(['SELECT' => ['id', 'name', 'completename'], 'FROM' => 'glpi_entities']) as $entityRow) {
+                $templateEntityNames[(int)$entityRow['id']] = $entityRow['completename'] ?: $entityRow['name'];
             }
-            $extraOptions['solutiontemplates'] = [];
-            if ($DB->tableExists('glpi_solutiontemplates')) {
-                foreach ($DB->request(['FROM' => 'glpi_solutiontemplates']) as $row) {
-                    $extraOptions['solutiontemplates'][$row['id']] = $row['name'];
+            foreach (['itilfollowuptemplates' => 'glpi_itilfollowuptemplates', 'solutiontemplates' => 'glpi_solutiontemplates'] as $key => $table) {
+                $extraOptions[$key] = [];
+                $templatesByEntity = [];
+                if ($DB->tableExists($table)) {
+                    foreach ($DB->request(['SELECT' => ['id', 'name', 'entities_id'], 'FROM' => $table, 'ORDER' => 'name ASC']) as $row) {
+                        $templatesByEntity[(int)$row['entities_id']][$row['id']] = $row['name'];
+                    }
+                }
+                $entityIds = array_keys($templatesByEntity);
+                usort($entityIds, static function ($a, $b) use ($templateEntityNames) {
+                    return strcasecmp($templateEntityNames[$a] ?? ('#' . $a), $templateEntityNames[$b] ?? ('#' . $b));
+                });
+                foreach ($entityIds as $entityId) {
+                    $extraOptions[$key][] = [
+                        'label' => $templateEntityNames[$entityId] ?? ('#' . $entityId),
+                        'items' => $templatesByEntity[$entityId],
+                    ];
                 }
             }
             $extraOptions['frequencies'] = [];
@@ -703,10 +714,7 @@ class Sector extends SectorBase {
             glpinewentityUnsaved.mark(document.getElementById('form_configs_tab_' + tabnum));
             
             // Inicializa Select2
-            template.find('.select2-copy-from').select2({ width: '100%' });
-            if(template.find('.select2-cat').length > 0) {
-                template.find('.select2-cat').select2({ width: '100%' });
-            }
+            template.find('.select2-copy-from, .select2-cat, .select2-calendar, .select2-freq, .select2-foltpl, .select2-fbr, .select2-soltpl, .select2-soltype, .select2-itemtype, .select2-event, .select2-tpl, .select2-target').select2({ width: '100%' });
 
             // Substituir textarea simples por Rich Text (abas 1, 2, 3)
             if ([1, 2, 3].indexOf(tabnum) !== -1) {
@@ -1304,9 +1312,13 @@ class Sector extends SectorBase {
             $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>&nbsp;<br>Modelo de acompanhamento</label>";
             $html .= "          <select name='items_itilfollowuptemplates_id[]' class='form-select select2-foltpl input-itilfollowuptemplates-id' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhum ---</option>";
-            foreach (($extraOptions['itilfollowuptemplates'] ?? []) as $fid => $fname) {
-                $sel = ($fid == $itilfollowuptemplates_id) ? 'selected' : '';
-                $html .= "            <option value='{$fid}' {$sel}>" . htmlspecialchars($fname) . "</option>";
+            foreach (($extraOptions['itilfollowuptemplates'] ?? []) as $group) {
+                $html .= "            <optgroup label='" . htmlspecialchars((string)$group['label'], ENT_QUOTES) . "'>";
+                foreach ($group['items'] as $fid => $fname) {
+                    $sel = ($fid == $itilfollowuptemplates_id) ? 'selected' : '';
+                    $html .= "              <option value='{$fid}' {$sel}>" . htmlspecialchars($fname) . "</option>";
+                }
+                $html .= "            </optgroup>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -1327,9 +1339,13 @@ class Sector extends SectorBase {
             $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Modelo de solução</label>";
             $html .= "          <select name='items_solutiontemplates_id[]' class='form-select select2-soltpl input-solutiontemplates-id' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhum ---</option>";
-            foreach (($extraOptions['solutiontemplates'] ?? []) as $sid => $sname) {
-                $sel = ($sid == $solutiontemplates_id) ? 'selected' : '';
-                $html .= "            <option value='{$sid}' {$sel}>" . htmlspecialchars($sname) . "</option>";
+            foreach (($extraOptions['solutiontemplates'] ?? []) as $group) {
+                $html .= "            <optgroup label='" . htmlspecialchars((string)$group['label'], ENT_QUOTES) . "'>";
+                foreach ($group['items'] as $sid => $sname) {
+                    $sel = ($sid == $solutiontemplates_id) ? 'selected' : '';
+                    $html .= "              <option value='{$sid}' {$sel}>" . htmlspecialchars($sname) . "</option>";
+                }
+                $html .= "            </optgroup>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
