@@ -2075,7 +2075,7 @@ TWIG);
         echo "</tr>";
         if ($transferActive) {
             echo "<tr class='tab_bg_1'><td colspan='2'>";
-            echo self::renderTransferSwitch('transfer_entity', 'Permitir transferência de chamados para esta entidade', true);
+            echo self::renderTransferSwitch('transfer_entity', 'Permitir transferência de chamados para esta entidade', !$isEdit || TransferBridge::entityEnabled((int)($meta['entity_id'] ?? 0)));
             echo "</td></tr>";
         }
 
