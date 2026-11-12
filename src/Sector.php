@@ -2291,7 +2291,7 @@ TWIG);
             echo "      <input type='hidden' name='subgroups[0][techs]' class='email-values' value='" . $sg0Techs . "'>";
             echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione técnicos cadastrados no GLPI'></select>";
             echo "      <small class='text-muted' style='display: block; margin-top: 2px;'>Devem estar cadastrados no GLPI. Se informar um subgrupo, os técnicos irão EXCLUSIVAMENTE para ele. Senão, irão para o Grupo Pai <strong>({SIGLA})</strong>.</small>";
-            echo self::renderTransferSwitch('subgroups[0][transfer]', 'Permitir que os membros deste grupo visualizem chamados transferidos', $sg0Transfer, 'group-transfer-switch');
+            echo self::renderTransferSwitch('subgroups[0][transfer]', 'Permitir que os membros deste subgrupo visualizem chamados transferidos', $sg0Transfer, 'group-transfer-switch');
             echo "  </div>";
             echo "</div>";
         } else {
@@ -2335,7 +2335,7 @@ TWIG);
                 echo "      <input type='hidden' name='subgroups[{$i}][techs]' class='email-values' value='{$sgTechs}'>";
                 echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione técnicos cadastrados no GLPI'></select>";
                 echo "      <small class='text-muted' style='display: block; margin-top: 2px;'>Na edição, carregamos os e-mails salvos na base da entidade. Se quiser sincronizar, modifique e salve.</small>";
-                echo self::renderTransferSwitch('subgroups[' . $i . '][transfer]', 'Permitir que os membros deste grupo visualizem chamados transferidos', in_array((int)($sg['id'] ?? 0), $transferSelectedGroups, true), 'group-transfer-switch');
+                echo self::renderTransferSwitch('subgroups[' . $i . '][transfer]', 'Permitir que os membros deste subgrupo visualizem chamados transferidos', in_array((int)($sg['id'] ?? 0), $transferSelectedGroups, true), 'group-transfer-switch');
                 echo "  </div>";
                 echo "</div>";
                 $i++;
