@@ -102,7 +102,7 @@ final class TransferBridge
         $allow = $entitySelected && self::enabled($entityLast['allow_transfer'] ?? 0);
         $required = $allow && self::enabled($entityLast['allow_entity_only_transfer'] ?? 0);
         $keepCategory = $allow && self::enabled($entityLast['keep_category'] ?? 0);
-        if (!$DB->beginTransaction()) throw new \RuntimeException(__('Unable to start transfer configuration transaction.', 'glpinewentity'));
+        $DB->beginTransaction();
         try {
             if (!$DB->updateOrInsert('glpi_plugin_transferticketentity_entities_settings', [
                 'allow_transfer' => (int) $allow,
@@ -139,7 +139,7 @@ final class TransferBridge
             $groupLast['groups'] = self::mergeIds((array) ($groupLast['groups'] ?? []), array_merge($oldGroups, array_keys($groups)), $selectedGroups);
             self::syncMembers($groupLast['groups']);
             Settings::rememberApplied('groups', $groupLast);
-            if (!$DB->commit()) throw new \RuntimeException(__('Unable to commit transfer settings.', 'glpinewentity'));
+            $DB->commit();
         } catch (\Throwable $e) {
             $DB->rollBack();
             throw $e;
