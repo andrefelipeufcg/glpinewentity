@@ -20,6 +20,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 *   **Criação Rápida de Entidade:** Cria imediatamente uma nova entidade sob uma entidade-pai escolhida.
 *   **Clonagem de Perfis Nativos:** Permite selecionar perfis preexistentes suportados (como Admin ou Atendimento) e cloná-los, nomeando-os automaticamente com o prefixo da sigla do novo setor (Ex: `[DC] - Admin`). Perfis com privilégios globais (Super-Admin) são intencionalmente bloqueados por segurança.
 *   **Vinculação Direta por E-mail:** Basta colar uma lista de e-mails, separados por vírgula ou quebra de linha. O plugin busca o usuário no banco de dados e automaticamente vincula o perfil à nova entidade em escopo recursivo.
+    *   Opcionalmente, ative **Este deve ser o Perfil Padrão destes usuários** em um ou mais perfis. Para cada usuário, o perfil Admin marcado tem prioridade; caso contrário, prevalece o vínculo mais recente entre os perfis marcados. A entidade também é definida como padrão. Sem seleção, as preferências existentes são mantidas para os vínculos preservados.
 *   **Gerenciamento Inteligente de Grupos e Subgrupos:**
     *   Cria automaticamente um "Grupo Pai" nomeado com a sigla do setor `(SIGLA)`.
     *   Permite a criação de múltiplos Subgrupos aninhados de forma dinâmica.
@@ -32,6 +33,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
     *   **Respostas Básicas**
     *   **Soluções Básicas**
     *   **Motivos de Pendências**
+    *   **Modelos de Notificação:** Aba imediatamente anterior a Notificações, com cópia dos modelos nativos, tipo, todos os idiomas do GLPI, assunto e editor HTML com visualização do código-fonte. As demais traduções e o CSS da origem são preservados. O campo Notificação é somente leitura e mostra as associações salvas na aba Notificações, em Padrão (Modelo de Notificação). Os modelos são globais no GLPI: editar um modelo já salvo afeta todas as notificações que o utilizam; copiar cria outro modelo sem alterar a origem.
     *   **Notificações**
     *   **Formulários Padrões**
 *   **Controle de Acesso e Segurança Nativos:** Desenvolvido seguindo os padrões mais rígidos de desenvolvimento seguro do GLPI. A interface e todos os fluxos de criação (endpoints) são protegidos pela matriz dinâmica de direitos do sistema (ACL). A instalação concede acesso de forma inteligente a todos os perfis com nível de Super-Admin de forma nativa e agnóstica, não dependendo de IDs engessados e não gerando poluição visual para os demais usuários.
@@ -63,29 +65,34 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 ![Lista de Setores Vazia](./docs/images/screenshot2.png)
 4. Clique em **Adicionar** (ou botão "+" dependendo do seu tema).
 ![Botão de Adicionar](./docs/images/screenshot3.png)
-5. Siga as instruções do Wizard:
+5. Siga as instruções do Wizard. As abas de configuração também são exibidas na inclusão, mas só podem ser acessadas depois que a entidade for salva:
 ![Preenchimento do Wizard](./docs/images/screenshot4.png)
    *   **Entidade-Pai e Sigla:** Indique a localização na árvore corporativa e a sigla (que dará nome à entidade e aos grupos).
-   *   **Perfis:** Determine de onde clonar o perfil e quais os e-mails dos encarregados daquele setor para herdarem esse acesso de forma recursiva.
+   *   **Perfis:** Ao criar um perfil, determine de onde cloná-lo e quais os e-mails dos encarregados daquele setor para herdarem esse acesso de forma recursiva. Na edição, o seletor de origem aparece somente para perfis novos.
+       Os perfis padrão (Admin e Atendimento) e adicionais possuem o botão **Remover**, com o mesmo ícone de lixeira dos grupos. A remoção altera apenas a tela até salvar. Na criação, perfis removidos não são criados; na edição, salvar e confirmar exclui definitivamente o perfil existente do GLPI e seus vínculos de usuários em todas as entidades, mesmo que existam usuários associados. É obrigatório manter pelo menos um perfil.
    *   **Subgrupos e Técnicos:** Adicione quantos subgrupos precisar, e cole todos os e-mails dos técnicos responsáveis.
    *   **Catálogo (Categorias):** Cole ou escreva sua árvore de categorias usando "-" para subníveis.
 6. Clique em **Salvar**.
+
+Se ocorrer um erro ao criar ou atualizar a estrutura, os dados preenchidos no Wizard ficam preservados na sessão para corrigir e tentar novamente, incluindo perfis, usuários, grupos e categorias. Se a entidade já tiver sido criada parcialmente, o formulário continua na edição dessa entidade. O rascunho é removido após salvar com sucesso.
 
 O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descritivos (inclusive ignorando e-mails inexistentes) e lhe devolvendo uma base pronta para operar em questão de segundos!
 
 ![Lista de Setores](./docs/images/screenshot5.png)
 
-7. **Ajustes e Configurações Avançadas:** Após salvar, retorne à lista e clique no nome do setor que acabou de criar para editá-lo. Você notará que agora estão disponíveis novas abas de configuração, permitindo personalizar toda a operação de forma exclusiva para esta entidade:
+7. **Ajustes e Configurações Avançadas:** Após salvar, retorne à lista e clique no nome do setor que acabou de criar para editá-lo. As abas de configuração permitem personalizar toda a operação de forma exclusiva para esta entidade:
 
 ![Abas de Configuração](./docs/images/screenshot6.png)
 
    *   **Estrutura da entidade:** Retorna ao formulário do Wizard para edição de membros, grupos e categorias.
    *   **Modelos de Chamado:** Crie e associe templates de chamados específicos.
    *   **Respostas Básicas:** Configure textos padronizados para os atendimentos.
-   *   **Soluções Básicas:** Padronize soluções frequentes para o fechamento.
+   *   **Soluções Básicas:** Padronize soluções frequentes para o fechamento. O tipo de solução selecionado é criado na entidade do setor, mesmo quando pertence a outra entidade; um tipo de mesmo nome já existente na entidade é reutilizado.
    *   **Motivos de Pendências:** Defina motivos customizados para pausar os chamados.
    *   **Notificações:** Ajuste ou sobrescreva os alertas de e-mail do setor.
   *   **Formulários:** Gerencie formulários (do Formcreator) vinculados ao setor.
+
+Em cada aba de configuração, clique em **Salvar** para salvar e aplicar as alterações à entidade.
 
 ## ⚙️ Estrutura Técnica e Classes
 

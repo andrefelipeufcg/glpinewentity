@@ -3,8 +3,8 @@
  * -----------------------------------------------------------------------
  * GLPI New Entity — ajax/generate_configs.php
  *
- * Este script é um endpoint AJAX acionado pelo botão "Aplicar Padronização".
- * Ele lê o rascunho salvo no banco de dados e repassa para as classes
+ * Este script é um endpoint AJAX acionado pelo botão "Salvar".
+ * Ele lê as configurações salvas no banco de dados e repassa para as classes
  * Builder corretas (TicketTemplateBuilder, WaitReasonBuilder, etc.), que
  * farão a criação final dos modelos e registros na Entidade do sistema.
  * -----------------------------------------------------------------------
@@ -93,14 +93,14 @@ $tabKey = 'tab_' . $tabnum;
 $savedConfigs = $meta['configs'][$tabKey] ?? [];
 
 if (empty($savedConfigs)) {
-    echo json_encode(['success' => false, 'error' => 'Nenhuma configuração definida para esta aba. Salve o rascunho primeiro.']);
+    echo json_encode(['success' => false, 'error' => 'Nenhuma configuração definida para esta aba.']);
     exit;
 }
 
 $managedIds = $meta['managed_ids'][$tabKey] ?? [];
 $externalIds = $meta['external_ids'][$tabKey] ?? [];
 
-// Prevenção de IDOR: Valida todos os IDs referenciados no rascunho antes de processar
+// Prevenção de IDOR: Valida todos os IDs referenciados nas configurações antes de processar
 $classMap = [
     1 => \TicketTemplate::class,
     2 => \ITILFollowupTemplate::class,
@@ -108,6 +108,7 @@ $classMap = [
     4 => \PendingReason::class,
     5 => \Notification::class,
     6 => \Glpi\Form\Form::class,
+    7 => \NotificationTemplate::class,
 ];
 $itemClass = $classMap[$tabnum] ?? null;
 
@@ -117,7 +118,7 @@ if ($itemClass && class_exists($itemClass)) {
         if ($generatedId > 0) {
             $item = new $itemClass();
             if ($item->getFromDB($generatedId)) {
-                if ($item->fields['entities_id'] != $new_entity_id) {
+                if ($tabnum != 7 && $item->fields['entities_id'] != $new_entity_id) {
                     echo json_encode(['success' => false, 'error' => "Violação de segurança: O item gerado #$generatedId não pertence à entidade gerenciada."]);
                     exit;
                 }
@@ -176,6 +177,10 @@ try {
             break;
         case 4:
             $builder = new WaitReasonBuilder();
+            $result = $builder->build($new_entity_id, $savedConfigs);
+            break;
+        case 7:
+            $builder = new \GlpiPlugin\Glpinewentity\Builders\NotificationTemplateBuilder();
             $result = $builder->build($new_entity_id, $savedConfigs);
             break;
         case 5:

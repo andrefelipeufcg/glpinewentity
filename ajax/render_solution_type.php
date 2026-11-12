@@ -52,6 +52,8 @@ if (class_exists('\SolutionType')) {
         'value'   => $type_id,
         'display' => true,
         'width'   => '100%',
+        'comments' => false,
+        'addicon' => false,
         'rand'    => mt_rand()
     ]);
 }

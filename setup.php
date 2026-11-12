@@ -23,8 +23,7 @@ function plugin_init_glpinewentity(): void {
     include_once __DIR__ . '/hook.php';
 
     $PLUGIN_HOOKS['csrf_compliant']['glpinewentity'] = true;
-    // A engrenagem do plugin inicia diretamente o wizard de inclusão.
-    $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['glpinewentity'] = 'front/sector.form.php';
+    $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['glpinewentity'] = 'front/sector.php';
     $PLUGIN_HOOKS[Hooks::UNDISCLOSED_CONFIG_VALUE]['glpinewentity'] = 'plugin_glpinewentity_undisclosed_config_value';
 
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Wizard');

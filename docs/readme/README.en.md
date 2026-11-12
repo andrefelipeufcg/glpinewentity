@@ -20,6 +20,7 @@ Instead of navigating through several GLPI screens to create entities, configure
 *   **Fast Entity Creation:** Instantly creates a new entity under a chosen parent entity.
 *   **Native Profile Cloning:** Allows you to select supported pre-existing profiles (such as Admin or Technician) and clone them, automatically naming them using the new sector's acronym prefix (e.g., `[DC] - Admin`). Super-Admin profiles are intentionally excluded for security reasons.
 *   **Direct E-mail Linking:** Just paste a list of e-mails, separated by commas or line breaks. The plugin searches for the user in the database and automatically links the profile to the new entity with recursive scope.
+    *   Optionally, enable the default-profile switch on one or more profiles. For each user, a selected Admin profile takes priority; otherwise the most recent assignment among the selected profiles wins. The entity is also set as the default. With no selection, existing preferences remain unchanged for retained assignments.
 *   **Smart Group and Subgroup Management:**
     *   Automatically creates a "Parent Group" named with the sector's acronym `(ACRONYM)`.
     *   Allows the dynamic creation of multiple nested Subgroups.
@@ -32,6 +33,7 @@ Instead of navigating through several GLPI screens to create entities, configure
     *   **Standard Follow-ups**
     *   **Standard Solutions**
     *   **Pending Reasons**
+    *   **Notification Templates:** Immediately above Notifications, with native template copying, type, all GLPI languages, subject and the HTML editor with source-code viewing. Other translations and source CSS are preserved. The read-only Notification field shows saved associations from Notifications > Notification Template. Templates are global in GLPI: editing a saved template affects every notification using it; copying creates a separate template without changing its source.
     *   **Notifications**
     *   **Standard Forms**
 *   **Native Security and Access Control:** Developed following GLPI's strictest secure development standards. The interface and all creation flows (endpoints) are protected by the system's dynamic rights matrix (ACL). The installation intelligently grants access to all Super-Admin profiles natively and agnostically, without depending on hardcoded IDs and avoiding visual pollution for other users.
@@ -63,29 +65,34 @@ Instead of navigating through several GLPI screens to create entities, configure
 ![Empty Sector List](../images/screenshot2.png)
 4. Click **Add** (or the "+" button depending on your theme).
 ![Add Button](../images/screenshot3.png)
-5. Follow the Wizard instructions:
+5. Follow the Wizard instructions. The configuration tabs are also visible when adding a sector, but can only be opened after the entity is saved:
 ![Wizard Filling](../images/screenshot4.png)
    *   **Parent Entity and Acronym:** Indicate the location in the corporate tree and the acronym (which will name the entity and groups).
-   *   **Profiles:** Determine where to clone the profile from and the e-mails of the sector managers to inherit this access recursively.
+   *   **Profiles:** When creating a profile, select its source and the e-mails of the sector managers to inherit this access recursively. When editing, the source selector is shown only for new profiles.
+       Standard profiles (Admin and Atendimento) and additional profiles have a **Remove** button with the same trash icon as the groups. Removal only changes the form until it is saved. During creation, removed profiles are not created; during editing, saving and confirming permanently deletes the existing GLPI profile and its user assignments across all entities, even when users are assigned. At least one profile must remain.
    *   **Subgroups and Technicians:** Add as many subgroups as needed, and paste all the e-mails of the responsible technicians.
    *   **Catalog (Categories):** Paste or write your category tree using "-" for sublevels.
 6. Click **Save**.
+
+If creating or updating the structure fails, the Wizard keeps the submitted data in the session so you can correct it and retry, including profiles, users, groups, and categories. If the entity was partially created, the form continues in edit mode for that entity. The draft is cleared after a successful save.
 
 The system will iterate and provision the entire environment, displaying descriptive alerts (even ignoring non-existent e-mails) and returning a base ready to operate in a matter of seconds!
 
 ![Sector List](../images/screenshot5.png)
 
-7. **Advanced Adjustments and Configurations:** After saving, return to the list and click on the name of the newly created sector to edit it. You will notice that new configuration tabs are now available, allowing you to exclusively customize the entire operation for this entity:
+7. **Advanced Adjustments and Configurations:** After saving, return to the list and click on the name of the newly created sector to edit it. The configuration tabs allow you to exclusively customize the entire operation for this entity:
 
 ![Configuration Tabs](../images/screenshot6.png)
 
    *   **Entity Infrastructure:** Returns to the Wizard form to edit members, groups, and categories.
    *   **Ticket Templates:** Create and associate specific ticket templates.
    *   **Standard Follow-ups:** Configure standardized texts for support replies.
-   *   **Standard Solutions:** Standardize frequent solutions for ticket closure.
+   *   **Standard Solutions:** Standardize frequent solutions for ticket closure. The selected solution type is created in the sector's entity even if it belongs to another entity; an existing type with the same name in that entity is reused.
    *   **Pending Reasons:** Define customized reasons for pausing tickets.
    *   **Notifications:** Adjust or override sector e-mail alerts.
    *   **Standard Forms:** Manage forms (from Formcreator) linked to the sector.
+
+In each configuration tab, click **Save** to save and apply changes to the entity.
 
 ## ⚙️ Technical Structure and Classes
 

@@ -38,6 +38,27 @@ class Sector extends SectorBase {
         parent::__construct();
     }
 
+    private static function trimSectorFields(array $input): array|false {
+        foreach (['sector_name', 'sector_abbr'] as $field) {
+            if (isset($input[$field]) && is_string($input[$field])) {
+                $input[$field] = trim($input[$field]);
+                if ($input[$field] === '') {
+                    Session::addMessageAfterRedirect(__('O nome do setor e a sigla são obrigatórios.', 'glpinewentity'), false, ERROR);
+                    return false;
+                }
+            }
+        }
+        return $input;
+    }
+
+    public function prepareInputForAdd($input) {
+        return self::trimSectorFields(parent::prepareInputForAdd($input));
+    }
+
+    public function prepareInputForUpdate($input) {
+        return self::trimSectorFields(parent::prepareInputForUpdate($input));
+    }
+
     /**
      * Valida se o perfil ativo do usuário atual é um perfil de Super-Admin
      * nativo do GLPI (id 4 ou perfis criados a partir dele marcados internamente).
@@ -160,15 +181,62 @@ class Sector extends SectorBase {
     public function defineTabs($options = []) {
         $ong = [];
         $this->addDefaultFormTab($ong); // Aba principal
-        if ($this->fields['id'] > 0) {
-            $ong['GlpiPlugin\Glpinewentity\Sector$1'] = self::createTabEntry(__('Modelos de Chamado', 'glpinewentity'), 0, __CLASS__, 'ti ti-ticket');
-            $ong['GlpiPlugin\Glpinewentity\Sector$2'] = self::createTabEntry(__('Respostas Básicas', 'glpinewentity'), 0, __CLASS__, 'ti ti-messages');
-            $ong['GlpiPlugin\Glpinewentity\Sector$3'] = self::createTabEntry(__('Soluções Básicas', 'glpinewentity'), 0, __CLASS__, 'ti ti-bulb');
-            $ong['GlpiPlugin\Glpinewentity\Sector$4'] = self::createTabEntry(__('Motivos de Pendências', 'glpinewentity'), 0, __CLASS__, 'ti ti-clock-pause');
-            $ong['GlpiPlugin\Glpinewentity\Sector$5'] = self::createTabEntry(__('Notificações', 'glpinewentity'), 0, __CLASS__, 'ti ti-bell');
-            $ong['GlpiPlugin\Glpinewentity\Sector$6'] = self::createTabEntry(__('Formulários', 'glpinewentity'), 0, __CLASS__, 'ti ti-clipboard-list');
+        foreach ($this->getTabNameForItem($this) as $number => $title) {
+            $ong[__CLASS__ . '$' . $number] = $title;
         }
         return $ong;
+    }
+
+    public function showTabsContent($options = []) {
+        if ((int)($options['id'] ?? $this->getID()) > 0) {
+            parent::showTabsContent($options);
+            return;
+        }
+
+        // O GLPI limita itens novos à aba principal em defineAllTabs().
+        $tabs = $this->defineTabs($options);
+        $mainTitle = array_shift($tabs);
+        $tabs[-1] = self::createTabEntry(__('All'), 0, null, 'ti ti-layout-list');
+        $warning = json_encode(
+            __('Crie a estrutura da entidade primeiro, antes de acessar as outras abas de configuração.', 'glpinewentity'),
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        );
+
+        echo "<div class='d-flex card-tabs flex-column flex-md-row vertical'>";
+        echo "<ul class='nav nav-tabs flex-row flex-md-column d-none d-md-block' id='tabspanel' style='min-width: 200px' role='tablist'>";
+        echo "<li class='nav-item ms-0'><a href='#' class='nav-link justify-content-between pe-1 active' id='glpinewentity-new-main-tab' role='tab' aria-selected='true'>{$mainTitle}</a></li>";
+        foreach ($tabs as $title) {
+            echo "<li class='nav-item ms-0'><a href='#' class='nav-link justify-content-between pe-1' role='tab' aria-selected='false' data-requires-entity>{$title}</a></li>";
+        }
+        echo "</ul>";
+        echo "<select class='form-select border-2 rounded-0 rounded-top d-md-none mb-2' id='glpinewentity-new-tabs-select' aria-label='" . htmlspecialchars(__('Selecionar uma aba', 'glpinewentity'), ENT_QUOTES) . "'>";
+        echo "<option value='main'>" . htmlspecialchars(strip_tags($mainTitle), ENT_QUOTES) . "</option>";
+        foreach ($tabs as $key => $title) {
+            echo "<option value='" . htmlspecialchars((string)$key, ENT_QUOTES) . "'>" . htmlspecialchars(strip_tags($title), ENT_QUOTES) . "</option>";
+        }
+        echo "</select>";
+        echo "<div class='tab-content p-2 flex-grow-1 card border-start-0' style='min-height: 150px'>";
+        echo "<div class='tab-pane active show' role='tabpanel'>";
+        $this->showForm(0, $options);
+        echo "</div></div></div>";
+
+        echo Html::scriptBlock("
+            document.getElementById('glpinewentity-new-main-tab').addEventListener('click', function (event) {
+                event.preventDefault();
+            });
+            document.querySelectorAll('#tabspanel [data-requires-entity]').forEach(function (tab) {
+                tab.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    alert({$warning});
+                });
+            });
+            document.getElementById('glpinewentity-new-tabs-select').addEventListener('change', function () {
+                if (this.value !== 'main') {
+                    this.value = 'main';
+                    alert({$warning});
+                }
+            });
+        ");
     }
 
     public function getTabNameForItem(\CommonGLPI $item, $withtemplate = 0) {
@@ -178,6 +246,7 @@ class Sector extends SectorBase {
             $ong[2] = self::createTabEntry(__('Respostas Básicas', 'glpinewentity'), 0, $item::class, 'ti ti-messages');
             $ong[3] = self::createTabEntry(__('Soluções Básicas', 'glpinewentity'), 0, $item::class, 'ti ti-bulb');
             $ong[4] = self::createTabEntry(__('Motivos de Pendências', 'glpinewentity'), 0, $item::class, 'ti ti-clock-pause');
+            $ong[7] = self::createTabEntry(__('Modelos de Notificação', 'glpinewentity'), 0, $item::class, 'ti ti-mail');
             $ong[5] = self::createTabEntry(__('Notificações', 'glpinewentity'), 0, $item::class, 'ti ti-bell');
             $ong[6] = self::createTabEntry(__('Formulários', 'glpinewentity'), 0, $item::class, 'ti ti-clipboard-list');
             return $ong;
@@ -185,8 +254,26 @@ class Sector extends SectorBase {
         return '';
     }
 
+    private static function renderDefaultProfileSwitch(string $value, bool $checked = false, bool $template = false): string {
+        $name = $template ? '' : " name='default_profile[]'";
+        $checkedAttr = $checked ? ' checked' : '';
+        return "<label class='form-check form-switch' style='margin-top: 10px;'>"
+            . "<input class='form-check-input profile-default-switch' type='checkbox'{$name} value='"
+            . htmlspecialchars($value, ENT_QUOTES) . "'{$checkedAttr}>"
+            . "<span class='form-check-label'>"
+            . htmlspecialchars(__('Este deve ser o Perfil Padrão destes usuários', 'glpinewentity'), ENT_QUOTES)
+            . "</span></label>";
+    }
+
     public static function displayTabContentForItem(\CommonGLPI $item, $tabnum = 1, $withtemplate = 0) {
         if ($item->getType() != __CLASS__) {
+            return false;
+        }
+        if ((int)$item->getID() <= 0) {
+            echo "<div class='alert alert-warning'>" . htmlspecialchars(
+                __('Crie a estrutura da entidade primeiro, antes de acessar as outras abas de configuração.', 'glpinewentity'),
+                ENT_QUOTES
+            ) . "</div>";
             return false;
         }
 
@@ -195,6 +282,7 @@ class Sector extends SectorBase {
             2 => 'Respostas Básicas',
             3 => 'Soluções Básicas',
             4 => 'Motivos de Pendências',
+            7 => 'Modelos de Notificação',
             5 => 'Notificações',
             6 => 'Formulários',
         ];
@@ -262,12 +350,39 @@ class Sector extends SectorBase {
             }
         }
 
+        if ($tabnum == 7) {
+            foreach ($savedConfigs as &$config) {
+                $generatedId = (int)($config['generated_id'] ?? 0);
+                if ($generatedId > 0) {
+                    $config = array_replace($config, Builders\NotificationTemplateBuilder::read($generatedId));
+                }
+                $notificationNames = [];
+                if ($generatedId > 0) {
+                    foreach ($DB->request([
+                        'SELECT' => ['glpi_notifications.name'],
+                        'FROM' => 'glpi_notifications',
+                        'INNER JOIN' => ['glpi_notifications_notificationtemplates' => [
+                            'ON' => ['glpi_notifications_notificationtemplates' => 'notifications_id', 'glpi_notifications' => 'id'],
+                        ]],
+                        'WHERE' => ['glpi_notifications_notificationtemplates.notificationtemplates_id' => $generatedId,
+                                    'glpi_notifications.entities_id' => (int)($meta['entity_id'] ?? 0)],
+                        'ORDER' => 'glpi_notifications.name ASC',
+                    ]) as $notification) {
+                        $notificationNames[] = $notification['name'];
+                    }
+                }
+                $config['notification_names'] = implode(', ', array_unique($notificationNames));
+            }
+            unset($config);
+        }
+
         // Definições por aba
         $tableMapping = [
             1 => 'glpi_tickettemplates',
             2 => 'glpi_itilfollowuptemplates',
             3 => 'glpi_solutiontemplates',
             4 => 'glpi_pendingreasons',
+            7 => 'glpi_notificationtemplates',
             5 => 'glpi_notifications', // Para notificações, copiamos de outras notifications
             6 => 'glpi_plugin_formcreator_forms', // Se tiver Formcreator (mas no Builder usamos nativo glpi_forms, entao testamos)
         ];
@@ -291,7 +406,7 @@ class Sector extends SectorBase {
             }
 
             $iterator = $DB->request([
-                'SELECT' => ['id', 'name', 'entities_id'],
+                'SELECT' => $tabnum == 7 ? ['id', 'name'] : ['id', 'name', 'entities_id'],
                 'FROM'   => $tableName,
                 'ORDER'  => 'name ASC'
             ]);
@@ -299,6 +414,10 @@ class Sector extends SectorBase {
             $groupsPadrao = [];
             $groupsNormal = [];
             foreach ($iterator as $row) {
+                if ($tabnum == 7) {
+                    $existingModels[$row['id']] = $row['name'];
+                    continue;
+                }
                 $entityId = (int)($row['entities_id'] ?? 0);
                 if (preg_match('/^\[padr(?:a|ã)o\]/iu', $row['name'])) {
                     $groupsPadrao[$entityId][$row['id']] = $row['name'];
@@ -320,14 +439,38 @@ class Sector extends SectorBase {
         $hasContentField = in_array($tabnum, [1, 2, 3]); // Modelos, Respostas, Soluções
 
         $extraOptions = [];
+        if ($tabnum == 7) {
+            $extraOptions['itemtypes'] = [];
+            foreach ($CFG_GLPI['notificationtemplates_types'] ?? [] as $notificationType) {
+                if (class_exists($notificationType)) {
+                    $extraOptions['itemtypes'][$notificationType] = $notificationType::getTypeName(1);
+                }
+            }
+            asort($extraOptions['itemtypes']);
+        }
         if ($tabnum == 1 && $DB->tableExists('glpi_itilcategories')) {
+            $categoryEntityNames = [];
+            foreach ($DB->request(['SELECT' => ['id', 'name', 'completename'], 'FROM' => 'glpi_entities']) as $entityRow) {
+                $categoryEntityNames[(int)$entityRow['id']] = $entityRow['completename'] ?: $entityRow['name'];
+            }
+            $categoriesByEntity = [];
             $catIter = $DB->request([
-                'SELECT' => ['id', 'completename'],
+                'SELECT' => ['id', 'completename', 'entities_id'],
                 'FROM' => 'glpi_itilcategories',
                 'ORDER' => 'completename ASC'
             ]);
             foreach ($catIter as $row) {
-                $extraOptions['categories'][$row['id']] = $row['completename'];
+                $categoriesByEntity[(int)$row['entities_id']][$row['id']] = $row['completename'];
+            }
+            $categoryEntityIds = array_keys($categoriesByEntity);
+            usort($categoryEntityIds, static function ($a, $b) use ($categoryEntityNames) {
+                return strcasecmp($categoryEntityNames[$a] ?? ('#' . $a), $categoryEntityNames[$b] ?? ('#' . $b));
+            });
+            foreach ($categoryEntityIds as $entityId) {
+                $extraOptions['categories'][] = [
+                    'label' => $categoryEntityNames[$entityId] ?? ('#' . $entityId),
+                    'items' => $categoriesByEntity[$entityId],
+                ];
             }
         }
         if ($tabnum == 3) {
@@ -345,16 +488,27 @@ class Sector extends SectorBase {
                     $extraOptions['calendars'][$row['id']] = $row['name'];
                 }
             }
-            $extraOptions['itilfollowuptemplates'] = [];
-            if ($DB->tableExists('glpi_itilfollowuptemplates')) {
-                foreach ($DB->request(['FROM' => 'glpi_itilfollowuptemplates']) as $row) {
-                    $extraOptions['itilfollowuptemplates'][$row['id']] = $row['name'];
-                }
+            $templateEntityNames = [];
+            foreach ($DB->request(['SELECT' => ['id', 'name', 'completename'], 'FROM' => 'glpi_entities']) as $entityRow) {
+                $templateEntityNames[(int)$entityRow['id']] = $entityRow['completename'] ?: $entityRow['name'];
             }
-            $extraOptions['solutiontemplates'] = [];
-            if ($DB->tableExists('glpi_solutiontemplates')) {
-                foreach ($DB->request(['FROM' => 'glpi_solutiontemplates']) as $row) {
-                    $extraOptions['solutiontemplates'][$row['id']] = $row['name'];
+            foreach (['itilfollowuptemplates' => 'glpi_itilfollowuptemplates', 'solutiontemplates' => 'glpi_solutiontemplates'] as $key => $table) {
+                $extraOptions[$key] = [];
+                $templatesByEntity = [];
+                if ($DB->tableExists($table)) {
+                    foreach ($DB->request(['SELECT' => ['id', 'name', 'entities_id'], 'FROM' => $table, 'ORDER' => 'name ASC']) as $row) {
+                        $templatesByEntity[(int)$row['entities_id']][$row['id']] = $row['name'];
+                    }
+                }
+                $entityIds = array_keys($templatesByEntity);
+                usort($entityIds, static function ($a, $b) use ($templateEntityNames) {
+                    return strcasecmp($templateEntityNames[$a] ?? ('#' . $a), $templateEntityNames[$b] ?? ('#' . $b));
+                });
+                foreach ($entityIds as $entityId) {
+                    $extraOptions[$key][] = [
+                        'label' => $templateEntityNames[$entityId] ?? ('#' . $entityId),
+                        'items' => $templatesByEntity[$entityId],
+                    ];
                 }
             }
             $extraOptions['frequencies'] = [];
@@ -443,7 +597,7 @@ class Sector extends SectorBase {
         $ajax_generate_url = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/ajax/generate_configs.php';
 
         echo "<div class='center' style='margin-top: 20px;'>";
-        echo "<form id='form_configs_tab_{$tabnum}'>";
+        echo "<form id='form_configs_tab_{$tabnum}' data-track-changes='true' data-glpinewentity-track='true'>";
         echo "<input type='hidden' name='action' value='save_draft'>";
         echo "<input type='hidden' name='sector_id' value='{$item->getID()}'>";
         echo "<input type='hidden' name='tabnum' value='{$tabnum}'>";
@@ -464,6 +618,17 @@ class Sector extends SectorBase {
             .config-block .select2-selection--single {
                 max-width: none !important;
             }
+            .glpinewentity-copy-overlay {
+                align-items: center; background: rgba(0, 0, 0, .65); color: #fff;
+                display: flex; flex-direction: column; font-size: 1.1rem; gap: 12px;
+                inset: 0; justify-content: center; position: fixed; z-index: 2000;
+            }
+            .glpinewentity-copy-spinner {
+                animation: glpinewentity-copy-spin .8s linear infinite;
+                border: 5px solid rgba(255, 255, 255, .3); border-radius: 50%;
+                border-top-color: #fff; height: 42px; width: 42px;
+            }
+            @keyframes glpinewentity-copy-spin { to { transform: rotate(360deg); } }
         </style>";
 
         echo "<div id='items-container-tab-{$tabnum}'>";
@@ -471,7 +636,7 @@ class Sector extends SectorBase {
         // Template oculto para adicionar novos
         echo self::renderConfigBlockTemplate($tabnum, $hasContentField, $existingModels, $extraOptions);
 
-        // Renderiza existentes (salvos no rascunho)
+        // Renderiza as configurações existentes.
         foreach ($savedConfigs as $idx => $config) {
             echo self::renderConfigBlock($tabnum, $hasContentField, $existingModels, $config, $idx, $extraOptions);
         }
@@ -486,12 +651,8 @@ class Sector extends SectorBase {
         // Botões de Ação
         echo "<tr class='tab_bg_2'><td class='center' colspan='2' style='padding: 20px;'>";
 
-        echo "<button type='button' id='btn_save_draft_{$tabnum}' class='btn btn-primary' onclick='saveDraftConfigs({$tabnum})' style='margin-right: 15px;'>";
-        echo "<i class='fas fa-save' style='margin-right: 5px;'></i> Salvar Rascunho";
-        echo "</button>";
-
-        echo "<button type='button' id='btn_generate_{$tabnum}' class='btn btn-success' style='color: white !important;' onclick='generateSectorConfigs({$item->getID()}, {$tabnum})'>";
-        echo "<i class='fas fa-magic' style='margin-right: 5px;'></i> Aplicar Padronização para esta Entidade";
+        echo "<button type='button' id='btn_generate_{$tabnum}' class='btn btn-primary' onclick='generateSectorConfigs({$item->getID()}, {$tabnum})'>";
+        echo "<i class='fas fa-save' style='margin-right: 5px;'></i> Salvar";
         echo "</button>";
 
         echo "</td></tr>";
@@ -600,12 +761,15 @@ class Sector extends SectorBase {
             selects.find('option').removeAttr('data-select2-id');
 
             container.append(template);
+            const pendingControls = [];
+            template.data('pending-controls', pendingControls);
+            template.find('[data-bs-toggle=tooltip]').each(function() {
+                bootstrap.Tooltip.getOrCreateInstance(this);
+            });
+            glpinewentityUnsaved.mark(document.getElementById('form_configs_tab_' + tabnum));
             
             // Inicializa Select2
-            template.find('.select2-copy-from').select2({ width: '100%' });
-            if(template.find('.select2-cat').length > 0) {
-                template.find('.select2-cat').select2({ width: '100%' });
-            }
+            template.find('.select2-copy-from, .select2-cat, .select2-calendar, .select2-freq, .select2-foltpl, .select2-fbr, .select2-soltpl, .select2-soltype, .select2-itemtype, .select2-event, .select2-tpl, .select2-target, .select2-exclusion').select2({ width: '100%' });
 
             // Substituir textarea simples por Rich Text (abas 1, 2, 3)
             if ([1, 2, 3].indexOf(tabnum) !== -1) {
@@ -614,29 +778,44 @@ class Sector extends SectorBase {
                     let wrapper = $('<div class=\"input-content-wrapper\"></div>');
                     plainTextarea.replaceWith(wrapper);
                     
-                    $.ajax({
+                    pendingControls.push($.ajax({
                         url: '{$ajax_render_richtext_url}',
                         type: 'POST',
                         data: { name: 'items_content[]', value: '' },
                         success: function(html) {
                             wrapper.html(html);
                         }
-                    });
+                    }));
                 }
             }
             
+            if (tabnum == 7) {
+                template.find('.input-translations').val('{}');
+                template.find('.input-language').val('').trigger('change');
+                template.find('.input-itemtype').val('Ticket').trigger('change');
+                template.find('.select2-language').select2({ width: '100%' });
+                const plainHtml = template.find('textarea.input-content-html');
+                const htmlWrapper = $('<div class=\"input-html-wrapper\"></div>');
+                plainHtml.replaceWith(htmlWrapper);
+                pendingControls.push($.ajax({
+                    url: '{$ajax_render_richtext_url}', type: 'POST',
+                    data: { name: 'items_content_html[]', value: '' },
+                    success: function(html) { htmlWrapper.html(html); }
+                }));
+            }
+
             // Buscar categoria de form via AJAX para tab 6 (mantém macro/botões nativos do GLPI)
             if (tabnum == 3) {
                 let solutionTypeWrapper = template.find('.solutiontype-wrapper');
                 if (solutionTypeWrapper.length > 0) {
-                    $.ajax({
+                    pendingControls.push($.ajax({
                         url: '{$ajax_render_solution_type_url}',
                         type: 'POST',
                         data: { type_id: 0 },
                         success: function(html) {
                             solutionTypeWrapper.html(html);
                         }
-                    });
+                    }));
                 }
             }
 
@@ -645,7 +824,7 @@ class Sector extends SectorBase {
                 let illustrationWrapper = template.find('.illustration-wrapper');
                 if (illustrationWrapper.length > 0) {
                     illustrationWrapper.empty();
-                    $.ajax({
+                    pendingControls.push($.ajax({
                         url: '{$ajax_render_illustration_url}',
                         type: 'POST',
                         data: { illustration: 'request-service' },
@@ -653,19 +832,19 @@ class Sector extends SectorBase {
                             illustrationWrapper.html(html);
                             initializeIllustrationPickers(illustrationWrapper.get(0));
                         }
-                    });
+                    }));
                 }
 
                 let categoryWrapper = template.find('.form-category-wrapper');
                 if (categoryWrapper.length > 0) {
-                    $.ajax({
+                    pendingControls.push($.ajax({
                         url: '{$ajax_render_form_category_url}',
                         type: 'POST',
                         data: { category_id: 0 },
                         success: function(html) {
                             categoryWrapper.html(html);
                         }
-                    });
+                    }));
                 }
                 
                 // Inicializa Rich Text para a descrição
@@ -674,20 +853,21 @@ class Sector extends SectorBase {
                     let descWrapper = $('<div class=\"input-description-wrapper\"></div>');
                     plainDesc.replaceWith(descWrapper);
                     
-                    $.ajax({
+                    pendingControls.push($.ajax({
                         url: '{$ajax_render_richtext_url}',
                         type: 'POST',
                         data: { name: 'items_description[]', value: '' },
                         success: function(html) {
                             descWrapper.html(html);
                         }
-                    });
+                    }));
                 }
             }
         }
 
         $(document).on('click', '.btn-remove-config', function() {
             let block = $(this).closest('.config-block');
+            glpinewentityUnsaved.mark(block.closest('form').get(0));
             let generatedId = parseInt(block.find('.input-generated-id').val(), 10) || 0;
             let tabnum = $('#form_configs_tab_6').length ? 6 : 0;
             if (tabnum === 6 && generatedId > 0) {
@@ -706,13 +886,23 @@ class Sector extends SectorBase {
             let id = $(this).val();
             let tabnum = $(this).data('tab');
             let block = $(this).closest('.config-block');
-            
+            const selectionVersion = (block.data('copy-selection-version') || 0) + 1;
+            block.data('copy-selection-version', selectionVersion);
+            const previousRequest = block.data('copy-request');
+            if (previousRequest) previousRequest.abort();
+
             if (id > 0) {
-                $.ajax({
+                const overlay = $('<div class=\"glpinewentity-copy-overlay\" role=\"status\" aria-live=\"polite\"><div class=\"glpinewentity-copy-spinner\"></div><div>Carregando...</div></div>');
+                $('body').append(overlay);
+                const hideOverlay = function() { overlay.remove(); };
+                const request = $.ajax({
                     url: '{$ajax_get_template_url}',
                     type: 'POST',
                     data: { id: id, tabnum: tabnum },
                     success: function(response) {
+                        $.when.apply($, block.data('pending-controls') || []).done(function() {
+                        hideOverlay();
+                        if (block.data('copy-selection-version') !== selectionVersion || !block.closest('body').length) return;
                         if (response.success && response.data) {
                             block.find('.input-name').val(response.data.name || '');
                             
@@ -766,6 +956,19 @@ class Sector extends SectorBase {
                                 block.find('.input-followups-before-resolution').val(response.data.followups_before_resolution || '0').trigger('change');
                                 block.find('.input-solutiontemplates-id').val(response.data.solutiontemplates_id || '0').trigger('change');
                                 block.find('.input-comment').val(response.data.comment || '');
+                            }
+
+                            if (tabnum == 7) {
+                                block.find('.input-itemtype').val(response.data.itemtype || 'Ticket').trigger('change');
+                                block.removeData('translation-language');
+                                block.find('.input-translations').val(JSON.stringify(Object.assign({}, response.data.translations || {})));
+                                block.find('.input-language').val(response.data.language || '').trigger('change');
+                                block.find('.input-subject').val(response.data.subject || '');
+                                block.find('.input-content-text').val(response.data.content_text || '');
+                                const textarea = block.find('.input-html-wrapper textarea');
+                                const editor = typeof tinymce !== 'undefined' && textarea.attr('id') ? tinymce.get(textarea.attr('id')) : null;
+                                if (editor) { editor.setContent(response.data.content_html || ''); }
+                                else { textarea.val(response.data.content_html || ''); }
                             }
 
                             if (tabnum == 5) {
@@ -827,10 +1030,31 @@ class Sector extends SectorBase {
                                     placeholderPreview.addClass('d-none');
                                 }
                             }
+                        } else {
+                            alert(response.error || 'Não foi possível carregar o modelo selecionado.');
+                        }
+                        }).fail(function() {
+                            hideOverlay();
+                            if (block.data('copy-selection-version') === selectionVersion) {
+                                alert('Não foi possível preparar os campos do modelo. Recarregue a página e tente novamente.');
+                            }
+                        });
+                    },
+                    error: function(xhr, status) {
+                        hideOverlay();
+                        if (status !== 'abort' && block.data('copy-selection-version') === selectionVersion) {
+                            alert('Não foi possível carregar o modelo selecionado. Tente novamente.');
                         }
                     }
                 });
+                block.data('copy-request', request);
             } else {
+                if (tabnum == 7) {
+                    block.removeData('translation-language');
+                    block.find('.input-translations').val('{}');
+                    block.find('.input-language').val('').trigger('change');
+                    block.find('.input-itemtype').val('Ticket').trigger('change');
+                }
                 block.find('.input-name').val('');
                 
                 // Limpar editor das abas 1, 2 e 3 se existir
@@ -908,52 +1132,34 @@ class Sector extends SectorBase {
             }
         });
 
-        function saveDraftConfigs(tabnum) {
-            let btn = $('#btn_save_draft_' + tabnum);
-            let originalHtml = btn.html();
-            btn.prop('disabled', true);
-            btn.html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Salvando...');
-
-            if (typeof tinymce !== 'undefined') {
-                tinymce.triggerSave();
-            }
-            let formData = $('#form_configs_tab_' + tabnum).serialize();
-            $.ajax({
-                url: '{$ajax_save_url}',
-                type: 'POST',
-                data: formData,
-                success: function(response) {
-                    if(response.success) {
-                        window.location.reload();
-                    } else {
-                        btn.prop('disabled', false).html(originalHtml);
-                        alert('Erro ao salvar rascunho: ' + (response.error || 'Erro desconhecido'));
-                    }
-                },
-                error: function() {
-                    btn.prop('disabled', false).html(originalHtml);
-                    alert('Erro na requisição.');
-                }
-            });
-        }
-
         function generateSectorConfigs(sectorId, tabnum) {
-            let confirmMsg = 'Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade. O rascunho atual será salvo automaticamente.\\nDeseja prosseguir?';
+            let confirmMsg = 'Atenção: Isso irá criar os registros definitivos no GLPI vinculados a esta entidade.\\nDeseja prosseguir?';
+            if (tabnum === 7) {
+                confirmMsg = 'Os modelos de notificação são globais no GLPI. Alterações em um modelo já salvo afetam todas as notificações que o utilizam. Deseja prosseguir?';
+            }
             if (tabnum === 6) {
-                confirmMsg = 'Atenção! A padronização irá criar, atualizar e remover formulários conforme as seguintes configurações:\\nFormulários não gerenciados pelo plugin (externos) que forem removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos desta tela serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\\nO rascunho atual será salvo automaticamente.\\nDeseja prosseguir com a sincronização?';
+                confirmMsg = 'Atenção! O salvamento irá criar, atualizar e remover formulários conforme as seguintes configurações:\\nFormulários não gerenciados pelo plugin (externos) que forem removidos desta tela serão INATIVADOS. Formulários gerenciados pelo plugin que forem removidos desta tela serão INATIVADOS se tiverem respostas e EXCLUÍDOS definitivamente se não tiverem respostas.\\nDeseja prosseguir com a sincronização?';
             }
             if(confirm(confirmMsg)) {
+                const form = document.getElementById('form_configs_tab_' + tabnum);
+                if (!glpinewentityUnsaved.confirmOtherChanges(form)) return;
                 
                 let btn = $('#btn_generate_' + tabnum);
                 let originalHtml = btn.html();
                 btn.prop('disabled', true);
-                btn.html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Aplicando...');
+                btn.html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Salvando...');
 
-                // Primeiro salva o rascunho, depois gera
+                // Salva as configurações antes de aplicá-las à entidade.
                 if (typeof tinymce !== 'undefined') {
                     tinymce.triggerSave();
                 }
+                if (tabnum == 7) {
+                    $('#form_configs_tab_7 .config-block:not(.template)').each(function() {
+                        storeNotificationTranslation($(this));
+                    });
+                }
                 let formData = $('#form_configs_tab_' + tabnum).serialize();
+                const savedRevision = glpinewentityUnsaved.snapshot();
                 $.ajax({
                     url: '{$ajax_save_url}',
                     type: 'POST',
@@ -970,20 +1176,21 @@ class Sector extends SectorBase {
                                 },
                                 success: function(genResp) {
                                     if(genResp.success) {
+                                        glpinewentityUnsaved.clearThrough(savedRevision);
                                         window.location.reload();
                                     } else {
                                         btn.prop('disabled', false).html(originalHtml);
-                                        alert('Erro ao gerar configurações: ' + (genResp.error || 'Erro desconhecido'));
+                                        alert('As configurações foram salvas, mas não puderam ser aplicadas: ' + (genResp.error || 'Erro desconhecido'));
                                     }
                                 },
                                 error: function() {
                                     btn.prop('disabled', false).html(originalHtml);
-                                    alert('Erro na requisição de geração.');
+                                    alert('As configurações foram salvas, mas houve um erro na requisição para aplicá-las.');
                                 }
                             });
                         } else {
                             btn.prop('disabled', false).html(originalHtml);
-                            alert('Erro ao salvar rascunho antes de aplicar.');
+                            alert('Erro ao salvar configurações: ' + (saveResp.error || 'Erro desconhecido'));
                         }
                     },
                     error: function() {
@@ -993,6 +1200,34 @@ class Sector extends SectorBase {
                 });
             }
         }
+
+        function storeNotificationTranslation(block) {
+            const language = block.data('translation-language');
+            if (language === undefined) { return; }
+            const translations = JSON.parse(block.find('.input-translations').val() || '{}');
+            const textarea = block.find('.input-html-wrapper textarea');
+            const editor = typeof tinymce !== 'undefined' && textarea.attr('id') ? tinymce.get(textarea.attr('id')) : null;
+            translations[language] = {
+                subject: block.find('.input-subject').val() || '',
+                content_html: editor ? editor.getContent() : (textarea.val() || ''),
+                content_text: block.find('.input-content-text').val() || ''
+            };
+            block.find('.input-translations').val(JSON.stringify(translations));
+        }
+        $(document).off('change.glpinewentityLanguage', '.input-language').on('change.glpinewentityLanguage', '.input-language', function() {
+            const block = $(this).closest('.config-block');
+            storeNotificationTranslation(block);
+            const language = $(this).val() || '';
+            const translations = JSON.parse(block.find('.input-translations').val() || '{}');
+            const translation = translations[language] || {};
+            block.find('.input-subject').val(translation.subject || '');
+            block.find('.input-content-text').val(translation.content_text || '');
+            const textarea = block.find('.input-html-wrapper textarea');
+            const editor = typeof tinymce !== 'undefined' && textarea.attr('id') ? tinymce.get(textarea.attr('id')) : null;
+            if (editor) { editor.setContent(translation.content_html || ''); }
+            else { textarea.val(translation.content_html || ''); }
+            block.data('translation-language', language);
+        });
 
         // Inicializa Rich Text (TinyMCE) via AJAX para os blocos marcados como pendentes
         // (evita o problema de DOMEval do jQuery ao carregar conteúdo de aba via AJAX)
@@ -1005,7 +1240,10 @@ class Sector extends SectorBase {
                 let decodedValue = '';
                 try { decodedValue = decodeBase64Utf8(encodedValue); } catch(e) { decodedValue = ''; }
 
-                $.ajax({
+                const block = wrapper.closest('.config-block');
+                const pendingControls = block.data('pending-controls') || [];
+                block.data('pending-controls', pendingControls);
+                pendingControls.push($.ajax({
                     url: '{$ajax_render_richtext_url}',
                     type: 'POST',
                     data: { name: fieldName, value: decodedValue },
@@ -1013,7 +1251,11 @@ class Sector extends SectorBase {
                         wrapper.html(html);
                         wrapper.removeClass('richtext-pending');
                     }
-                });
+                }));
+            });
+            $('.select2-language').select2({ width: '100%' });
+            $('.input-language').each(function() {
+                $(this).closest('.config-block').data('translation-language', $(this).val() || '');
             });
             $('.select2-copy-from').select2({ width: '100%' });
             $('.select2-cat').select2({ width: '100%' });
@@ -1027,6 +1269,7 @@ class Sector extends SectorBase {
             $('.select2-event').select2({ width: '100%' });
             $('.select2-tpl').select2({ width: '100%' });
             $('.select2-target').select2({ width: '100%' });
+            $('.select2-exclusion').select2({ width: '100%' });
             initializeIllustrationPickers();
         });
         </script>";
@@ -1098,13 +1341,18 @@ class Sector extends SectorBase {
         $html .= "  </div>";
         $html .= "  <input type='hidden' name='items_generated_id[]' class='input-generated-id' value='{$generated_id}'>";
 
-        // Copiar de... (apenas visível se for template OU for um bloco único como no Tab 6)
+        // Copiar de... (apenas visível se for template OU for um bloco único)
         $showCopyFrom = ($isTemplate || $isSingleBlock) ? "block" : "none";
         $html .= "  <div style='display: {$showCopyFrom}; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #ddd;'>";
         $html .= "      <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Copiar de...</label>";
         $html .= "      <select name='items_copy_from[]' class='form-select select2-copy-from' style='width: 100%;' data-tab='{$tabnum}'>";
         $html .= "        <option value='0'>--- Nenhum (Criar Básico) ---</option>";
         foreach ($existingModels as $entityLabel => $entityModels) {
+            if ($tabnum == 7) {
+                $selected = ($entityLabel == $copyFrom) ? 'selected' : '';
+                $html .= "          <option value='" . (int)$entityLabel . "' {$selected}>" . htmlspecialchars($entityModels) . "</option>";
+                continue;
+            }
             $html .= "        <optgroup label='" . htmlspecialchars((string)$entityLabel, ENT_QUOTES) . "'>";
             foreach ($entityModels as $id => $mName) {
                 $selected = ($id == $copyFrom) ? 'selected' : '';
@@ -1135,9 +1383,13 @@ class Sector extends SectorBase {
             $html .= "          <label style='display: block; margin-bottom: 5px;  font-weight:bold;'>Categoria ITIL</label>";
             $html .= "          <select name='items_category[]' class='form-select select2-cat input-category' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhuma ---</option>";
-            foreach (($extraOptions['categories'] ?? []) as $id => $cName) {
-                $selected = ($id == $itilcategoryId) ? 'selected' : '';
-                $html .= "            <option value='{$id}' {$selected}>" . htmlspecialchars($cName) . "</option>";
+            foreach (($extraOptions['categories'] ?? []) as $categoryGroup) {
+                $html .= "            <optgroup label='" . htmlspecialchars((string)$categoryGroup['label'], ENT_QUOTES) . "'>";
+                foreach ($categoryGroup['items'] as $id => $cName) {
+                    $selected = ($id == $itilcategoryId) ? 'selected' : '';
+                    $html .= "              <option value='{$id}' {$selected}>" . htmlspecialchars($cName) . "</option>";
+                }
+                $html .= "            </optgroup>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -1145,7 +1397,7 @@ class Sector extends SectorBase {
         } elseif ($tabnum == 3) {
             // Campos de SolutionTemplate: Tipo de solução + Comentários
             $html .= "  <div style='margin-bottom: 10px;'>";
-            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Tipo de solução</label>";
+            $html .= "      <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Tipo de solução <span class='form-help' data-bs-toggle='tooltip' data-bs-placement='top' data-bs-html='true' data-bs-title='O tipo de solução selecionado será criado na entidade deste setor, mesmo que pertença a outra entidade. Se já existir um tipo com o mesmo nome nessa entidade, ele será reutilizado.'>?</span></label>";
             if (!$isTemplate && class_exists('\SolutionType')) {
                 $html .= "      <div class='solutiontype-wrapper'>";
                 $html .= \SolutionType::dropdown([
@@ -1153,6 +1405,8 @@ class Sector extends SectorBase {
                     'value'   => $solutiontypes_id,
                     'display' => false,
                     'width'   => '100%',
+                    'comments' => false,
+                    'addicon' => false,
                     'rand'    => mt_rand()
                 ]);
                 $html .= "      </div>";
@@ -1221,9 +1475,13 @@ class Sector extends SectorBase {
             $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>&nbsp;<br>Modelo de acompanhamento</label>";
             $html .= "          <select name='items_itilfollowuptemplates_id[]' class='form-select select2-foltpl input-itilfollowuptemplates-id' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhum ---</option>";
-            foreach (($extraOptions['itilfollowuptemplates'] ?? []) as $fid => $fname) {
-                $sel = ($fid == $itilfollowuptemplates_id) ? 'selected' : '';
-                $html .= "            <option value='{$fid}' {$sel}>" . htmlspecialchars($fname) . "</option>";
+            foreach (($extraOptions['itilfollowuptemplates'] ?? []) as $group) {
+                $html .= "            <optgroup label='" . htmlspecialchars((string)$group['label'], ENT_QUOTES) . "'>";
+                foreach ($group['items'] as $fid => $fname) {
+                    $sel = ($fid == $itilfollowuptemplates_id) ? 'selected' : '';
+                    $html .= "              <option value='{$fid}' {$sel}>" . htmlspecialchars($fname) . "</option>";
+                }
+                $html .= "            </optgroup>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -1244,9 +1502,13 @@ class Sector extends SectorBase {
             $html .= "          <label style='display: block; margin-bottom: 5px; font-weight:bold;'>Modelo de solução</label>";
             $html .= "          <select name='items_solutiontemplates_id[]' class='form-select select2-soltpl input-solutiontemplates-id' style='width: 100%;'>";
             $html .= "            <option value='0'>--- Nenhum ---</option>";
-            foreach (($extraOptions['solutiontemplates'] ?? []) as $sid => $sname) {
-                $sel = ($sid == $solutiontemplates_id) ? 'selected' : '';
-                $html .= "            <option value='{$sid}' {$sel}>" . htmlspecialchars($sname) . "</option>";
+            foreach (($extraOptions['solutiontemplates'] ?? []) as $group) {
+                $html .= "            <optgroup label='" . htmlspecialchars((string)$group['label'], ENT_QUOTES) . "'>";
+                foreach ($group['items'] as $sid => $sname) {
+                    $sel = ($sid == $solutiontemplates_id) ? 'selected' : '';
+                    $html .= "              <option value='{$sid}' {$sel}>" . htmlspecialchars($sname) . "</option>";
+                }
+                $html .= "            </optgroup>";
             }
             $html .= "          </select>";
             $html .= "      </div>";
@@ -1257,6 +1519,36 @@ class Sector extends SectorBase {
             $html .= "      <textarea name='items_comment[]' class='form-control input-comment' style='width: 100%; height: 60px;'>{$comment}</textarea>";
             $html .= "  </div>";
 
+        } elseif ($tabnum == 7) {
+            $html .= "<div class='mb-3'><label class='form-label fw-bold'>Tipo</label><select name='items_itemtype[]' class='form-select select2-itemtype input-itemtype'>";
+            foreach ($extraOptions['itemtypes'] ?? [] as $value => $label) {
+                $selected = ($value === ($config['itemtype'] ?? 'Ticket')) ? ' selected' : '';
+                $html .= "<option value='" . htmlspecialchars($value, ENT_QUOTES) . "'{$selected}>" . htmlspecialchars($label) . "</option>";
+            }
+            $html .= "</select></div>";
+            $html .= "<div class='mb-3'><label class='form-label fw-bold'>" . __('Language') . "</label>";
+            global $CFG_GLPI;
+            $html .= "<select name='items_language[]' class='form-select select2-language input-language'><option value=''>" . __('Default translation') . "</option>";
+            foreach (\Dropdown::getLanguages() as $languageCode => $languageLabel) {
+                $selected = ($languageCode === ($config['language'] ?? '')) ? ' selected' : '';
+                $html .= "<option value='" . htmlspecialchars($languageCode, ENT_QUOTES) . "'{$selected}>" . htmlspecialchars($languageLabel) . "</option>";
+            }
+            $html .= "</select>";
+            $html .= "</div><div class='mb-3'><label class='form-label fw-bold'>" . __('Subject') . "</label>";
+            $html .= "<input type='text' name='items_subject[]' class='form-control input-subject' value='" . htmlspecialchars($config['subject'] ?? '', ENT_QUOTES) . "'></div>";
+            $html .= "<div class='mb-3'><label class='form-label fw-bold'>" . __('Email HTML body') . "</label>";
+            $htmlValue = $config['content_html'] ?? '';
+            if ($isTemplate) {
+                $html .= "<textarea name='items_content_html[]' class='form-control input-content-html' rows='15'></textarea>";
+            } else {
+                $html .= "<div class='input-html-wrapper richtext-pending' data-field-name='items_content_html[]' data-field-value='" . base64_encode($htmlValue) . "'><textarea name='items_content_html[]' rows='15'>" . htmlspecialchars($htmlValue) . "</textarea></div>";
+            }
+            $translations = htmlspecialchars(json_encode((object)($config['translations'] ?? [])), ENT_QUOTES);
+            $html .= "</div><input type='hidden' name='items_translations[]' class='input-translations' value='{$translations}'>";
+            $html .= "<input type='hidden' name='items_content_text[]' class='input-content-text' value='" . htmlspecialchars($config['content_text'] ?? '', ENT_QUOTES) . "'>";
+            $help = htmlspecialchars(__('Campo somente leitura: mostra as notificações desta entidade associadas a este modelo em Notificações > Padrão (Modelo de Notificação). Salve as notificações para atualizar a associação.', 'glpinewentity'), ENT_QUOTES);
+            $html .= "<div class='mb-3'><label class='form-label fw-bold'>Notificação <span class='form-help' data-bs-toggle='tooltip' data-bs-title='{$help}'>?</span></label>";
+            $html .= "<input type='text' class='form-control input-notification-names' readonly value='" . htmlspecialchars($config['notification_names'] ?? '', ENT_QUOTES) . "'></div>";
         } elseif ($tabnum == 5) {
             // Campos de Notification
             $html .= "  <div style='display: flex; gap: 15px; align-items: flex-start; margin-bottom: 10px;'>";
@@ -1434,6 +1726,7 @@ TWIG);
         $sectorId = $ID;
         $isEdit = ($ID > 0);
         $sectorObj = $this;
+        $wizardDraft = $_SESSION['plugin_glpinewentity_wizard_drafts'][(int)$ID] ?? null;
 
         if ($isEdit) {
             // A edição continua usando a validação padrão do registro existente.
@@ -1449,16 +1742,19 @@ TWIG);
         $def_parent_entity = 0;
         $def_category_names = '';
         $def_subgroups = [];
+        $defaultProfileIds = [];
         // A inclusão usa a mesma estrutura consumida pela edição ao montar os perfis.
         $def_profiles = [
             'admin' => ['id' => 0, 'emails' => []],
             'support' => ['id' => 0, 'emails' => []],
-            'transfer' => ['id' => 0, 'emails' => []],
             'custom' => []
         ];
 
         if ($isEdit) {
             $meta = json_decode($sectorObj->fields['metadata'], true) ?: [];
+            $defaultProfileIds = array_key_exists('default_profile_ids', $meta)
+                ? (is_array($meta['default_profile_ids']) ? array_map('intval', $meta['default_profile_ids']) : [])
+                : [(int)($meta['default_profile_id'] ?? 0)];
             $def_sector_name = $sectorObj->fields['sector_name'];
             $def_sector_abbr = $sectorObj->fields['sector_abbr'];
             $def_parent_entity = $sectorObj->fields['entities_id'];
@@ -1646,11 +1942,10 @@ TWIG);
                             $profile_map[$pid] = 'admin';
                         } elseif (str_ends_with($pname, ' - Atendimento')) {
                             $profile_map[$pid] = 'support';
-                        } elseif (str_ends_with($pname, ' - Transferência de Chamados')) {
-                            $profile_map[$pid] = 'transfer';
                         } else {
                             $def_profiles['custom'][] = [
                                 'id' => $pid,
+                                'name' => $pname,
                                 'emails' => []
                             ];
                             $profile_map[$pid] = 'custom_' . (count($def_profiles['custom']) - 1);
@@ -1702,7 +1997,7 @@ TWIG);
         // FORMULÁRIO WIZARD
         // =====================================================================
 
-        echo "<form method='post' action='" . $form_url . "' id='form_wizard' data-email-search-url='" . htmlspecialchars($ajax_user_email_url, ENT_QUOTES) . "'>";
+        echo "<form method='post' action='" . $form_url . "' id='form_wizard' data-track-changes='true' data-glpinewentity-track='true' data-email-search-url='" . htmlspecialchars($ajax_user_email_url, ENT_QUOTES) . "'>";
         echo "<input type='hidden' name='_glpi_csrf_token' value='" . \Session::getNewCSRFToken() . "'>";
         echo "<input type='hidden' name='process_wizard' value='1'>";
         if ($isEdit) {
@@ -1728,7 +2023,7 @@ TWIG);
         echo "      <td>";
         Entity::dropdown([
             'name'  => 'parent_entity',
-            'value' => $def_parent_entity,
+            'value' => isset($wizardDraft['parent_entity']) ? (int)$wizardDraft['parent_entity'] : $def_parent_entity,
             'width' => '100%',
         ]);
         echo "          <br><small class='text-muted'>Selecione sob qual entidade o novo setor será criado.</small>";
@@ -1775,109 +2070,87 @@ TWIG);
         echo "<div id='perfis-padrao-section'>";
 
         // Admin
-        echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
+        $adminId = (int)($def_profiles['admin']['id'] ?? 0);
+        if (!$isEdit || $adminId > 0 || isset($wizardDraft['copy_profile_admin'])) {
+        echo "<div class='profile-block standard-profile-block' data-existing-profile-id='" . ($adminId ?: '') . "' data-existing-profile-name='" . htmlspecialchars($def_sector_abbr . ' - Admin', ENT_QUOTES) . "' style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
+        echo "  <div style='display:flex; justify-content:space-between;'><strong>Administrador da Entidade</strong><button type='button' class='btn btn-sm btn-danger btn-remove-profile' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button></div>";
         echo "  <div style='display: flex; gap: 10px;'>";
         echo "    <div style='flex: 1;'>";
         echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
         $adminVal = $def_sector_abbr ? htmlspecialchars($def_sector_abbr) . ' - Admin' : '';
-        echo "      <input type='text' id='profile_admin' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$adminVal}'>";
+        echo "      <input type='text' id='profile_admin' name='profiles_default[0]' class='form-control' style='width: 100%; border: none; ' readonly value='{$adminVal}'>";
         echo "    </div>";
-        echo "    <div style='flex: 1;'>";
-        echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
-        echo "      <select name='copy_profile_admin' class='form-select profile-select2' style='width: 100%;'>";
-        echo "        <option value='0'>-----</option>";
-        $adminId = $def_profiles['admin']['id'] ?? 0;
-        foreach ($profiles as $pid => $pname) {
-            if ($adminId > 0) {
-                $selected = ($pid == $adminId) ? 'selected' : '';
-            } else {
+        if ($adminId > 0) {
+            echo "    <input type='hidden' name='copy_profile_admin' class='profile-source' value='{$adminId}'>";
+        } else {
+            echo "    <div style='flex: 1;'>";
+            echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
+            echo "      <select name='copy_profile_admin' class='form-select profile-select2 profile-source' style='width: 100%;'>";
+            echo "        <option value='0'>-----</option>";
+            foreach ($profiles as $pid => $pname) {
                 $selected = (strpos($pname, '[Padrão] Admin') !== false) ? 'selected' : '';
+                echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
             }
-            echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
+            echo "      </select>";
+            echo "    </div>";
         }
-        echo "      </select>";
-        echo "    </div>";
         echo "  </div>";
         echo "  <div>";
         echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
         $adminEmails = htmlspecialchars(implode("\n", $def_profiles['admin']['emails'] ?? []), ENT_QUOTES);
         echo "    <input type='hidden' name='users_profile_admin' class='email-values' value='{$adminEmails}'>";
         echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
+        echo self::renderDefaultProfileSwitch('admin', $adminId > 0 && in_array($adminId, $defaultProfileIds, true));
         echo "  </div>";
         echo "</div>";
 
+        }
+
         // Atendimento
-        echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
+        $supportId = (int)($def_profiles['support']['id'] ?? 0);
+        if (!$isEdit || $supportId > 0 || isset($wizardDraft['copy_profile_support'])) {
+        echo "<div class='profile-block standard-profile-block' data-existing-profile-id='" . ($supportId ?: '') . "' data-existing-profile-name='" . htmlspecialchars($def_sector_abbr . ' - Atendimento', ENT_QUOTES) . "' style='display: flex; flex-direction: column; gap: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
+        echo "  <div style='display:flex; justify-content:space-between;'><strong>Atendente da Entidade</strong><button type='button' class='btn btn-sm btn-danger btn-remove-profile' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button></div>";
         echo "  <div style='display: flex; gap: 10px;'>";
         echo "    <div style='flex: 1;'>";
         echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
         $supportVal = $def_sector_abbr ? htmlspecialchars($def_sector_abbr) . ' - Atendimento' : '';
-        echo "      <input type='text' id='profile_support' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$supportVal}'>";
+        echo "      <input type='text' id='profile_support' name='profiles_default[1]' class='form-control' style='width: 100%; border: none; ' readonly value='{$supportVal}'>";
         echo "    </div>";
-        echo "    <div style='flex: 1;'>";
-        echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
-        echo "      <select name='copy_profile_support' class='form-select profile-select2' style='width: 100%;'>";
-        echo "        <option value='0'>-----</option>";
-        $supportId = $def_profiles['support']['id'] ?? 0;
-        foreach ($profiles as $pid => $pname) {
-            if ($supportId > 0) {
-                $selected = ($pid == $supportId) ? 'selected' : '';
-            } else {
+        if ($supportId > 0) {
+            echo "    <input type='hidden' name='copy_profile_support' class='profile-source' value='{$supportId}'>";
+        } else {
+            echo "    <div style='flex: 1;'>";
+            echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
+            echo "      <select name='copy_profile_support' class='form-select profile-select2 profile-source' style='width: 100%;'>";
+            echo "        <option value='0'>-----</option>";
+            foreach ($profiles as $pid => $pname) {
                 $selected = (strpos($pname, '[Padrão] Atendimento') !== false) ? 'selected' : '';
+                echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
             }
-            echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
+            echo "      </select>";
+            echo "    </div>";
         }
-        echo "      </select>";
-        echo "    </div>";
         echo "  </div>";
         echo "  <div>";
         echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
         $supportEmails = htmlspecialchars(implode("\n", $def_profiles['support']['emails'] ?? []), ENT_QUOTES);
         echo "    <input type='hidden' name='users_profile_support' class='email-values' value='{$supportEmails}'>";
         echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
+        echo self::renderDefaultProfileSwitch('support', $supportId > 0 && in_array($supportId, $defaultProfileIds, true));
         echo "  </div>";
         echo "</div>";
 
-        // Transferência de Chamados
-        echo "<div style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px;'>";
-        echo "  <div style='display: flex; gap: 10px;'>";
-        echo "    <div style='flex: 1;'>";
-        echo "      <label style='display: block; margin-bottom: 5px; '>Perfil Padrão</label>";
-        $transferVal = $def_sector_abbr ? htmlspecialchars($def_sector_abbr) . ' - Transferência de Chamados' : '';
-        echo "      <input type='text' id='profile_transfer' name='profiles_default[]' class='form-control' style='width: 100%; border: none; ' readonly value='{$transferVal}'>";
-        echo "    </div>";
-        echo "    <div style='flex: 1;'>";
-        echo "      <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
-        echo "      <select name='copy_profile_transfer' class='form-select profile-select2' style='width: 100%;'>";
-        echo "        <option value='0'>-----</option>";
-        $transferId = $def_profiles['transfer']['id'] ?? 0;
-        foreach ($profiles as $pid => $pname) {
-            if ($transferId > 0) {
-                $selected = ($pid == $transferId) ? 'selected' : '';
-            } else {
-                $selected = (strpos($pname, '[Padrão] Transferência de Chamados') !== false) ? 'selected' : '';
-            }
-            echo "        <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
         }
-        echo "      </select>";
-        echo "    </div>";
-        echo "  </div>";
-        echo "  <div>";
-        echo "    <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
-        $transferEmails = htmlspecialchars(implode("\n", $def_profiles['transfer']['emails'] ?? []), ENT_QUOTES);
-        echo "    <input type='hidden' name='users_profile_transfer' class='email-values' value='{$transferEmails}'>";
-        echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
-        echo "  </div>";
-        echo "</div>";
-
         echo "</div>"; // fecha #perfis-padrao-section
 
-        echo "<br><small class='text-muted'>Os 'Perfis Padrão' são criados automaticamente com base na SIGLA e não podem ser apagados, mas você pode adicionar um novo em 'Adicionar Perfil'.</small>";
+        echo "<small class='text-muted' style='display: block; margin-top: 8px;'>Os 'Perfis Padrão' são criados automaticamente com base na SIGLA, mas você pode adicionar um novo em 'Adicionar Perfil'.</small>";
         echo "</td>";
         echo "</tr>";
 
         echo "<tr class='tab_bg_1'>";
         echo "<td colspan='2' style='padding: 0;'>";
+        echo "<div id='removed-profiles'></div>";
         echo "<div id='profiles-container'>";
 
         // Template oculto para adicionar perfis customizados
@@ -1889,11 +2162,11 @@ TWIG);
         echo "  <div style='display: flex; gap: 10px; align-items: flex-start;'>";
         echo "      <div style='flex: 1;'>";
         echo "          <label style='display: block; margin-bottom: 5px; '>Nome do Perfil</label>";
-        echo "          <input type='text' class='form-control profile-input' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' name='name_profile_custom[]'>";
+        echo "          <input type='text' class='form-control profile-input' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador'>";
         echo "      </div>";
         echo "      <div style='flex: 1;'>";
         echo "          <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
-        echo "          <select name='copy_profile_custom[]' class='form-select profile-select2' style='width: 100%;'>";
+        echo "          <select class='form-select profile-select2 profile-source' style='width: 100%;'>";
         echo "            <option value='0'>-----</option>";
         foreach ($profiles as $pid => $pname) {
             echo "            <option value='{$pid}'>" . htmlspecialchars($pname) . "</option>";
@@ -1905,16 +2178,17 @@ TWIG);
         echo "      <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
         echo "      <input type='hidden' class='email-values profile-users-input' value=''>";
         echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
+        echo self::renderDefaultProfileSwitch('', false, true);
         echo "  </div>";
         echo "</div>";
 
         // Renderiza perfis customizados existentes na edição
         if (!empty($def_profiles['custom'])) {
-            foreach ($def_profiles['custom'] as $cProf) {
+            foreach ($def_profiles['custom'] as $customIndex => $cProf) {
                 $cEmails = htmlspecialchars(implode("\n", $cProf['emails'] ?? []), ENT_QUOTES);
                 $cId = $cProf['id'];
 
-                echo "<div class='profile-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
+                echo "<div class='profile-block' data-existing-profile-id='" . (int)$cId . "' data-existing-profile-name='" . htmlspecialchars($cProf['name'], ENT_QUOTES) . "' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
                 echo "  <div style='display:flex; justify-content:space-between; margin-bottom:10px;'>";
                 echo "      <strong>Perfil Adicional</strong>";
                 echo "      <button type='button' class='btn btn-sm btn-danger btn-remove-profile' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button>";
@@ -1923,23 +2197,14 @@ TWIG);
                 echo "      <div style='flex: 1;'>";
                 echo "          <label style='display: block; margin-bottom: 5px; '>Nome do Perfil</label>";
                 echo "          <input type='text' class='form-control profile-input' name='name_profile_custom[]' style='width: 100%;' placeholder='Ex: SIGLA - Coordenador' value='" . htmlspecialchars($cProf['name']) . "'>";
-                echo "          <small class='text-muted'>O nome original não é carregado na edição, preencha novamente se desejar salvar outro.</small>";
                 echo "      </div>";
-                echo "      <div style='flex: 1;'>";
-                echo "          <label style='display: block; margin-bottom: 5px; '>Copiar de...</label>";
-                echo "          <select name='copy_profile_custom[]' class='form-select profile-select2' style='width: 100%;'>";
-                echo "            <option value='0'>-----</option>";
-                foreach ($profiles as $pid => $pname) {
-                    $selected = ($pid == $cId) ? 'selected' : '';
-                    echo "            <option value='{$pid}' {$selected}>" . htmlspecialchars($pname) . "</option>";
-                }
-                echo "          </select>";
-                echo "      </div>";
+                echo "      <input type='hidden' name='copy_profile_custom[]' class='profile-source' value='" . (int)$cId . "'>";
                 echo "  </div>";
                 echo "  <div style='margin-top: 10px;'>";
                 echo "      <label style='display: block; margin-bottom: 5px;  font-size: 0.9em;'>Usuários a serem vinculados neste perfil (E-mails)</label>";
                 echo "      <input type='hidden' name='users_profile_custom[]' class='email-values profile-users-input' value='{$cEmails}'>";
                 echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
+                echo self::renderDefaultProfileSwitch('custom:' . $customIndex, in_array((int)$cId, $defaultProfileIds, true));
                 echo "  </div>";
                 echo "</div>";
             }
@@ -2095,8 +2360,81 @@ TWIG);
 
         Html::closeForm();
 
+        $wizardDraft = $_SESSION['plugin_glpinewentity_wizard_drafts'][(int)$ID] ?? null;
+        $wizardDraftJson = json_encode($wizardDraft, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
         echo "<script>
                 $(function() {
+                    const wizardDraft = {$wizardDraftJson};
+                    if (wizardDraft) {
+                        const form = $('#form_wizard');
+                        ['admin', 'support'].forEach(function(type) {
+                            if (!Object.prototype.hasOwnProperty.call(wizardDraft, 'copy_profile_' + type)) {
+                                form.find('[name=copy_profile_' + type + ']').closest('.profile-block').remove();
+                            }
+                        });
+
+                        const container = $('#profiles-container');
+                        const existingProfiles = container.find('.profile-block:not(.template)').detach();
+                        (wizardDraft.name_profile_custom || []).forEach(function(name, index) {
+                            let block = existingProfiles.filter(function() {
+                                return $(this).find('.profile-input').val() === name;
+                            }).first();
+                            if (!block.length) {
+                                block = container.find('.template').clone().removeClass('template').show();
+                            }
+                            block.find('.select2-container').remove();
+                            block.find('select').removeClass('select2-hidden-accessible').removeAttr('data-select2-id tabindex aria-hidden').show();
+                            block.find('.profile-input').attr('name', 'name_profile_custom[]');
+                            block.find('.profile-source').attr('name', 'copy_profile_custom[]');
+                            block.find('.profile-users-input').attr('name', 'users_profile_custom[]');
+                            block.find('.profile-default-switch').attr('name', 'default_profile[]').val('custom:' + index).prop('disabled', false);
+                            container.append(block);
+                        });
+
+                        const groupContainer = $('#subgroups-container');
+                        const groupTemplate = groupContainer.find('.subgroup-block').first().clone();
+                        groupContainer.empty();
+                        Object.values(wizardDraft.subgroups || []).forEach(function(group, index) {
+                            const block = groupTemplate.clone();
+                            block.find('.select2-container').remove();
+                            block.find('.email-autocomplete').empty().removeClass('select2-hidden-accessible').removeAttr('data-select2-id tabindex aria-hidden').show();
+                            block.find('.sg-index').text(index + 1);
+                            block.find('.sg-name-input').attr('name', 'subgroups[' + index + '][name]').val(group.name || '');
+                            block.find('.email-values').attr('name', 'subgroups[' + index + '][techs]').val(group.techs || '');
+                            const parent = $('<select>', { name: 'subgroups[' + index + '][parent]', class: 'form-select sg-parent-select' });
+                            parent.append(new Option('(SIGLA)', '-1'));
+                            Object.values(wizardDraft.subgroups || []).slice(0, index).forEach(function(previous, parentIndex) {
+                                parent.append(new Option(previous.name, String(parentIndex)));
+                            });
+                            parent.val(String(group.parent == null ? '-1' : group.parent));
+                            block.find('.parent-wrapper').empty().append(parent);
+                            groupContainer.append(block);
+                        });
+
+                        const listIndexes = {};
+                        form.find(':input[name]').each(function() {
+                            const input = $(this);
+                            if (input.closest('.template').length) return;
+                            const name = input.attr('name');
+                            if (name === 'parent_entity') return;
+                            if (name === 'profiles_default[0]' || name === 'profiles_default[1]') {
+                                input.val((wizardDraft.profiles_default || {})[name === 'profiles_default[0]' ? 0 : 1] || '');
+                            } else if (name === 'default_profile[]') {
+                                input.prop('checked', (wizardDraft.default_profile || []).indexOf(input.val()) !== -1);
+                            } else if (name.endsWith('[]') && name !== 'removed_profile_ids[]') {
+                                const key = name.slice(0, -2);
+                                const index = listIndexes[key] || 0;
+                                input.val((wizardDraft[key] || [])[index] || '').trigger('change.select2');
+                                listIndexes[key] = index + 1;
+                            } else if (Object.prototype.hasOwnProperty.call(wizardDraft, name)) {
+                                input.val(wizardDraft[name]).trigger('change.select2');
+                            }
+                        });
+                        (wizardDraft.removed_profile_ids || []).forEach(function(id) {
+                            $('<input>', { type: 'hidden', name: 'removed_profile_ids[]', value: id }).appendTo('#removed-profiles');
+                        });
+                    }
+
                     function validateEmailsStr(str) {
                         let cleanStr = str.trim();
                         if (cleanStr === '') return false;
@@ -2114,6 +2452,21 @@ TWIG);
                     const emailSearchUrl = $('#form_wizard').data('email-search-url');
                     const csrfToken = $('#form_wizard input[name=_glpi_csrf_token]').val();
                     let pendingEmailRequests = 0;
+
+                    function validateStandardProfiles() {
+                        let valid = true;
+                        $('#perfis-padrao-section .profile-source').each(function() {
+                            if ($(this).val() === '0' || $(this).val() === null || $(this).val() === '') {
+                                valid = false;
+                            }
+                        });
+                        $('#perfis-padrao-section .email-values').each(function() {
+                            if (!validateEmailsStr($(this).val())) {
+                                valid = false;
+                            }
+                        });
+                        return valid;
+                    }
 
                     function splitEmailList(value) {
                         return String(value || '').split(/[\s,;]+/).map(function(email) {
@@ -2138,7 +2491,7 @@ TWIG);
                         picker.select2({
                             width: '100%',
                             placeholder: picker.data('placeholder'),
-                            closeOnSelect: false,
+                            closeOnSelect: true,
                             minimumInputLength: 2,
                             ajax: {
                                 url: emailSearchUrl,
@@ -2164,6 +2517,7 @@ TWIG);
 
                         picker.on('select2:select', function() {
                             picker.next('.select2-container').find('.select2-search__field').val('');
+                            picker.select2('close');
                         });
 
                         const initialEmails = splitEmailList(values.val());
@@ -2175,7 +2529,9 @@ TWIG);
                                 accepted.forEach(function(item) {
                                     picker.append(new Option(item.text, item.id, true, true));
                                 });
-                                picker.val(accepted.map(function(item) { return item.id; })).trigger('change');
+                                const acceptedEmails = accepted.map(function(item) { return item.id; });
+                                values.val(acceptedEmails.join('\\n'));
+                                picker.val(acceptedEmails).trigger('change.select2');
                             }).always(function() {
                                 pendingEmailRequests--;
                             });
@@ -2219,6 +2575,10 @@ TWIG);
                                 }
                             });
                             picker.val(selected).trigger('change');
+                            if (found.length) {
+                                picker.next('.select2-container').find('.select2-search__field').val('');
+                                picker.select2('close');
+                            }
 
                             const rejected = pastedEmails.filter(function(email) {
                                 return !foundByEmail[email.toLowerCase()];
@@ -2301,6 +2661,7 @@ TWIG);
                         let match = block.find('input.sg-name-input').attr('name').match(/\d+/);
                         let removedIndex = match ? match[0] : null;
                         block.remove();
+                        glpinewentityUnsaved.mark(document.getElementById('form_wizard'));
                         updateAllParentCombos(removedIndex);
                     });
 
@@ -2348,8 +2709,13 @@ TWIG);
                         newBlock.find('input.sg-name-input').val('');
                         newBlock.find('.email-values').val('');
                         newBlock.find('.select2-container').remove();
-                        const emailSelect = newBlock.find('.email-autocomplete');
-                        emailSelect.removeClass('select2-hidden-accessible').removeAttr('data-select2-id tabindex aria-hidden').empty().show();
+                        const oldEmailSelect = newBlock.find('.email-autocomplete');
+                        const emailSelect = $('<select>', {
+                            multiple: true,
+                            class: 'form-control email-autocomplete',
+                            'data-placeholder': oldEmailSelect.attr('data-placeholder')
+                        });
+                        oldEmailSelect.replaceWith(emailSelect);
                         
                         newBlock.find('input.sg-name-input').attr('name', 'subgroups[' + index + '][name]');
                         newBlock.find('.email-values').attr('name', 'subgroups[' + index + '][techs]');
@@ -2365,6 +2731,7 @@ TWIG);
                         // Evento de remoção agora é delegado globalmente
                         
                         container.append(newBlock);
+                        glpinewentityUnsaved.mark(document.getElementById('form_wizard'));
                         initEmailPicker(emailSelect);
                         index++;
                         updateAllParentCombos();
@@ -2376,22 +2743,50 @@ TWIG);
                         if (abbr === '') {
                             $('#profile_admin').val('');
                             $('#profile_support').val('');
-                            $('#profile_transfer').val('');
                         } else {
                             $('#profile_admin').val(abbr + ' - Admin');
                             $('#profile_support').val(abbr + ' - Atendimento');
-                            $('#profile_transfer').val(abbr + ' - Transferência de Chamados');
                         }
                         updateAllParentCombos();
                     });
                     // Inicializa ao carregar (se houver valor padrão)
-                    $('input[name=\'sector_abbr\']').trigger('input');
+                    $('input[name=\'sector_abbr\']').triggerHandler('input');
 
                     // Inicializa o select2 explicitamente com 100% de largura
                     $('.profile-select2').select2({ width: '100%' });
 
                     // ── Lógica para Adicionar Perfis Customizados ──
+                    function syncCustomProfileDefaults() {
+                        $('#profiles-container .profile-block:not(.template)').each(function(index) {
+                            $(this).find('.profile-default-switch').val('custom:' + index);
+                        });
+                    }
+
+                    $('#perfis-padrao-section, #profiles-container').on('click', '.btn-remove-profile', function() {
+                        const block = $(this).closest('.profile-block');
+                        const profileId = block.attr('data-existing-profile-id');
+                        if (profileId) {
+                            $('<input>', {
+                                type: 'hidden',
+                                name: 'removed_profile_ids[]',
+                                value: profileId
+                            }).attr('data-profile-name', block.attr('data-existing-profile-name')).appendTo('#removed-profiles');
+                        }
+                        block.remove();
+                        glpinewentityUnsaved.mark(document.getElementById('form_wizard'));
+                        syncCustomProfileDefaults();
+                    });
+
                     $('#btn-add-profile').on('click', function() {
+                        if (pendingEmailRequests > 0) {
+                            alert('Aguarde a validação dos e-mails cadastrados no GLPI antes de adicionar um novo perfil.');
+                            return;
+                        }
+                        if (!validateStandardProfiles()) {
+                            alert('Por favor, selecione de qual perfil copiar e certifique-se de que todos os e-mails informados são válidos (ex: nome@dominio.com) para todos os Perfis Padrão antes de adicionar um novo.');
+                            return;
+                        }
+
                         const container = $('#profiles-container');
                         const template = container.find('.profile-block.template');
                         
@@ -2400,7 +2795,7 @@ TWIG);
                         let emailsValid = true;
                         container.find('.profile-block:visible').each(function() {
                             const nameVal = $(this).find('.profile-input').val().trim();
-                            const copyVal = $(this).find('select.profile-select2').val();
+                            const copyVal = $(this).find('.profile-source').val();
                             const usersVal = $(this).find('.profile-users-input').val().trim();
                             if (nameVal === '' || copyVal === '' || copyVal === null || copyVal === '0' || usersVal === '') {
                                 allFilled = false;
@@ -2419,6 +2814,7 @@ TWIG);
                         newBlock.css('display', 'block');
                         newBlock.find('.profile-input').attr('name', 'name_profile_custom[]');
                         newBlock.find('.profile-users-input').attr('name', 'users_profile_custom[]');
+                        newBlock.find('.profile-default-switch').attr('name', 'default_profile[]').prop('checked', false);
                         
                         // Limpa o textarea de usuários
                         newBlock.find('.profile-users-input').val('');
@@ -2428,6 +2824,7 @@ TWIG);
                         
                         // Restaura o select original para inicializar o select2 novamente
                         let selectEl = newBlock.find('select.profile-select2');
+                        selectEl.attr('name', 'copy_profile_custom[]');
                         selectEl.removeClass('select2-hidden-accessible')
                                 .removeAttr('data-select2-id')
                                 .removeAttr('tabindex')
@@ -2441,11 +2838,9 @@ TWIG);
                         selectEl.attr('id', newId).val('0');
                         selectEl.find('option').removeAttr('data-select2-id');
 
-                        newBlock.find('.btn-remove-profile').on('click', function() {
-                            newBlock.remove();
-                        });
-                        
                         container.append(newBlock);
+                        glpinewentityUnsaved.mark(document.getElementById('form_wizard'));
+                        syncCustomProfileDefaults();
                         initEmailPicker(emailSelect);
 
                         // Inicializa select2 no novo dropdown com largura total
@@ -2454,29 +2849,19 @@ TWIG);
 
                     // Validação no Submit do Formulário
                     $('#form_wizard').on('submit', function(e) {
+                        syncCustomProfileDefaults();
+                        if (!$('#perfis-padrao-section .standard-profile-block, #profiles-container .profile-block:not(.template)').length) {
+                            e.preventDefault();
+                            alert('Mantenha pelo menos um perfil padrão ou adicional.');
+                            return false;
+                        }
                         if (pendingEmailRequests > 0) {
                             e.preventDefault();
                             alert('Aguarde a validação dos e-mails cadastrados no GLPI antes de enviar o formulário.');
                             return false;
                         }
 
-                        let standardFilled = true;
-                        let standardEmailsValid = true;
-                        $('#perfis-padrao-section select.profile-select2').each(function() {
-                            if ($(this).val() === '0' || $(this).val() === null) {
-                                standardFilled = false;
-                            }
-                        });
-                        $('#perfis-padrao-section .email-values').each(function() {
-                            let usersVal = $(this).val().trim();
-                            if (usersVal === '') {
-                                standardFilled = false;
-                            } else if (!validateEmailsStr(usersVal)) {
-                                standardEmailsValid = false;
-                            }
-                        });
-                        
-                        if (!standardFilled || !standardEmailsValid) {
+                        if (!validateStandardProfiles()) {
                             e.preventDefault();
                             alert('Por favor, selecione de qual perfil copiar e certifique-se de que todos os e-mails informados são válidos (ex: nome@dominio.com) para todos os Perfis Padrão.');
                             return false;
@@ -2486,7 +2871,7 @@ TWIG);
                         let customEmailsValid = true;
                         $('#profiles-container .profile-block:visible').each(function() {
                             const nameVal = $(this).find('.profile-input').val().trim();
-                            const copyVal = $(this).find('select.profile-select2').val();
+                            const copyVal = $(this).find('.profile-source').val();
                             const usersVal = $(this).find('.profile-users-input').val().trim();
                             
                             if (nameVal === '' || copyVal === '' || copyVal === null || copyVal === '0' || usersVal === '') {
@@ -2559,6 +2944,17 @@ TWIG);
                                 }
                             }
                         }                        
+                        const removedProfiles = $('#removed-profiles input').map(function() {
+                            return $(this).attr('data-profile-name');
+                        }).get();
+                        if (removedProfiles.length && !confirm('Atenção: ao salvar, os perfis abaixo serão excluídos do GLPI, incluindo seus vínculos com usuários em todas as entidades:\\n\\n' + removedProfiles.join('\\n') + '\\n\\nDeseja continuar?')) {
+                            e.preventDefault();
+                            return false;
+                        }
+                        if (!glpinewentityUnsaved.confirmOtherChanges(this)) {
+                            e.preventDefault();
+                            return false;
+                        }
                         // Se chegou até aqui, todas as validações passaram.
                         // Troca o texto do botão para Salvando...
                         $('#btn-submit-wizard').html('<i class=\"fas fa-spinner fa-spin\" style=\"margin-right: 5px;\"></i> Salvando...').css('pointer-events', 'none').css('opacity', '0.7');

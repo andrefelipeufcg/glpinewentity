@@ -34,6 +34,28 @@ class NotificationBuilder
         return ['count' => $count, 'configs' => $configs];
     }
 
+    private function linkTemplate(int $notificationId, int $templateId): void
+    {
+        if ($templateId <= 0) {
+            return;
+        }
+        $template = new NotificationTemplate();
+        if (!$template->getFromDB($templateId)) {
+            throw new \RuntimeException('Notification template not found.');
+        }
+        global $DB;
+        $join = new Notification_NotificationTemplate();
+        foreach ($DB->request(['FROM' => 'glpi_notifications_notificationtemplates', 'WHERE' => ['notifications_id' => $notificationId, 'mode' => 'mailing']]) as $row) {
+            if ((int)$row['notificationtemplates_id'] === $templateId) {
+                return;
+            }
+            $join->delete(['id' => $row['id']], true);
+        }
+        if (!$join->add(['notifications_id' => $notificationId, 'notificationtemplates_id' => $templateId, 'mode' => 'mailing'])) {
+            throw new \RuntimeException('Unable to associate notification template.');
+        }
+    }
+
     private function createNotification(array &$config, int $entities_id): void
     {
         $name = trim($config['name'] ?? '');
@@ -53,11 +75,13 @@ class NotificationBuilder
                  'name' => $name,
                  'entities_id' => $entities_id
             ]);
+            $this->linkTemplate($generatedId, (int)($config['notificationtemplates_id'] ?? 0));
             return;
         }
 
         if ($notification->getFromDBByCrit(['name' => $name, 'entities_id' => $entities_id])) {
             $config['generated_id'] = $notification->getID();
+            $this->linkTemplate($notification->getID(), (int)($config['notificationtemplates_id'] ?? 0));
             return;
         }
 
