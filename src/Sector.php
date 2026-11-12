@@ -1726,6 +1726,7 @@ TWIG);
         $sectorId = $ID;
         $isEdit = ($ID > 0);
         $sectorObj = $this;
+        $wizardDraft = $_SESSION['plugin_glpinewentity_wizard_drafts'][(int)$ID] ?? null;
 
         if ($isEdit) {
             // A edição continua usando a validação padrão do registro existente.
@@ -2022,7 +2023,7 @@ TWIG);
         echo "      <td>";
         Entity::dropdown([
             'name'  => 'parent_entity',
-            'value' => $def_parent_entity,
+            'value' => isset($wizardDraft['parent_entity']) ? (int)$wizardDraft['parent_entity'] : $def_parent_entity,
             'width' => '100%',
         ]);
         echo "          <br><small class='text-muted'>Selecione sob qual entidade o novo setor será criado.</small>";
@@ -2070,7 +2071,7 @@ TWIG);
 
         // Admin
         $adminId = (int)($def_profiles['admin']['id'] ?? 0);
-        if (!$isEdit || $adminId > 0) {
+        if (!$isEdit || $adminId > 0 || isset($wizardDraft['copy_profile_admin'])) {
         echo "<div class='profile-block standard-profile-block' data-existing-profile-id='" . ($adminId ?: '') . "' data-existing-profile-name='" . htmlspecialchars($def_sector_abbr . ' - Admin', ENT_QUOTES) . "' style='display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
         echo "  <div style='display:flex; justify-content:space-between;'><strong>Administrador da Entidade</strong><button type='button' class='btn btn-sm btn-danger btn-remove-profile' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button></div>";
         echo "  <div style='display: flex; gap: 10px;'>";
@@ -2107,7 +2108,7 @@ TWIG);
 
         // Atendimento
         $supportId = (int)($def_profiles['support']['id'] ?? 0);
-        if (!$isEdit || $supportId > 0) {
+        if (!$isEdit || $supportId > 0 || isset($wizardDraft['copy_profile_support'])) {
         echo "<div class='profile-block standard-profile-block' data-existing-profile-id='" . ($supportId ?: '') . "' data-existing-profile-name='" . htmlspecialchars($def_sector_abbr . ' - Atendimento', ENT_QUOTES) . "' style='display: flex; flex-direction: column; gap: 10px; border-bottom: 1px dashed #ccc; padding-bottom: 10px;'>";
         echo "  <div style='display:flex; justify-content:space-between;'><strong>Atendente da Entidade</strong><button type='button' class='btn btn-sm btn-danger btn-remove-profile' style='color: white !important;'><i class='fas fa-trash' style='margin-right: 5px;'></i> Remover</button></div>";
         echo "  <div style='display: flex; gap: 10px;'>";
@@ -2359,8 +2360,81 @@ TWIG);
 
         Html::closeForm();
 
+        $wizardDraft = $_SESSION['plugin_glpinewentity_wizard_drafts'][(int)$ID] ?? null;
+        $wizardDraftJson = json_encode($wizardDraft, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
         echo "<script>
                 $(function() {
+                    const wizardDraft = {$wizardDraftJson};
+                    if (wizardDraft) {
+                        const form = $('#form_wizard');
+                        ['admin', 'support'].forEach(function(type) {
+                            if (!Object.prototype.hasOwnProperty.call(wizardDraft, 'copy_profile_' + type)) {
+                                form.find('[name=copy_profile_' + type + ']').closest('.profile-block').remove();
+                            }
+                        });
+
+                        const container = $('#profiles-container');
+                        const existingProfiles = container.find('.profile-block:not(.template)').detach();
+                        (wizardDraft.name_profile_custom || []).forEach(function(name, index) {
+                            let block = existingProfiles.filter(function() {
+                                return $(this).find('.profile-input').val() === name;
+                            }).first();
+                            if (!block.length) {
+                                block = container.find('.template').clone().removeClass('template').show();
+                            }
+                            block.find('.select2-container').remove();
+                            block.find('select').removeClass('select2-hidden-accessible').removeAttr('data-select2-id tabindex aria-hidden').show();
+                            block.find('.profile-input').attr('name', 'name_profile_custom[]');
+                            block.find('.profile-source').attr('name', 'copy_profile_custom[]');
+                            block.find('.profile-users-input').attr('name', 'users_profile_custom[]');
+                            block.find('.profile-default-switch').attr('name', 'default_profile[]').val('custom:' + index).prop('disabled', false);
+                            container.append(block);
+                        });
+
+                        const groupContainer = $('#subgroups-container');
+                        const groupTemplate = groupContainer.find('.subgroup-block').first().clone();
+                        groupContainer.empty();
+                        Object.values(wizardDraft.subgroups || []).forEach(function(group, index) {
+                            const block = groupTemplate.clone();
+                            block.find('.select2-container').remove();
+                            block.find('.email-autocomplete').empty().removeClass('select2-hidden-accessible').removeAttr('data-select2-id tabindex aria-hidden').show();
+                            block.find('.sg-index').text(index + 1);
+                            block.find('.sg-name-input').attr('name', 'subgroups[' + index + '][name]').val(group.name || '');
+                            block.find('.email-values').attr('name', 'subgroups[' + index + '][techs]').val(group.techs || '');
+                            const parent = $('<select>', { name: 'subgroups[' + index + '][parent]', class: 'form-select sg-parent-select' });
+                            parent.append(new Option('(SIGLA)', '-1'));
+                            Object.values(wizardDraft.subgroups || []).slice(0, index).forEach(function(previous, parentIndex) {
+                                parent.append(new Option(previous.name, String(parentIndex)));
+                            });
+                            parent.val(String(group.parent == null ? '-1' : group.parent));
+                            block.find('.parent-wrapper').empty().append(parent);
+                            groupContainer.append(block);
+                        });
+
+                        const listIndexes = {};
+                        form.find(':input[name]').each(function() {
+                            const input = $(this);
+                            if (input.closest('.template').length) return;
+                            const name = input.attr('name');
+                            if (name === 'parent_entity') return;
+                            if (name === 'profiles_default[0]' || name === 'profiles_default[1]') {
+                                input.val((wizardDraft.profiles_default || {})[name === 'profiles_default[0]' ? 0 : 1] || '');
+                            } else if (name === 'default_profile[]') {
+                                input.prop('checked', (wizardDraft.default_profile || []).indexOf(input.val()) !== -1);
+                            } else if (name.endsWith('[]') && name !== 'removed_profile_ids[]') {
+                                const key = name.slice(0, -2);
+                                const index = listIndexes[key] || 0;
+                                input.val((wizardDraft[key] || [])[index] || '').trigger('change.select2');
+                                listIndexes[key] = index + 1;
+                            } else if (Object.prototype.hasOwnProperty.call(wizardDraft, name)) {
+                                input.val(wizardDraft[name]).trigger('change.select2');
+                            }
+                        });
+                        (wizardDraft.removed_profile_ids || []).forEach(function(id) {
+                            $('<input>', { type: 'hidden', name: 'removed_profile_ids[]', value: id }).appendTo('#removed-profiles');
+                        });
+                    }
+
                     function validateEmailsStr(str) {
                         let cleanStr = str.trim();
                         if (cleanStr === '') return false;
