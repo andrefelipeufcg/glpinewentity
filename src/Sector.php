@@ -254,6 +254,20 @@ class Sector extends SectorBase {
         return '';
     }
 
+    private static function renderTransferSwitch(string $name, string $label, bool $checked, string $class = ''): string {
+        require_once __DIR__ . '/TransferBridge.php';
+        if (!TransferBridge::active()) return '';
+        return "<label class='form-check form-switch' style='margin-top: 10px;'><input type='checkbox' class='form-check-input "
+            . htmlspecialchars($class, ENT_QUOTES) . "' name='" . htmlspecialchars($name, ENT_QUOTES) . "' value='1'"
+            . ($checked ? ' checked' : '') . "><span class='form-check-label'>" . htmlspecialchars(__($label, 'glpinewentity'), ENT_QUOTES) . "</span></label>";
+    }
+
+    private static function renderTransferProfile(string $key, int $id = 0): string {
+        require_once __DIR__ . '/TransferBridge.php';
+        if (!TransferBridge::active()) return '';
+        return str_replace("value='1'", "value='" . htmlspecialchars($key, ENT_QUOTES) . "'", self::renderTransferSwitch('transfer_profiles[]', 'Permitir transferência de chamados utilizando este perfil', $id <= 0 || TransferBridge::profileEnabled($id), 'profile-transfer-switch'));
+    }
+
     private static function renderDefaultProfileSwitch(string $value, bool $checked = false, bool $template = false): string {
         $name = $template ? '' : " name='default_profile[]'";
         $checkedAttr = $checked ? ' checked' : '';
@@ -1737,6 +1751,9 @@ TWIG);
             $this->getEmpty();
         }
 
+        require_once __DIR__ . '/TransferBridge.php';
+        $transferActive = TransferBridge::active();
+        $transferSelectedGroups = $transferActive ? TransferBridge::selectedGroups() : [];
         $def_sector_name = '';
         $def_sector_abbr = '';
         $def_parent_entity = 0;
@@ -1781,7 +1798,7 @@ TWIG);
                 }
 
                 if ($parentGroupId > 0) {
-                    $def_subgroups[] = ['name' => '', 'techs' => []]; // Bloco Pai
+                    $def_subgroups[] = ['id' => $parentGroupId, 'name' => '', 'techs' => []]; // Bloco Pai
 
                     $subgroupsIter = $DB->request([
                         'SELECT' => ['id', 'name', 'groups_id'],
@@ -1804,7 +1821,7 @@ TWIG);
 
                     foreach ($rows as $row) {
                         // Se a view nativa mostra nomes certos mas tem um prefixo ou algo assim, pegamos o nome real
-                        $def_subgroups[] = ['name' => $row['name'], 'techs' => [], 'parent' => '-1'];
+                        $def_subgroups[] = ['id' => (int)$row['id'], 'name' => $row['name'], 'techs' => [], 'parent' => '-1'];
                         $sgMap[$row['id']] = (string)$formIdx++;
                     }
 
@@ -2043,11 +2060,14 @@ TWIG);
         echo "<td>Sigla <span style='color:red;'>*</span></td>";
         echo "<td>";
         echo "<input type='text' name='sector_abbr' class='form-control' style='width: 100%;' placeholder='Ex: DC' value='" . htmlspecialchars($def_sector_abbr) . "' maxlength='20' required>";
-        echo "<br><small class='text-muted'>A entidade será criada com o mesmo nome da sigla.</small>";
+        echo "<small class='text-muted' style='display: block; margin-top: 2px;'>A entidade será criada com o mesmo nome da sigla.</small>";
         echo "</td>";
         echo "</tr>";
-
-
+        if ($transferActive) {
+            echo "<tr class='tab_bg_1'><td colspan='2'>";
+            echo self::renderTransferSwitch('transfer_entity', 'Permitir transferência de chamados para esta entidade', true);
+            echo "</td></tr>";
+        }
 
         echo "</table>";
 
@@ -2101,6 +2121,7 @@ TWIG);
         echo "    <input type='hidden' name='users_profile_admin' class='email-values' value='{$adminEmails}'>";
         echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
         echo self::renderDefaultProfileSwitch('admin', $adminId > 0 && in_array($adminId, $defaultProfileIds, true));
+        echo self::renderTransferProfile('admin', $adminId);
         echo "  </div>";
         echo "</div>";
 
@@ -2138,6 +2159,7 @@ TWIG);
         echo "    <input type='hidden' name='users_profile_support' class='email-values' value='{$supportEmails}'>";
         echo "    <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
         echo self::renderDefaultProfileSwitch('support', $supportId > 0 && in_array($supportId, $defaultProfileIds, true));
+        echo self::renderTransferProfile('support', $supportId);
         echo "  </div>";
         echo "</div>";
 
@@ -2179,6 +2201,7 @@ TWIG);
         echo "      <input type='hidden' class='email-values profile-users-input' value=''>";
         echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
         echo self::renderDefaultProfileSwitch('', false, true);
+        echo str_replace("type='checkbox'", "type='checkbox' disabled", self::renderTransferProfile(''));
         echo "  </div>";
         echo "</div>";
 
@@ -2205,6 +2228,7 @@ TWIG);
                 echo "      <input type='hidden' name='users_profile_custom[]' class='email-values profile-users-input' value='{$cEmails}'>";
                 echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione usuários cadastrados no GLPI'></select>";
                 echo self::renderDefaultProfileSwitch('custom:' . $customIndex, in_array((int)$cId, $defaultProfileIds, true));
+                echo self::renderTransferProfile('custom:' . $customIndex, (int)$cId);
                 echo "  </div>";
                 echo "</div>";
             }
@@ -2233,6 +2257,7 @@ TWIG);
         if (empty($def_subgroups) || count($def_subgroups) <= 1) {
             // Se não tem subgrupos, ou só tem o pai (índice 0), renderiza 1 bloco vazio
             $sg0Name = htmlspecialchars($def_subgroups[0]['name'] ?? '');
+            $sg0Transfer = !$isEdit || in_array((int)($def_subgroups[0]['id'] ?? $meta['groups'][0]['id'] ?? 0), $transferSelectedGroups, true);
             $sg0Techs = htmlspecialchars($def_subgroups[0]['techs'] ?? '', ENT_QUOTES);
 
             echo "<div class='subgroup-block' style='border: 1px solid #ccc; padding: 10px; margin: 10px; '>";
@@ -2255,7 +2280,8 @@ TWIG);
             echo "      <label>E-mails dos Técnicos Atendentes</label>";
             echo "      <input type='hidden' name='subgroups[0][techs]' class='email-values' value='" . $sg0Techs . "'>";
             echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione técnicos cadastrados no GLPI'></select>";
-            echo "      <small class='text-muted'>Devem estar cadastrados no GLPI. Se informar um subgrupo, os técnicos irão EXCLUSIVAMENTE para ele. Senão, irão para o Grupo Pai <strong>({SIGLA})</strong>.</small>";
+            echo "      <small class='text-muted' style='display: block; margin-top: 2px;'>Devem estar cadastrados no GLPI. Se informar um subgrupo, os técnicos irão EXCLUSIVAMENTE para ele. Senão, irão para o Grupo Pai <strong>({SIGLA})</strong>.</small>";
+            echo self::renderTransferSwitch('subgroups[0][transfer]', 'Permitir que os membros deste grupo visualizem chamados transferidos', $sg0Transfer, 'group-transfer-switch');
             echo "  </div>";
             echo "</div>";
         } else {
@@ -2298,7 +2324,8 @@ TWIG);
                 echo "      <label>E-mails dos Técnicos Atendentes</label>";
                 echo "      <input type='hidden' name='subgroups[{$i}][techs]' class='email-values' value='{$sgTechs}'>";
                 echo "      <select multiple class='form-control email-autocomplete' data-placeholder='Busque e selecione técnicos cadastrados no GLPI'></select>";
-                echo "      <small class='text-muted'>Na edição, carregamos os e-mails salvos na base da entidade. Se quiser sincronizar, modifique e salve.</small>";
+                echo "      <small class='text-muted' style='display: block; margin-top: 2px;'>Na edição, carregamos os e-mails salvos na base da entidade. Se quiser sincronizar, modifique e salve.</small>";
+                echo self::renderTransferSwitch('subgroups[' . $i . '][transfer]', 'Permitir que os membros deste grupo visualizem chamados transferidos', in_array((int)($sg['id'] ?? 0), $transferSelectedGroups, true), 'group-transfer-switch');
                 echo "  </div>";
                 echo "</div>";
                 $i++;
@@ -2388,6 +2415,7 @@ TWIG);
                             block.find('.profile-source').attr('name', 'copy_profile_custom[]');
                             block.find('.profile-users-input').attr('name', 'users_profile_custom[]');
                             block.find('.profile-default-switch').attr('name', 'default_profile[]').val('custom:' + index).prop('disabled', false);
+                            block.find('.profile-transfer-switch').val('custom:' + index).prop('disabled', false);
                             container.append(block);
                         });
 
@@ -2408,6 +2436,7 @@ TWIG);
                             });
                             parent.val(String(group.parent == null ? '-1' : group.parent));
                             block.find('.parent-wrapper').empty().append(parent);
+                            block.find('.group-transfer-switch').attr('name', 'subgroups[' + index + '][transfer]').prop('checked', String(group.transfer || 0) === '1');
                             groupContainer.append(block);
                         });
 
@@ -2417,6 +2446,9 @@ TWIG);
                             if (input.closest('.template').length) return;
                             const name = input.attr('name');
                             if (name === 'parent_entity') return;
+                            if (input.hasClass('group-transfer-switch')) return;
+                            if (name === 'transfer_entity') { input.prop('checked', String(wizardDraft.transfer_entity || 0) === '1'); return; }
+                            if (name === 'transfer_profiles[]') { input.prop('checked', (wizardDraft.transfer_profiles || []).indexOf(input.val()) !== -1); return; }
                             if (name === 'profiles_default[0]' || name === 'profiles_default[1]') {
                                 input.val((wizardDraft.profiles_default || {})[name === 'profiles_default[0]' ? 0 : 1] || '');
                             } else if (name === 'default_profile[]') {
@@ -2719,6 +2751,7 @@ TWIG);
                         
                         newBlock.find('input.sg-name-input').attr('name', 'subgroups[' + index + '][name]');
                         newBlock.find('.email-values').attr('name', 'subgroups[' + index + '][techs]');
+                        newBlock.find('.group-transfer-switch').attr('name', 'subgroups[' + index + '][transfer]').prop('checked', true);
                         newBlock.find('.sg-index').text(index + 1);
                         
                         let parentWrapper = newBlock.find('.parent-wrapper');
@@ -2759,6 +2792,7 @@ TWIG);
                     function syncCustomProfileDefaults() {
                         $('#profiles-container .profile-block:not(.template)').each(function(index) {
                             $(this).find('.profile-default-switch').val('custom:' + index);
+                            $(this).find('.profile-transfer-switch').val('custom:' + index);
                         });
                     }
 
@@ -2815,6 +2849,7 @@ TWIG);
                         newBlock.find('.profile-input').attr('name', 'name_profile_custom[]');
                         newBlock.find('.profile-users-input').attr('name', 'users_profile_custom[]');
                         newBlock.find('.profile-default-switch').attr('name', 'default_profile[]').prop('checked', false);
+                        newBlock.find('.profile-transfer-switch').prop('disabled', false).prop('checked', true);
                         
                         // Limpa o textarea de usuários
                         newBlock.find('.profile-users-input').val('');

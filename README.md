@@ -94,6 +94,14 @@ O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descrit
 
 Em cada aba de configuração, clique em **Salvar** para salvar e aplicar as alterações à entidade.
 
+## Integração com TransferTicketEntity
+
+Quando o plugin TransferTicketEntity estiver ativo, o assistente exibe opções para permitir transferências para a entidade, utilizar cada perfil nas transferências e adicionar os membros de cada grupo ao grupo atribuído padrão. As opções ficam ativadas por padrão na inclusão; na edição, refletem as configurações salvas.
+
+Ao salvar, as opções de entidade e perfil aplicam os valores configurados nas abas Entidades e Perfis do TransferTicketEntity, preservando as demais seleções. Desmarcar uma opção e salvar desativa a integração correspondente. A sincronização dos grupos exige um Grupo atribuído padrão válido; ao desmarcar, somente vínculos criados por esta integração são removidos, preservando membros manuais e membros necessários a outros grupos selecionados.
+
+As seleções também são preservadas no rascunho do assistente após erros. Com o TransferTicketEntity desativado, os controles não aparecem e suas configurações não são alteradas.
+
 ## ⚙️ Estrutura Técnica e Classes
 
 *   `setup.php`: Inicialização, ganchos (hooks) e registro no núcleo do GLPI.

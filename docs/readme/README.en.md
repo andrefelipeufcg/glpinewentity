@@ -94,6 +94,14 @@ The system will iterate and provision the entire environment, displaying descrip
 
 In each configuration tab, click **Save** to save and apply changes to the entity.
 
+## TransferTicketEntity Integration
+
+When TransferTicketEntity is active, the wizard shows switches to allow transfers to the entity, enable each profile for transfers, and add each group's members to the default assigned group. Switches default to enabled for new entries and reflect saved settings when editing.
+
+Saving applies the settings configured in TransferTicketEntity's Entities and Profiles tabs without replacing unrelated selections. Unchecking and saving disables the corresponding integration. Group synchronization requires a valid default assigned group. Only memberships created by this integration are removed when no longer required; manual members and members required by other selected source groups are preserved.
+
+Selections are preserved in the wizard draft after errors. When TransferTicketEntity is inactive, these controls are hidden and its settings remain unchanged.
+
 ## ⚙️ Technical Structure and Classes
 
 *   `setup.php`: Initialization, hooks, and GLPI core registration.

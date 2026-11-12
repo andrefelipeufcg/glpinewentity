@@ -65,7 +65,7 @@ if (isset($_POST['process_wizard'])) {
         'copy_profile_admin', 'copy_profile_support', 'users_profile_admin',
         'users_profile_support', 'copy_profile_custom', 'name_profile_custom',
         'users_profile_custom', 'default_profile', 'removed_profile_ids',
-        'subgroups', 'category_names',
+        'subgroups', 'category_names', 'transfer_entity', 'transfer_profiles',
     ]));
     $sectorName = trim($_POST['sector_name'] ?? '');
     $sectorAbbr = trim($_POST['sector_abbr'] ?? '');
