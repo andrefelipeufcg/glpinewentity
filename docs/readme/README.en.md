@@ -74,7 +74,7 @@ Instead of navigating through several GLPI screens to create entities, configure
    *   **Catalog (Categories):** Paste or write your category tree using "-" for sublevels.
 6. Click **Save**.
 
-If creating or updating the structure fails, the Wizard keeps the submitted data in the session so you can correct it and retry, including profiles, users, groups, and categories. If the entity was partially created, the form continues in edit mode for that entity. The draft is cleared after a successful save.
+If creating or updating the structure fails, the Wizard keeps the submitted data in the session so you can correct it and retry, including profiles, users, groups, and categories. During creation, data is restored only when returning after an error; opening a new creation form starts fresh. If the entity was partially created, the form continues in edit mode for that entity. Editing drafts are cleared after a successful save.
 
 The system will iterate and provision the entire environment, displaying descriptive alerts (even ignoring non-existent e-mails) and returning a base ready to operate in a matter of seconds!
 

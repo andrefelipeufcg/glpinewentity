@@ -1740,7 +1740,17 @@ TWIG);
         $sectorId = $ID;
         $isEdit = ($ID > 0);
         $sectorObj = $this;
-        $wizardDraft = $_SESSION['plugin_glpinewentity_wizard_drafts'][(int)$ID] ?? null;
+        $draftKey = 'plugin_glpinewentity_wizard_drafts';
+        $tokenKey = 'plugin_glpinewentity_wizard_draft_tokens';
+        $wizardDraft = $_SESSION[$draftKey][(int)$ID] ?? null;
+        if (!$isEdit) {
+            $token = $_GET['draft'] ?? null;
+            $expected = $_SESSION[$tokenKey][0] ?? null;
+            if (!is_string($token) || !is_string($expected) || !hash_equals($expected, $token)) {
+                $wizardDraft = null;
+            }
+            unset($_SESSION[$draftKey][0], $_SESSION[$tokenKey][0]);
+        }
 
         if ($isEdit) {
             // A edição continua usando a validação padrão do registro existente.
@@ -2387,7 +2397,6 @@ TWIG);
 
         Html::closeForm();
 
-        $wizardDraft = $_SESSION['plugin_glpinewentity_wizard_drafts'][(int)$ID] ?? null;
         $wizardDraftJson = json_encode($wizardDraft, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
         echo "<script>
                 $(function() {

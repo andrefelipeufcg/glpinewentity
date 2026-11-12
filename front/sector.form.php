@@ -67,12 +67,17 @@ if (isset($_POST['process_wizard'])) {
         'users_profile_custom', 'default_profile', 'removed_profile_ids',
         'subgroups', 'category_names', 'transfer_entity', 'transfer_profiles',
     ]));
+    $draftToken = null;
+    if (!$isEdit) {
+        $draftToken = bin2hex(random_bytes(16));
+        $_SESSION['plugin_glpinewentity_wizard_draft_tokens'][0] = $draftToken;
+    }
     $sectorName = trim($_POST['sector_name'] ?? '');
     $sectorAbbr = trim($_POST['sector_abbr'] ?? '');
     if (empty($sectorName) || empty($sectorAbbr)) {
         Session::addMessageAfterRedirect(__('O nome do setor e a sigla são obrigatórios.', 'glpinewentity'), false, ERROR);
         $formUrl = $CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php';
-        Html::redirect($formUrl . ($isEdit ? '?id=' . $sectorId : ''));
+        Html::redirect($formUrl . ($isEdit ? '?id=' . $sectorId : '?draft=' . $draftToken));
     }
     if ($isEdit) {
         Session::checkRight("plugin_glpinewentity", UPDATE);
@@ -133,9 +138,9 @@ if (isset($_POST['process_wizard'])) {
             ]);
             if (!$newSectorId) {
                 Session::addMessageAfterRedirect(__('A entidade foi criada, mas não foi possível salvar o registro do setor. Verifique a estrutura no GLPI antes de tentar novamente.', 'glpinewentity'), false, ERROR);
-                Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php');
+                Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?draft=' . $draftToken);
             }
-            unset($_SESSION[$draftKey][0]);
+            unset($_SESSION[$draftKey][0], $_SESSION['plugin_glpinewentity_wizard_draft_tokens'][0]);
             Session::addMessageAfterRedirect(__('Estrutura criada com sucesso!', 'glpinewentity'), true, INFO);
             global $CFG_GLPI;
             Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $newSectorId);
@@ -153,10 +158,10 @@ if (isset($_POST['process_wizard'])) {
                 }
                 if (!$newSectorId) {
                     Session::addMessageAfterRedirect(__('A entidade foi criada, mas não foi possível salvar o registro do setor. Verifique a estrutura no GLPI antes de tentar novamente.', 'glpinewentity'), false, ERROR);
-                    Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php');
+                    Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?draft=' . $draftToken);
                 }
                 $_SESSION[$draftKey][(int)$newSectorId] = $_SESSION[$draftKey][0];
-                unset($_SESSION[$draftKey][0]);
+                unset($_SESSION[$draftKey][0], $_SESSION['plugin_glpinewentity_wizard_draft_tokens'][0]);
                 Session::addMessageAfterRedirect(__('Estrutura criada parcialmente. Verifique os erros.', 'glpinewentity'), false, WARNING);
                 global $CFG_GLPI;
                 Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?id=' . $newSectorId);
@@ -166,7 +171,7 @@ if (isset($_POST['process_wizard'])) {
                     Session::addMessageAfterRedirect($err, false, ERROR);
                 }
                 global $CFG_GLPI;
-                Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php');
+                Html::redirect($CFG_GLPI['root_doc'] . \Plugin::getPhpDir('glpinewentity', false) . '/front/sector.form.php?draft=' . $draftToken);
             }
         }
     }

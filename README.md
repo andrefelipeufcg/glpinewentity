@@ -74,7 +74,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
    *   **Catálogo (Categorias):** Cole ou escreva sua árvore de categorias usando "-" para subníveis.
 6. Clique em **Salvar**.
 
-Se ocorrer um erro ao criar ou atualizar a estrutura, os dados preenchidos no Wizard ficam preservados na sessão para corrigir e tentar novamente, incluindo perfis, usuários, grupos e categorias. Se a entidade já tiver sido criada parcialmente, o formulário continua na edição dessa entidade. O rascunho é removido após salvar com sucesso.
+Se ocorrer um erro ao criar ou atualizar a estrutura, os dados preenchidos no Wizard ficam preservados na sessão para corrigir e tentar novamente, incluindo perfis, usuários, grupos e categorias. Na inclusão, os dados são recuperados apenas no retorno após o erro; ao abrir uma nova inclusão, o formulário começa vazio. Se a entidade já tiver sido criada parcialmente, o formulário continua na edição dessa entidade. Na edição, o rascunho é removido após salvar com sucesso.
 
 O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descritivos (inclusive ignorando e-mails inexistentes) e lhe devolvendo uma base pronta para operar em questão de segundos!
 
