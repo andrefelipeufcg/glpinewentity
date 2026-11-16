@@ -6,6 +6,18 @@
  * -----------------------------------------------------------------------
  */
 
+function plugin_glpinewentity_group_user_changed(Group_User $item): void {
+    $groupId = (int) ($item->fields['groups_id'] ?? 0);
+    if ($groupId <= 0) return;
+    require_once __DIR__ . '/src/TransferBridge.php';
+    try {
+        \GlpiPlugin\Glpinewentity\TransferBridge::syncCurrentMembers($groupId);
+    } catch (\Throwable $e) {
+        Toolbox::logInFile('glpinewentity', 'Falha ao sincronizar membros do grupo de atribuição: ' . $e->getMessage() . "\n");
+        Session::addMessageAfterRedirect(__('Não foi possível sincronizar os membros do grupo de atribuição. Consulte o log do plugin.', 'glpinewentity'), false, ERROR);
+    }
+}
+
 // -----------------------------------------------------------------------
 // INSTALL — Criar tabela para armazenar as estruturas geradas
 // -----------------------------------------------------------------------

@@ -38,10 +38,6 @@ final class TransferBridge
         if (!self::enabled(\Config::getConfigurationValue('glpinewentity', 'transfer_enabled'))) return false;
         $name = self::pluginName();
         if (!self::validPluginName($name) || !class_exists(\Plugin::class) || !method_exists(\Plugin::class, 'isActivated') || !(new \Plugin())->isActivated($name)) return false;
-        $ownedPlugin = (string) \Config::getConfigurationValue('glpinewentity', 'transfer_owned_plugin');
-        $owned = json_decode((string) \Config::getConfigurationValue('glpinewentity', 'transfer_owned_members'), true);
-        if ($ownedPlugin === '' && !empty($owned)) $ownedPlugin = 'transferticketentity';
-        if ($ownedPlugin !== '' && $ownedPlugin !== $name && !empty($owned)) return false;
         foreach (['Settings', 'Entity', 'Profile'] as $class) {
             if (!class_exists(self::pluginClass($class))) return false;
         }
@@ -191,43 +187,51 @@ final class TransferBridge
         }
     }
 
+    public static function syncCurrentMembers(int $changedGroupId): void
+    {
+        static $syncing = false;
+        if ($syncing || !self::active()) return;
+        $sourceGroups = self::selectedGroups();
+        if (!in_array($changedGroupId, $sourceGroups, true)) return;
+        $syncing = true;
+        try {
+            self::syncMembers($sourceGroups);
+        } finally {
+            $syncing = false;
+        }
+    }
+
     private static function syncMembers(array $sourceGroups): void
     {
         global $DB;
-        $target = (self::pluginClass('Settings'))::getAssignedGroupId();
-        if (in_array($target, $sourceGroups, true) && $target > 0) {
+        $target = (int) (self::pluginClass('Settings'))::getAssignedGroupId();
+        if ($target <= 0) {
+            if ($sourceGroups) throw new \RuntimeException(__('Configure um grupo de atribuição válido no plugin de transferência de chamados.', 'glpinewentity'));
+            return;
+        }
+        if (in_array($target, $sourceGroups, true)) {
             throw new \RuntimeException(__('O grupo de atribuição não pode ser selecionado como grupo de origem.', 'glpinewentity'));
         }
-        $owned = json_decode((string) \Config::getConfigurationValue('glpinewentity', 'transfer_owned_members'), true);
-        if (!is_array($owned)) $owned = [];
+        $targetGroup = new \Group();
+        if (!$targetGroup->getFromDB($target) || !\Session::haveRight(\Group::$rightname, UPDATE) || !\Session::haveAccessToEntity($targetGroup->getEntityID(), $targetGroup->isRecursive())) {
+            throw new \RuntimeException(__('Grupo de atribuição inválido ou sem permissão de atualização.', 'glpinewentity'));
+        }
         $needed = [];
         if ($sourceGroups) {
             foreach ($DB->request(['SELECT' => ['users_id'], 'FROM' => 'glpi_groups_users', 'WHERE' => ['groups_id' => $sourceGroups]]) as $member) $needed[(int) $member['users_id']] = true;
         }
-        foreach ($owned as $oldTarget => $users) {
-            $gu = new \Group_User();
-            foreach ((array) $users as $user) {
-                if ((int) $oldTarget === $target && isset($needed[(int) $user])) continue;
-                $criteria = ['groups_id' => (int) $oldTarget, 'users_id' => (int) $user];
-                $exists = $DB->request(['FROM' => 'glpi_groups_users', 'WHERE' => $criteria, 'LIMIT' => 1])->current();
-                if ($exists && !$gu->deleteByCriteria($criteria, true)) throw new \RuntimeException(__('Não foi possível remover um usuário do grupo de atribuição.', 'glpinewentity'));
-                unset($owned[$oldTarget][array_search($user, $owned[$oldTarget], true)]);
-            }
-            $owned[$oldTarget] = array_values($owned[$oldTarget]);
-            if (!$owned[$oldTarget]) unset($owned[$oldTarget]);
-        }
-        if ($target > 0 && $needed) {
-            $existing = [];
-            foreach ($DB->request(['SELECT' => ['users_id'], 'FROM' => 'glpi_groups_users', 'WHERE' => ['groups_id' => $target]]) as $member) $existing[(int) $member['users_id']] = true;
-            foreach (array_keys($needed) as $user) {
-                if (isset($existing[$user])) continue;
-                if (!(new \Group_User())->add(['groups_id' => $target, 'users_id' => $user])) throw new \RuntimeException(__('Não foi possível adicionar um usuário ao grupo de atribuição.', 'glpinewentity'));
-                $owned[$target][] = $user;
+        $existing = [];
+        foreach ($DB->request(['SELECT' => ['users_id'], 'FROM' => 'glpi_groups_users', 'WHERE' => ['groups_id' => $target]]) as $member) $existing[(int) $member['users_id']] = true;
+        $groupUser = new \Group_User();
+        foreach (array_keys($existing) as $user) {
+            if (!isset($needed[$user]) && !$groupUser->deleteByCriteria(['groups_id' => $target, 'users_id' => $user], true)) {
+                throw new \RuntimeException(__('Não foi possível remover um usuário do grupo de atribuição.', 'glpinewentity'));
             }
         }
-        \Config::setConfigurationValues('glpinewentity', [
-            'transfer_owned_members' => json_encode($owned),
-            'transfer_owned_plugin' => self::pluginName(),
-        ]);
+        foreach (array_keys($needed) as $user) {
+            if (!isset($existing[$user]) && !$groupUser->add(['groups_id' => $target, 'users_id' => $user])) {
+                throw new \RuntimeException(__('Não foi possível adicionar um usuário ao grupo de atribuição.', 'glpinewentity'));
+            }
+        }
     }
 }

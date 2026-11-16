@@ -17,14 +17,7 @@ if (isset($_POST['save_config'])) {
     if ($enabled && !TransferBridge::validPluginName($name)) {
         $error = __('Informe o nome exato da pasta do plugin, com até 50 letras ou números.', 'glpinewentity');
     } elseif ($enabled && !TransferBridge::pluginExists($name)) {
-        $error = __('A pasta do plugin informada não existe em plugins ou marketplace, ou não contém setup.php.', 'glpinewentity');
-    } else {
-        $previous = (string) Config::getConfigurationValue('glpinewentity', 'transfer_owned_plugin');
-        $owned = json_decode((string) Config::getConfigurationValue('glpinewentity', 'transfer_owned_members'), true);
-        if ($previous === '' && !empty($owned)) $previous = 'transferticketentity';
-        if ($enabled && $previous !== '' && $previous !== $name && !empty($owned)) {
-            $error = __('Não é possível trocar o plugin enquanto houver membros gerenciados pela integração. Remova-os pela integração anterior antes de alterar o nome.', 'glpinewentity');
-        }
+        $error = __('A pasta do plugin informada não existe em plugins ou marketplace.', 'glpinewentity');
     }
     if ($error !== '') {
         Session::addMessageAfterRedirect($error, false, ERROR);
@@ -49,8 +42,8 @@ echo '<div class="card col-12 col-lg-8 mx-auto my-4"><div class="card-body">';
 echo '<div class="alert alert-info"><i class="ti ti-info-circle" aria-hidden="true"></i> ' . __('Para acessar as funcionalidades de criação de entidade pelo plugin, acesse Configurar > GLPI New Entity.', 'glpinewentity') . '</div>';
 echo '<form method="post" action="' . htmlspecialchars($_SERVER['REQUEST_URI'], ENT_QUOTES, 'UTF-8') . '">';
 echo '<input type="hidden" name="_glpi_csrf_token" value="' . htmlspecialchars(Session::getNewCSRFToken(), ENT_QUOTES, 'UTF-8') . '">';
-echo '<label class="form-check form-switch mb-3"><input type="hidden" name="transfer_enabled" value="0"><input class="form-check-input" type="checkbox" id="transfer_enabled" name="transfer_enabled" value="1"' . ($enabled ? ' checked' : '') . '> <span class="form-check-label">' . __('Ativar integração com plugin de transferência de chamados entre setores (entidades)?', 'glpinewentity') . '</span></label>';
-echo '<div id="transfer_plugin_field" class="mb-3"' . ($enabled ? '' : ' style="display:none"') . '><label class="form-label" for="transfer_plugin">' . __('Nome exato da pasta do plugin em plugins ou marketplace', 'glpinewentity') . '</label><input class="form-control" type="text" id="transfer_plugin" name="transfer_plugin" maxlength="50" pattern="[a-zA-Z0-9]+" value="' . $name . '"' . ($enabled ? ' required' : '') . '></div>';
-echo '<button class="btn btn-primary" type="submit" name="save_config" value="1">' . __('Salvar', 'glpinewentity') . '</button></form></div></div>';
+echo '<label class="form-check form-switch mb-3"><input type="hidden" name="transfer_enabled" value="0"><input class="form-check-input" type="checkbox" id="transfer_enabled" name="transfer_enabled" value="1"' . ($enabled ? ' checked' : '') . '> <span class="form-check-label">' . __('Ativar integração com plugin de transferência de chamados entre setores (entidades)', 'glpinewentity') . '</span></label>';
+echo '<div id="transfer_plugin_field" class="mb-3"' . ($enabled ? '' : ' style="display:none"') . '><label class="form-label" for="transfer_plugin">' . __('Digite o nome exato da pasta do plugin de transferência de chamados entre setores/entidades (instalado dentro da pasta plugins ou marketplace)', 'glpinewentity') . '</label><input class="form-control" type="text" id="transfer_plugin" name="transfer_plugin" maxlength="50" pattern="[a-zA-Z0-9]+" value="' . $name . '"' . ($enabled ? ' required' : '') . '></div>';
+echo '<div class="text-center"><button class="btn btn-primary" type="submit" name="save_config" value="1">' . __('Salvar', 'glpinewentity') . '</button></div></form></div></div>';
 echo Html::scriptBlock("$(function() { function toggleTransfer() { var active = $('#transfer_enabled').is(':checked'); $('#transfer_plugin_field').toggle(active); $('#transfer_plugin').prop('required', active); } $('#transfer_enabled').on('change', toggleTransfer); toggleTransfer(); });");
 Html::footer();

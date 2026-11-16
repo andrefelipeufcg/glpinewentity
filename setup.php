@@ -25,6 +25,8 @@ function plugin_init_glpinewentity(): void {
     $PLUGIN_HOOKS['csrf_compliant']['glpinewentity'] = true;
     $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['glpinewentity'] = 'front/config.form.php';
     $PLUGIN_HOOKS[Hooks::UNDISCLOSED_CONFIG_VALUE]['glpinewentity'] = 'plugin_glpinewentity_undisclosed_config_value';
+    $PLUGIN_HOOKS[Hooks::ITEM_ADD]['glpinewentity']['Group_User'] = 'plugin_glpinewentity_group_user_changed';
+    $PLUGIN_HOOKS[Hooks::ITEM_PURGE]['glpinewentity']['Group_User'] = 'plugin_glpinewentity_group_user_changed';
 
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Wizard');
     Plugin::registerClass('GlpiPlugin\Glpinewentity\Sector');
