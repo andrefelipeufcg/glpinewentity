@@ -74,7 +74,7 @@ Instead of navigating through several GLPI screens to create entities, configure
    *   **Catalog (Categories):** Paste or write your category tree using "-" for sublevels.
 6. Click **Save**.
 
-If creating or updating the structure fails, the Wizard keeps the submitted data in the session so you can correct it and retry, including profiles, users, groups, and categories. If the entity was partially created, the form continues in edit mode for that entity. The draft is cleared after a successful save.
+If creating or updating the structure fails, the Wizard keeps the submitted data in the session so you can correct it and retry, including profiles, users, groups, and categories. During creation, data is restored only when returning after an error; opening a new creation form starts fresh. If the entity was partially created, the form continues in edit mode for that entity. Editing drafts are cleared after a successful save.
 
 The system will iterate and provision the entire environment, displaying descriptive alerts (even ignoring non-existent e-mails) and returning a base ready to operate in a matter of seconds!
 
@@ -93,6 +93,16 @@ The system will iterate and provision the entire environment, displaying descrip
    *   **Standard Forms:** Manage forms (from Formcreator) linked to the sector.
 
 In each configuration tab, click **Save** to save and apply changes to the entity.
+
+## Ticket Transfer Plugin Integration
+
+When the configured ticket transfer plugin is active, the wizard shows switches to allow transfers to the entity, enable each profile for transfers, and add each group's members to the default assigned group. Switches default to enabled for new entries and reflect saved settings when editing.
+
+The plugin identifier is defined by the `TRANSFER_PLUGIN` constant in `src/TransferBridge.php`, currently set to `transferticketentity`. Change this constant to use a different name. The integration assumes that the configured plugin retains the same classes and namespace and table naming conventions; it is not automatically compatible with every ticket transfer plugin.
+
+Saving applies the settings configured in the transfer plugin's Entities and Profiles tabs without replacing unrelated selections. Unchecking and saving disables the corresponding integration. Group synchronization requires a valid default assigned group. Only memberships created by this integration are removed when no longer required; manual members and members required by other selected source groups are preserved.
+
+Selections are preserved in the wizard draft after errors. When the transfer plugin is inactive, these controls are hidden and its settings remain unchanged.
 
 ## ⚙️ Technical Structure and Classes
 

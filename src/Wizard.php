@@ -17,6 +17,20 @@ use ITILCategory;
 use User;
 
 class Wizard {
+    private static function transferActive(): bool {
+        require_once __DIR__ . '/TransferBridge.php';
+        return TransferBridge::active();
+    }
+
+    private static function saveTransfer(array $input, array &$result, array $profiles, array $groups, array $oldGroups = []): void {
+        if (!self::transferActive() || $result['errors']) return;
+        try {
+            TransferBridge::apply((int)$result['entity_id'], TransferBridge::enabled($input['transfer_entity'] ?? 0), $profiles, array_map('intval', (array)($input['removed_profile_ids'] ?? [])), $groups, $oldGroups);
+        } catch (\Throwable $e) {
+            $result['errors'][] = $e->getMessage();
+        }
+    }
+
 
     private static function checkStructureReauthentication(): void {
         foreach ([Entity::class, Profile::class, Profile_User::class, User::class, Group::class, Group_User::class, ITILCategory::class] as $itemType) {
@@ -294,6 +308,8 @@ class Wizard {
             'errors'         => [],
         ];
 
+        $transferProfiles = [];
+        $transferGroups = [];
         $defaultProfile = self::getDefaultProfileSelection($input);
         if ($defaultProfile === false) {
             $result['errors'][] = __('Selecione apenas perfis válidos com usuários para definir como padrão.', 'glpinewentity');
@@ -310,6 +326,10 @@ class Wizard {
         $sectorAbbr   = trim($input['sector_abbr'] ?? '');
         $parentEntity  = (int)($input['parent_entity'] ?? 0);
 
+        if (self::transferActive() && ($error = TransferBridge::validate($input, 0, $parentEntity))) {
+            $result['errors'][] = $error;
+            return $result;
+        }
         $subgroupsData = is_array($input['subgroups'] ?? null) ? $input['subgroups'] : [];
         $categoryNames = trim($input['category_names'] ?? '');
 
@@ -413,6 +433,7 @@ class Wizard {
             $profileAssignments[] = [
                 'source_profile_id' => (int)$input['copy_profile_admin'],
                 'is_default'        => isset($defaultProfile['admin']),
+                'transfer_key'      => 'admin',
                 'is_admin'          => true,
                 'new_name'          => trim($profileNames[0] ?? ($sectorAbbr . ' - Admin')),
                 'users'             => trim($input['users_profile_admin']),
@@ -424,6 +445,7 @@ class Wizard {
             $profileAssignments[] = [
                 'source_profile_id' => (int)$input['copy_profile_support'],
                 'is_default'        => isset($defaultProfile['support']),
+                'transfer_key'      => 'support',
                 'is_admin'          => false,
                 'new_name'          => trim($profileNames[1] ?? ($sectorAbbr . ' - Atendimento')),
                 'users'             => trim($input['users_profile_support']),
@@ -438,6 +460,7 @@ class Wizard {
                     $profileAssignments[] = [
                         'source_profile_id' => (int)$pId,
                         'is_default'        => isset($defaultProfile['custom:' . $idx]),
+                        'transfer_key'      => 'custom:' . $idx,
                         'is_admin'          => false,
                         'new_name'          => $customName,
                         'users'             => trim($input['users_profile_custom'][$idx]),
@@ -476,6 +499,7 @@ class Wizard {
                 continue;
             }
 
+            $transferProfiles[$newProfileId] = in_array($assignment['transfer_key'], (array)($input['transfer_profiles'] ?? []), true);
             $result['profiles'][] = [
                 'id'   => $newProfileId,
                 'name' => $assignment['new_name'],
@@ -625,6 +649,7 @@ class Wizard {
                 }
                 
                 // Associa técnicos ao grupo alvo (seja o pai ou o subgrupo)
+                $transferGroups[$targetGroupId] = TransferBridge::enabled($sg['transfer'] ?? 0);
                 foreach ($techUserIds as $tuid) {
                     $groupUser = new Group_User();
                     $groupUser->add([
@@ -693,6 +718,7 @@ class Wizard {
             }
         }
 
+        self::saveTransfer($input, $result, $transferProfiles, $transferGroups);
         return $result;
     }
 
@@ -731,6 +757,8 @@ class Wizard {
         $result = json_decode($existingFields['metadata'] ?? '{}', true) ?: [];
         // Limpa erros antigos carregados do metadata
         $result['errors'] = [];
+        $transferProfiles = [];
+        $transferGroups = [];
         $defaultProfile = self::getDefaultProfileSelection($input);
         if ($defaultProfile === false) {
             $result['errors'][] = __('Selecione apenas perfis válidos com usuários para definir como padrão.', 'glpinewentity');
@@ -779,6 +807,11 @@ class Wizard {
             return $result;
         }
 
+        if (self::transferActive() && ($error = TransferBridge::validate($input, (int)$entityId, $parentEntity))) {
+            $result['errors'][] = $error;
+            return $result;
+        }
+        $oldTransferGroups = array_map('intval', array_column($result['groups'] ?? [], 'id'));
         $entity = new Entity();
         if (!$entity->getFromDB($entityId)) {
             $result['errors'][] = __('A entidade gerenciada não foi encontrada. A edição foi cancelada para evitar vínculos inconsistentes.', 'glpinewentity');
@@ -883,6 +916,7 @@ class Wizard {
             $profileAssignments[] = [
                 'source_profile_id' => (int)$input['copy_profile_admin'],
                 'is_default'        => isset($defaultProfile['admin']),
+                'transfer_key'      => 'admin',
                 'is_admin'          => true,
                 'new_name'          => trim($profileNames[0] ?? ($sectorAbbr . ' - Admin')),
                 'users'             => trim($input['users_profile_admin'] ?? ''),
@@ -894,6 +928,7 @@ class Wizard {
             $profileAssignments[] = [
                 'source_profile_id' => (int)$input['copy_profile_support'],
                 'is_default'        => isset($defaultProfile['support']),
+                'transfer_key'      => 'support',
                 'is_admin'          => false,
                 'new_name'          => trim($profileNames[1] ?? ($sectorAbbr . ' - Atendimento')),
                 'users'             => trim($input['users_profile_support'] ?? ''),
@@ -908,6 +943,7 @@ class Wizard {
                     $profileAssignments[] = [
                         'source_profile_id' => (int)$pId,
                         'is_default'        => isset($defaultProfile['custom:' . $idx]),
+                        'transfer_key'      => 'custom:' . $idx,
                         'is_admin'          => false,
                         'new_name'          => $customName,
                         'users'             => trim($input['users_profile_custom'][$idx] ?? ''),
@@ -971,6 +1007,7 @@ class Wizard {
                 }
             }
 
+            $transferProfiles[$profileId] = in_array($assignment['transfer_key'], (array)($input['transfer_profiles'] ?? []), true);
             $result['profiles'][] = [
                 'id'   => $profileId,
                 'name' => $newName,
@@ -1142,6 +1179,7 @@ class Wizard {
                 }
 
                 // Sincronizar técnicos: remover os atuais do grupo e adicionar os novos
+                $transferGroups[$targetGroupId] = TransferBridge::enabled($sg['transfer'] ?? 0);
                 $guIter = $DB->request([
                     'SELECT' => 'id',
                     'FROM'   => 'glpi_groups_users',
@@ -1229,6 +1267,7 @@ class Wizard {
         }
 
         self::applyDefaultProfiles($defaultCandidates, (int)$entityId, $result['errors']);
+        self::saveTransfer($input, $result, $transferProfiles, $transferGroups, $oldTransferGroups);
         return $result;
     }
 

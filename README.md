@@ -74,7 +74,7 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
    *   **Catálogo (Categorias):** Cole ou escreva sua árvore de categorias usando "-" para subníveis.
 6. Clique em **Salvar**.
 
-Se ocorrer um erro ao criar ou atualizar a estrutura, os dados preenchidos no Wizard ficam preservados na sessão para corrigir e tentar novamente, incluindo perfis, usuários, grupos e categorias. Se a entidade já tiver sido criada parcialmente, o formulário continua na edição dessa entidade. O rascunho é removido após salvar com sucesso.
+Se ocorrer um erro ao criar ou atualizar a estrutura, os dados preenchidos no Wizard ficam preservados na sessão para corrigir e tentar novamente, incluindo perfis, usuários, grupos e categorias. Na inclusão, os dados são recuperados apenas no retorno após o erro; ao abrir uma nova inclusão, o formulário começa vazio. Se a entidade já tiver sido criada parcialmente, o formulário continua na edição dessa entidade. Na edição, o rascunho é removido após salvar com sucesso.
 
 O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descritivos (inclusive ignorando e-mails inexistentes) e lhe devolvendo uma base pronta para operar em questão de segundos!
 
@@ -93,6 +93,18 @@ O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descrit
   *   **Formulários:** Gerencie formulários (do Formcreator) vinculados ao setor.
 
 Em cada aba de configuração, clique em **Salvar** para salvar e aplicar as alterações à entidade.
+
+## Integração com plugin de transferência de chamados
+
+Quando o plugin de transferência configurado estiver ativo, o assistente exibe opções para permitir transferências para a entidade, utilizar cada perfil nas transferências e adicionar os membros de cada grupo ao grupo atribuído padrão. As opções ficam ativadas por padrão na inclusão; na edição, refletem as configurações salvas.
+
+A integração vem desativada por padrão. Na página de configuração do GLPI New Entity em **Configurar > Plugins**, habilite a integração e informe o nome exato da pasta do plugin de transferência em `plugins` ou `marketplace` (por exemplo, `transferticketentity`). O nome deve ter até 50 caracteres e conter apenas letras ou números, respeitando maiúsculas e minúsculas da pasta. O plugin deve estar instalado, ativado e oferecer as classes e convenções de namespace e de tabela esperadas; a integração não é automaticamente compatível com qualquer plugin de transferência. A listagem e a criação de entidades continuam disponíveis em **Configurar > GLPI New Entity**.
+
+A configuração rejeita pastas inexistentes. Se a integração for desativada, nenhuma alteração é feita no plugin de transferência. É possível trocar o plugin configurado; a sincronização usa o grupo de atribuição e os grupos marcados no plugin atual, sem modificar o grupo de atribuição anterior.
+
+Ao salvar, as opções de entidade e perfil aplicam os valores configurados nas abas Entidades e Perfis do plugin de transferência, preservando as demais seleções. A sincronização exige um Grupo atribuído padrão válido e o mantém igual à união dos membros de todos os grupos marcados. Inclusões e remoções nesses grupos também acionam a sincronização. **Membros adicionados manualmente ao grupo de atribuição são removidos se não pertencerem a nenhum grupo marcado.**
+
+As seleções também são preservadas no rascunho do assistente após erros. Com o plugin de transferência desativado, os controles não aparecem e suas configurações não são alteradas.
 
 ## ⚙️ Estrutura Técnica e Classes
 
