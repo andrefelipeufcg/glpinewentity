@@ -39,7 +39,8 @@ $enabled = (string) Config::getConfigurationValue('glpinewentity', 'transfer_ena
 $name = htmlspecialchars(TransferBridge::pluginName(), ENT_QUOTES, 'UTF-8');
 Html::header(__('Configurações do GLPI New Entity', 'glpinewentity'), $_SERVER['REQUEST_URI'], 'config', 'plugins');
 echo '<div class="card col-12 col-lg-8 mx-auto my-4"><div class="card-body">';
-echo '<div class="alert alert-info"><i class="ti ti-info-circle" aria-hidden="true"></i> ' . __('Para acessar as funcionalidades de criação de entidade pelo plugin, acesse Configurar > GLPI New Entity.', 'glpinewentity') . '</div>';
+$sectorUrl = htmlspecialchars(($CFG_GLPI['root_doc'] ?? '') . Plugin::getPhpDir('glpinewentity', false) . '/front/sector.php', ENT_QUOTES, 'UTF-8');
+echo '<div class="alert alert-info"><i class="ti ti-info-circle" aria-hidden="true"></i> ' . sprintf(__('Para acessar as funcionalidades de criação de entidade pelo plugin, acesse %s.', 'glpinewentity'), '<a href="' . $sectorUrl . '">Configurar &gt; GLPI New Entity</a>') . '</div>';
 echo '<form method="post" action="' . htmlspecialchars($_SERVER['REQUEST_URI'], ENT_QUOTES, 'UTF-8') . '">';
 echo '<input type="hidden" name="_glpi_csrf_token" value="' . htmlspecialchars(Session::getNewCSRFToken(), ENT_QUOTES, 'UTF-8') . '">';
 echo '<label class="form-check form-switch mb-3"><input type="hidden" name="transfer_enabled" value="0"><input class="form-check-input" type="checkbox" id="transfer_enabled" name="transfer_enabled" value="1"' . ($enabled ? ' checked' : '') . '> <span class="form-check-label">' . __('Ativar integração com plugin de transferência de chamados entre setores (entidades)', 'glpinewentity') . '</span></label>';
