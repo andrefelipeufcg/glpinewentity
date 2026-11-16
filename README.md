@@ -94,13 +94,15 @@ O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descrit
 
 Em cada aba de configuração, clique em **Salvar** para salvar e aplicar as alterações à entidade.
 
-## Integração com TransferTicketEntity
+## Integração com plugin de transferência de chamados
 
-Quando o plugin TransferTicketEntity estiver ativo, o assistente exibe opções para permitir transferências para a entidade, utilizar cada perfil nas transferências e adicionar os membros de cada grupo ao grupo atribuído padrão. As opções ficam ativadas por padrão na inclusão; na edição, refletem as configurações salvas.
+Quando o plugin de transferência configurado estiver ativo, o assistente exibe opções para permitir transferências para a entidade, utilizar cada perfil nas transferências e adicionar os membros de cada grupo ao grupo atribuído padrão. As opções ficam ativadas por padrão na inclusão; na edição, refletem as configurações salvas.
 
-Ao salvar, as opções de entidade e perfil aplicam os valores configurados nas abas Entidades e Perfis do TransferTicketEntity, preservando as demais seleções. Desmarcar uma opção e salvar desativa a integração correspondente. A sincronização dos grupos exige um Grupo atribuído padrão válido; ao desmarcar, somente vínculos criados por esta integração são removidos, preservando membros manuais e membros necessários a outros grupos selecionados.
+O identificador do plugin é definido pela constante `TRANSFER_PLUGIN` em `src/TransferBridge.php`, atualmente com o valor `transferticketentity`. Para usar outro nome, altere essa constante. A integração pressupõe que o plugin configurado mantenha as mesmas classes e convenções de namespace e de tabela; não é compatível automaticamente com qualquer plugin de transferência.
 
-As seleções também são preservadas no rascunho do assistente após erros. Com o TransferTicketEntity desativado, os controles não aparecem e suas configurações não são alteradas.
+Ao salvar, as opções de entidade e perfil aplicam os valores configurados nas abas Entidades e Perfis do plugin de transferência, preservando as demais seleções. Desmarcar uma opção e salvar desativa a integração correspondente. A sincronização dos grupos exige um Grupo atribuído padrão válido; ao desmarcar, somente vínculos criados por esta integração são removidos, preservando membros manuais e membros necessários a outros grupos selecionados.
+
+As seleções também são preservadas no rascunho do assistente após erros. Com o plugin de transferência desativado, os controles não aparecem e suas configurações não são alteradas.
 
 ## ⚙️ Estrutura Técnica e Classes
 

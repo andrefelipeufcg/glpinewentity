@@ -94,13 +94,15 @@ The system will iterate and provision the entire environment, displaying descrip
 
 In each configuration tab, click **Save** to save and apply changes to the entity.
 
-## TransferTicketEntity Integration
+## Ticket Transfer Plugin Integration
 
-When TransferTicketEntity is active, the wizard shows switches to allow transfers to the entity, enable each profile for transfers, and add each group's members to the default assigned group. Switches default to enabled for new entries and reflect saved settings when editing.
+When the configured ticket transfer plugin is active, the wizard shows switches to allow transfers to the entity, enable each profile for transfers, and add each group's members to the default assigned group. Switches default to enabled for new entries and reflect saved settings when editing.
 
-Saving applies the settings configured in TransferTicketEntity's Entities and Profiles tabs without replacing unrelated selections. Unchecking and saving disables the corresponding integration. Group synchronization requires a valid default assigned group. Only memberships created by this integration are removed when no longer required; manual members and members required by other selected source groups are preserved.
+The plugin identifier is defined by the `TRANSFER_PLUGIN` constant in `src/TransferBridge.php`, currently set to `transferticketentity`. Change this constant to use a different name. The integration assumes that the configured plugin retains the same classes and namespace and table naming conventions; it is not automatically compatible with every ticket transfer plugin.
 
-Selections are preserved in the wizard draft after errors. When TransferTicketEntity is inactive, these controls are hidden and its settings remain unchanged.
+Saving applies the settings configured in the transfer plugin's Entities and Profiles tabs without replacing unrelated selections. Unchecking and saving disables the corresponding integration. Group synchronization requires a valid default assigned group. Only memberships created by this integration are removed when no longer required; manual members and members required by other selected source groups are preserved.
+
+Selections are preserved in the wizard draft after errors. When the transfer plugin is inactive, these controls are hidden and its settings remain unchanged.
 
 ## ⚙️ Technical Structure and Classes
 

@@ -2,16 +2,20 @@
 
 namespace GlpiPlugin\Glpinewentity;
 
-use GlpiPlugin\Transferticketentity\Entity as TransferEntity;
-use GlpiPlugin\Transferticketentity\Profile as TransferProfile;
-use GlpiPlugin\Transferticketentity\Settings;
 
-/** Optional integration with the settings maintained by Transfer Ticket Entity. */
+/** Integração opcional com as configurações do plugin de transferência de chamados. */
 final class TransferBridge
 {
+    public const TRANSFER_PLUGIN = 'transferticketentity';
+
+    private static function pluginClass(string $class): string
+    {
+        return 'GlpiPlugin\\' . ucfirst(self::TRANSFER_PLUGIN) . '\\' . $class;
+    }
+
     public static function active(): bool
     {
-        return class_exists(\Plugin::class) && method_exists(\Plugin::class, 'isActivated') && (new \Plugin())->isActivated('transferticketentity');
+        return class_exists(\Plugin::class) && method_exists(\Plugin::class, 'isActivated') && (new \Plugin())->isActivated(self::TRANSFER_PLUGIN);
     }
 
     public static function enabled($value): bool
@@ -21,15 +25,15 @@ final class TransferBridge
 
     public static function entityEnabled(int $id): bool
     {
-        if (in_array($id, array_map('intval', (array)(Settings::getLastApplied('entities')['entities'] ?? [])), true)) return true;
-        $row = TransferEntity::checkRights($id);
+        if (in_array($id, array_map('intval', (array)((self::pluginClass('Settings'))::getLastApplied('entities')['entities'] ?? [])), true)) return true;
+        $row = (self::pluginClass('Entity'))::checkRights($id);
         return self::enabled($row['allow_transfer'] ?? 0);
     }
 
     public static function profileEnabled(int $id): bool
     {
-        if (in_array($id, array_map('intval', (array)(Settings::getLastApplied('profiles')['profiles'] ?? [])), true)) return true;
-        $fields = array_column(TransferProfile::getAllRights(), 'field');
+        if (in_array($id, array_map('intval', (array)((self::pluginClass('Settings'))::getLastApplied('profiles')['profiles'] ?? [])), true)) return true;
+        $fields = array_column((self::pluginClass('Profile'))::getAllRights(), 'field');
         foreach (\ProfileRight::getProfileRights($id, $fields) as $value) {
             if ((int) $value > 0) return true;
         }
@@ -38,7 +42,7 @@ final class TransferBridge
 
     public static function selectedGroups(): array
     {
-        return array_map('intval', (array) (Settings::getLastApplied('groups')['groups'] ?? []));
+        return array_map('intval', (array) ((self::pluginClass('Settings'))::getLastApplied('groups')['groups'] ?? []));
     }
 
     /** Validate against the prospective parent before any structure is modified. */
@@ -47,23 +51,23 @@ final class TransferBridge
         global $DB;
         foreach ((array) ($input['subgroups'] ?? []) as $group) {
             if (self::enabled($group['transfer'] ?? 0)) {
-                $target = Settings::getAssignedGroupId();
+                $target = (self::pluginClass('Settings'))::getAssignedGroupId();
                 $item = new \Group();
                 if ($target <= 0 || !$item->getFromDB($target)) {
-                    return __('Configure um grupo de atribuição válido no plugin Transfer Ticket Entity antes de permitir a visualização de chamados transferidos.', 'glpinewentity');
+                    return __('Configure um grupo de atribuição válido no plugin de transferência de chamados antes de permitir a visualização de chamados transferidos.', 'glpinewentity');
                 }
                 if (!\Session::haveRight(\Group::$rightname, UPDATE) || !\Session::haveAccessToEntity($item->getEntityID(), $item->isRecursive())) {
-                    return __('Você não tem permissão para atualizar o grupo de atribuição do Transfer Ticket Entity.', 'glpinewentity');
+                    return __('Você não tem permissão para atualizar o grupo de atribuição do plugin de transferência de chamados.', 'glpinewentity');
                 }
                 break;
             }
         }
         if (!self::enabled($input['transfer_entity'] ?? 0)) return null;
-        $last = Settings::getLastApplied('entities');
+        $last = (self::pluginClass('Settings'))::getLastApplied('entities');
         if (!self::enabled($last['allow_transfer'] ?? 0)) return null;
-        $groupId = self::enabled($last['allow_entity_only_transfer'] ?? 0) ? (int) ($last['groups_id'] ?? Settings::getAssignedGroupId()) : 0;
+        $groupId = self::enabled($last['allow_entity_only_transfer'] ?? 0) ? (int) ($last['groups_id'] ?? (self::pluginClass('Settings'))::getAssignedGroupId()) : 0;
         if (self::enabled($last['allow_entity_only_transfer'] ?? 0) && $groupId <= 0) {
-            return __('Selecione um grupo de atribuição nas configurações do Transfer Ticket Entity.', 'glpinewentity');
+            return __('Selecione um grupo de atribuição nas configurações do plugin de transferência de chamados.', 'glpinewentity');
         }
         $categoryId = !self::enabled($last['keep_category'] ?? 0) ? (int) ($last['itilcategories_id'] ?? 0) : 0;
         foreach ([['glpi_groups', $groupId, 'group'], ['glpi_itilcategories', $categoryId, 'category']] as [$table, $id, $kind]) {
@@ -74,17 +78,17 @@ final class TransferBridge
                 $available = true;
             } elseif ($row && !empty($row['is_recursive'])) {
                 if ($kind === 'group') {
-                    $available = in_array($id, array_map('intval', array_column(TransferEntity::getEntityGroups($parentId), 'id')), true);
+                    $available = in_array($id, array_map('intval', array_column((self::pluginClass('Entity'))::getEntityGroups($parentId), 'id')), true);
                 } else {
-                    foreach (TransferEntity::availableCategories($parentId) as $categories) {
+                    foreach ((self::pluginClass('Entity'))::availableCategories($parentId) as $categories) {
                         if (array_key_exists($id, $categories)) $available = true;
                     }
                 }
             }
             if (!$available) {
                 return $kind === 'group'
-                    ? __('O grupo de atribuição configurado no Transfer Ticket Entity não está disponível na entidade escolhida.', 'glpinewentity')
-                    : __('A categoria padrão configurada no Transfer Ticket Entity não está disponível na entidade escolhida.', 'glpinewentity');
+                    ? __('O grupo de atribuição configurado no plugin de transferência de chamados não está disponível na entidade escolhida.', 'glpinewentity')
+                    : __('A categoria padrão configurada no plugin de transferência de chamados não está disponível na entidade escolhida.', 'glpinewentity');
             }
         }
         return null;
@@ -98,29 +102,29 @@ final class TransferBridge
     public static function apply(int $entityId, bool $entitySelected, array $profiles, array $removedProfiles, array $groups, array $oldGroups): void
     {
         global $DB;
-        $entityLast = Settings::getLastApplied('entities');
+        $entityLast = (self::pluginClass('Settings'))::getLastApplied('entities');
         $allow = $entitySelected && self::enabled($entityLast['allow_transfer'] ?? 0);
         $required = $allow && self::enabled($entityLast['allow_entity_only_transfer'] ?? 0);
         $keepCategory = $allow && self::enabled($entityLast['keep_category'] ?? 0);
         $DB->beginTransaction();
         try {
-            if (!$DB->updateOrInsert('glpi_plugin_transferticketentity_entities_settings', [
+            if (!$DB->updateOrInsert('glpi_plugin_' . self::TRANSFER_PLUGIN . '_entities_settings', [
                 'allow_transfer' => (int) $allow,
                 'allow_entity_only_transfer' => (int) $required,
-                'groups_id' => $required ? (int) ($entityLast['groups_id'] ?? Settings::getAssignedGroupId()) : 0,
+                'groups_id' => $required ? (int) ($entityLast['groups_id'] ?? (self::pluginClass('Settings'))::getAssignedGroupId()) : 0,
                 'keep_sla' => (int) ($allow && self::enabled($entityLast['keep_sla'] ?? 1)),
                 'justification_transfer' => (int) ($allow && self::enabled($entityLast['justification_transfer'] ?? 0)),
                 'keep_category' => (int) $keepCategory,
                 'itilcategories_id' => $allow && !$keepCategory && (int) ($entityLast['itilcategories_id'] ?? 0) > 0 ? (int) $entityLast['itilcategories_id'] : null,
             ], ['entities_id' => $entityId])) throw new \RuntimeException(__('Unable to save entity transfer settings.', 'glpinewentity'));
             $entityLast['entities'] = self::mergeIds((array) ($entityLast['entities'] ?? []), [$entityId], $entitySelected ? [$entityId] : []);
-            Settings::rememberApplied('entities', $entityLast);
+            (self::pluginClass('Settings'))::rememberApplied('entities', $entityLast);
 
-            $profileLast = Settings::getLastApplied('profiles');
+            $profileLast = (self::pluginClass('Settings'))::getLastApplied('profiles');
             $selectedProfiles = [];
             foreach ($profiles as $id => $selected) {
                 $rights = [];
-                foreach (TransferProfile::getAllRights() as $right) {
+                foreach ((self::pluginClass('Profile'))::getAllRights() as $right) {
                     $rights[$right['field']] = $selected && (int) ($profileLast['rights'][$right['field']] ?? 0) > 0 ? key($right['rights']) : 0;
                 }
                 \ProfileRight::updateProfileRights((int) $id, $rights);
@@ -131,14 +135,14 @@ final class TransferBridge
                 if ($selected) $selectedProfiles[] = (int) $id;
             }
             $profileLast['profiles'] = self::mergeIds((array) ($profileLast['profiles'] ?? []), array_merge(array_keys($profiles), $removedProfiles), $selectedProfiles);
-            Settings::rememberApplied('profiles', $profileLast);
+            (self::pluginClass('Settings'))::rememberApplied('profiles', $profileLast);
 
-            $groupLast = Settings::getLastApplied('groups');
+            $groupLast = (self::pluginClass('Settings'))::getLastApplied('groups');
             $selectedGroups = [];
             foreach ($groups as $id => $selected) if ($selected) $selectedGroups[] = (int) $id;
             $groupLast['groups'] = self::mergeIds((array) ($groupLast['groups'] ?? []), array_merge($oldGroups, array_keys($groups)), $selectedGroups);
             self::syncMembers($groupLast['groups']);
-            Settings::rememberApplied('groups', $groupLast);
+            (self::pluginClass('Settings'))::rememberApplied('groups', $groupLast);
             $DB->commit();
         } catch (\Throwable $e) {
             $DB->rollBack();
@@ -149,7 +153,7 @@ final class TransferBridge
     private static function syncMembers(array $sourceGroups): void
     {
         global $DB;
-        $target = Settings::getAssignedGroupId();
+        $target = (self::pluginClass('Settings'))::getAssignedGroupId();
         if (in_array($target, $sourceGroups, true) && $target > 0) {
             throw new \RuntimeException(__('O grupo de atribuição não pode ser selecionado como grupo de origem.', 'glpinewentity'));
         }
