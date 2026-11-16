@@ -28,7 +28,8 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 *   **Construção Automática de Árvore de Categorias ITIL:**
     *   Aceita listas hierárquicas em formato de texto usando hífens (ex: `- Hardware`, `-- Manutenção`, `--- Reparos`).
     *   Cria categorias de incidentes e requisições perfeitamente aninhadas com apenas um clique.
-*   **Aba de Configurações Dinâmicas:** Centraliza a personalização do fluxo de trabalho e templates para o novo setor, permitindo criar, editar e aplicar múltiplas padronizações exclusivas para a entidade:
+*   **Abas de Configuração desde a Inclusão:** As abas aparecem já no formulário de criação, oferecendo uma visão das configurações disponíveis. Para acessá-las e salvar suas configurações, primeiro crie a estrutura da entidade na aba principal.
+*   **Configurações Dinâmicas:** Após criar a estrutura, personalize fluxos e modelos do setor nas abas:
     *   **Modelos de Chamado**
     *   **Respostas Básicas**
     *   **Soluções Básicas**
@@ -38,6 +39,8 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
     *   **Formulários Padrões**
 *   **Controle de Acesso e Segurança Nativos:** Desenvolvido seguindo os padrões mais rígidos de desenvolvimento seguro do GLPI. A interface e todos os fluxos de criação (endpoints) são protegidos pela matriz dinâmica de direitos do sistema (ACL). A instalação concede acesso de forma inteligente a todos os perfis com nível de Super-Admin de forma nativa e agnóstica, não dependendo de IDs engessados e não gerando poluição visual para os demais usuários.
 *   **Edição e Atualização Sincronizada:** Em caso de ajustes futuros, o sistema armazena os metadados e permite reeditar os grupos, vínculos de e-mails ou nomes do setor a partir de um registro central.
+*   **Proteção do Preenchimento:** Preserva um rascunho do assistente após erros e avisa antes de sair de formulários com alterações não salvas.
+*   **Seletores e Cópia de Modelos:** Os seletores de categorias ITIL, modelos de acompanhamento e de solução são agrupados por entidade; ao carregar uma cópia, um indicador informa que a operação está em andamento.
 
 ## 🛠️ Requisitos
 
@@ -76,11 +79,9 @@ Ao invés de navegar por diversas telas diferentes do GLPI para criar entidades,
 
 Se ocorrer um erro ao criar ou atualizar a estrutura, os dados preenchidos no Wizard ficam preservados na sessão para corrigir e tentar novamente, incluindo perfis, usuários, grupos e categorias. Na inclusão, os dados são recuperados apenas no retorno após o erro; ao abrir uma nova inclusão, o formulário começa vazio. Se a entidade já tiver sido criada parcialmente, o formulário continua na edição dessa entidade. Na edição, o rascunho é removido após salvar com sucesso.
 
-O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descritivos (inclusive ignorando e-mails inexistentes) e lhe devolvendo uma base pronta para operar em questão de segundos!
-
 ![Lista de Setores](./docs/images/screenshot5.png)
 
-7. **Ajustes e Configurações Avançadas:** Após salvar, retorne à lista e clique no nome do setor que acabou de criar para editá-lo. As abas de configuração permitem personalizar toda a operação de forma exclusiva para esta entidade:
+7. **Ajustes e Configurações Avançadas:** As abas já aparecem durante a inserção. Após criar a estrutura, acesse-as no formulário ou retorne à lista e clique no nome do setor para editá-lo. Elas permitem personalizar a operação da entidade:
 
 ![Abas de Configuração](./docs/images/screenshot6.png)
 
@@ -89,6 +90,7 @@ O sistema irá iterar e provisionar o ambiente inteiro, exibindo alertas descrit
    *   **Respostas Básicas:** Configure textos padronizados para os atendimentos.
    *   **Soluções Básicas:** Padronize soluções frequentes para o fechamento. O tipo de solução selecionado é criado na entidade do setor, mesmo quando pertence a outra entidade; um tipo de mesmo nome já existente na entidade é reutilizado.
    *   **Motivos de Pendências:** Defina motivos customizados para pausar os chamados.
+   *   **Modelos de Notificação:** Copie ou edite modelos e traduções usados pelas notificações. Esses modelos são globais no GLPI.
    *   **Notificações:** Ajuste ou sobrescreva os alertas de e-mail do setor.
   *   **Formulários:** Gerencie formulários (do Formcreator) vinculados ao setor.
 
@@ -96,24 +98,26 @@ Em cada aba de configuração, clique em **Salvar** para salvar e aplicar as alt
 
 ## Integração com plugin de transferência de chamados
 
-Quando o plugin de transferência configurado estiver ativo, o assistente exibe opções para permitir transferências para a entidade, utilizar cada perfil nas transferências e adicionar os membros de cada grupo ao grupo atribuído padrão. As opções ficam ativadas por padrão na inclusão; na edição, refletem as configurações salvas.
+Quando a integração estiver habilitada e o plugin de transferência configurado estiver ativo e for compatível, o assistente exibe opções para permitir transferências para a entidade, utilizar cada perfil nas transferências e adicionar os membros de cada subgrupo ao grupo atribuído padrão. As opções ficam ativadas por padrão para novos itens; na edição, refletem as configurações salvas.
 
 A integração vem desativada por padrão. Na página de configuração do GLPI New Entity em **Configurar > Plugins**, habilite a integração e informe o nome exato da pasta do plugin de transferência em `plugins` ou `marketplace` (por exemplo, `transferticketentity`). O nome deve ter até 50 caracteres e conter apenas letras ou números, respeitando maiúsculas e minúsculas da pasta. O plugin deve estar instalado, ativado e oferecer as classes e convenções de namespace e de tabela esperadas; a integração não é automaticamente compatível com qualquer plugin de transferência. A listagem e a criação de entidades continuam disponíveis em **Configurar > GLPI New Entity**.
 
-A configuração rejeita pastas inexistentes. Se a integração for desativada, nenhuma alteração é feita no plugin de transferência. É possível trocar o plugin configurado; a sincronização usa o grupo de atribuição e os grupos marcados no plugin atual, sem modificar o grupo de atribuição anterior.
+A configuração rejeita pastas inexistentes ou sem `setup.php`. Se o plugin informado estiver inativo ou não oferecer a interface esperada, a tela apresenta um aviso e a integração permanece inativa. Se a integração for desativada, nenhuma alteração é feita no plugin de transferência. É possível trocar o plugin configurado; a sincronização usa o grupo de atribuição e os grupos marcados no plugin atual, sem modificar o grupo de atribuição anterior.
 
-Ao salvar, as opções de entidade e perfil aplicam os valores configurados nas abas Entidades e Perfis do plugin de transferência, preservando as demais seleções. A sincronização exige um Grupo atribuído padrão válido e o mantém igual à união dos membros de todos os grupos marcados. Inclusões e remoções nesses grupos também acionam a sincronização. **Membros adicionados manualmente ao grupo de atribuição são removidos se não pertencerem a nenhum grupo marcado.**
+Ao salvar, as opções de entidade e perfil aplicam os valores configurados nas abas Entidades e Perfis do plugin de transferência, preservando as demais seleções. A sincronização exige um Grupo atribuído padrão válido e o mantém igual à união dos membros de todos os grupos marcados. Inclusões e remoções nesses grupos também acionam a sincronização. Membros adicionados manualmente ao grupo de atribuição são removidos se não pertencerem a nenhum grupo marcado.
 
 As seleções também são preservadas no rascunho do assistente após erros. Com o plugin de transferência desativado, os controles não aparecem e suas configurações não são alteradas.
 
 ## ⚙️ Estrutura Técnica e Classes
 
 *   `setup.php`: Inicialização, ganchos (hooks) e registro no núcleo do GLPI.
+*   `front/config.form.php`: Configurações gerais do plugin.
 *   `front/sector.php`: Interface principal (Listagem).
 *   `front/sector.form.php`: View principal (Formulário do Wizard e abas de configuração).
 *   `src/Menu.php`: Lógica exclusiva para inserção e restrição (Super-Admin) no menu superior nativo de "Configurar" do GLPI.
 *   `src/Sector.php`: Classe CRUD básica e motor central de renderização de abas dinâmicas, estendendo `CommonDBTM`.
 *   `src/Wizard.php`: Coração da criação inicial. Contém a lógica estrutural, manipulação do banco, criação de cópias de perfis e validação de e-mails.
+*   `src/TransferBridge.php`: Integração opcional de entidades, perfis e grupos com o plugin de transferência configurado.
 *   `src/Builders/`: Classes especializadas (`TicketTemplateBuilder`, `NotificationBuilder`, `FormBuilder`, etc.) responsáveis por aplicar individualmente cada padronização gerada nas abas.
 
 ## 📜 Licença

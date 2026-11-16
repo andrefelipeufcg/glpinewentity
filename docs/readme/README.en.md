@@ -28,7 +28,8 @@ Instead of navigating through several GLPI screens to create entities, configure
 *   **Automatic ITIL Category Tree Construction:**
     *   Accepts hierarchical lists in text format using hyphens (e.g., `- Hardware`, `-- Maintenance`, `--- Repairs`).
     *   Creates perfectly nested incident and request categories with a single click.
-*   **Dynamic Configuration Tabs:** Centralizes the customization of workflows and templates for the new sector, allowing you to create, edit, and apply multiple unique standards for the entity:
+*   **Configuration Tabs Visible During Creation:** The tabs appear on the creation form so you can see the available settings. Create the entity structure in the main tab before opening the other tabs and saving their settings.
+*   **Dynamic Configuration:** After creating the structure, customize the sector's workflows and templates in the tabs:
     *   **Ticket Templates**
     *   **Standard Follow-ups**
     *   **Standard Solutions**
@@ -38,6 +39,8 @@ Instead of navigating through several GLPI screens to create entities, configure
     *   **Standard Forms**
 *   **Native Security and Access Control:** Developed following GLPI's strictest secure development standards. The interface and all creation flows (endpoints) are protected by the system's dynamic rights matrix (ACL). The installation intelligently grants access to all Super-Admin profiles natively and agnostically, without depending on hardcoded IDs and avoiding visual pollution for other users.
 *   **Synchronized Editing and Updating:** In case of future adjustments, the system stores metadata and allows you to re-edit groups, e-mail links, or sector names from a central record.
+*   **Form Protection:** Retains a wizard draft after errors and warns before leaving forms with unsaved changes.
+*   **Selectors and Template Copying:** ITIL categories, follow-up templates, and solution templates are grouped by entity; a loading indicator is displayed while copying.
 
 ## 🛠️ Requirements
 
@@ -76,11 +79,9 @@ Instead of navigating through several GLPI screens to create entities, configure
 
 If creating or updating the structure fails, the Wizard keeps the submitted data in the session so you can correct it and retry, including profiles, users, groups, and categories. During creation, data is restored only when returning after an error; opening a new creation form starts fresh. If the entity was partially created, the form continues in edit mode for that entity. Editing drafts are cleared after a successful save.
 
-The system will iterate and provision the entire environment, displaying descriptive alerts (even ignoring non-existent e-mails) and returning a base ready to operate in a matter of seconds!
-
 ![Sector List](../images/screenshot5.png)
 
-7. **Advanced Adjustments and Configurations:** After saving, return to the list and click on the name of the newly created sector to edit it. The configuration tabs allow you to exclusively customize the entire operation for this entity:
+7. **Advanced Adjustments and Configurations:** The tabs are visible during creation. Once the structure is created, open them on the form or return to the list and click the sector name to edit it. The tabs let you customize the entity's operation:
 
 ![Configuration Tabs](../images/screenshot6.png)
 
@@ -89,6 +90,7 @@ The system will iterate and provision the entire environment, displaying descrip
    *   **Standard Follow-ups:** Configure standardized texts for support replies.
    *   **Standard Solutions:** Standardize frequent solutions for ticket closure. The selected solution type is created in the sector's entity even if it belongs to another entity; an existing type with the same name in that entity is reused.
    *   **Pending Reasons:** Define customized reasons for pausing tickets.
+   *   **Notification Templates:** Copy or edit templates and translations used by notifications. These templates are global in GLPI.
    *   **Notifications:** Adjust or override sector e-mail alerts.
    *   **Standard Forms:** Manage forms (from Formcreator) linked to the sector.
 
@@ -96,22 +98,22 @@ In each configuration tab, click **Save** to save and apply changes to the entit
 
 ## Ticket Transfer Plugin Integration
 
-When the configured ticket transfer plugin is active, the wizard shows switches to allow transfers to the entity, enable each profile for transfers, and add each group's members to the default assigned group. Switches default to enabled for new entries and reflect saved settings when editing.
+The integration is disabled by default. In **Setup > Plugins**, open the GLPI New Entity configuration, enable the integration, and enter the exact folder name of the transfer plugin installed under `plugins` or `marketplace` (for example, `transferticketentity`). The name is case-sensitive, limited to 50 letters or digits, and must identify an existing plugin folder containing `setup.php`. The plugin must also be active and provide the expected classes, namespace, and table conventions; not every transfer plugin is compatible. The configuration page links to **Setup > GLPI New Entity**, where sectors are listed and created.
 
-The plugin identifier is defined by the `TRANSFER_PLUGIN` constant in `src/TransferBridge.php`, currently set to `transferticketentity`. Change this constant to use a different name. The integration assumes that the configured plugin retains the same classes and namespace and table naming conventions; it is not automatically compatible with every ticket transfer plugin.
+When the integration is active and compatible, the wizard shows options for entity transfers, profile permissions, and inclusion of subgroup members in the default assigned group. The options default to enabled for new items and reflect saved settings when editing. Selections are retained in the wizard draft after errors. When the integration or transfer plugin is inactive, the controls are hidden and transfer settings are not changed.
 
-Saving applies the settings configured in the transfer plugin's Entities and Profiles tabs without replacing unrelated selections. Unchecking and saving disables the corresponding integration. Group synchronization requires a valid default assigned group. Only memberships created by this integration are removed when no longer required; manual members and members required by other selected source groups are preserved.
-
-Selections are preserved in the wizard draft after errors. When the transfer plugin is inactive, these controls are hidden and its settings remain unchanged.
+Saving applies the current settings from the transfer plugin's Entities and Profiles tabs while preserving unrelated selections. Group synchronization uses the current transfer plugin's selected source groups and default assigned group. Changes to members of selected source groups also trigger synchronization. The assigned group's membership is made equal to the union of the selected groups: manually added members who do not belong to any selected group are removed. A valid assigned group and permission to update it are required. Switching plugins does not change the previous plugin's assigned group.
 
 ## ⚙️ Technical Structure and Classes
 
 *   `setup.php`: Initialization, hooks, and GLPI core registration.
+*   `front/config.form.php`: General plugin settings.
 *   `front/sector.php`: Main interface (List view).
 *   `front/sector.form.php`: Main view (Wizard form and configuration tabs).
 *   `src/Menu.php`: Exclusive logic for insertion and restriction (Super-Admin) in the native GLPI "Setup" top menu.
 *   `src/Sector.php`: Basic CRUD class and central engine for dynamic tab rendering, extending `CommonDBTM`.
 *   `src/Wizard.php`: Heart of the initial creation. Contains structural logic, database manipulation, profile copy creation, and e-mail validation.
+*   `src/TransferBridge.php`: Optional entity, profile, and group integration with the configured transfer plugin.
 *   `src/Builders/`: Specialized classes (`TicketTemplateBuilder`, `NotificationBuilder`, `FormBuilder`, etc.) responsible for individually applying each standard generated in the tabs.
 
 ## 📜 License
