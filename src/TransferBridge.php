@@ -6,16 +6,52 @@ namespace GlpiPlugin\Glpinewentity;
 /** Integração opcional com as configurações do plugin de transferência de chamados. */
 final class TransferBridge
 {
-    public const TRANSFER_PLUGIN = 'transferticketentity';
+    public static function pluginName(): string
+    {
+        return (string) \Config::getConfigurationValue('glpinewentity', 'transfer_plugin');
+    }
+
+    public static function validPluginName(string $name): bool
+    {
+        return strlen($name) <= 50 && preg_match('/\A[a-zA-Z0-9]+\z/D', $name) === 1;
+    }
+
+    public static function pluginExists(string $name): bool
+    {
+        if (!self::validPluginName($name)) return false;
+        $directories = defined('GLPI_PLUGINS_DIRECTORIES') ? GLPI_PLUGINS_DIRECTORIES : (defined('GLPI_ROOT') ? [GLPI_ROOT . '/plugins', GLPI_ROOT . '/marketplace'] : []);
+        foreach ($directories as $root) {
+            if (is_dir($root . DIRECTORY_SEPARATOR . $name)
+                && in_array($name, scandir($root) ?: [], true)
+                && is_file($root . DIRECTORY_SEPARATOR . $name . DIRECTORY_SEPARATOR . 'setup.php')) return true;
+        }
+        return false;
+    }
 
     private static function pluginClass(string $class): string
     {
-        return 'GlpiPlugin\\' . ucfirst(self::TRANSFER_PLUGIN) . '\\' . $class;
+        return 'GlpiPlugin\\' . ucfirst(self::pluginName()) . '\\' . $class;
     }
 
     public static function active(): bool
     {
-        return class_exists(\Plugin::class) && method_exists(\Plugin::class, 'isActivated') && (new \Plugin())->isActivated(self::TRANSFER_PLUGIN);
+        if (!self::enabled(\Config::getConfigurationValue('glpinewentity', 'transfer_enabled'))) return false;
+        $name = self::pluginName();
+        if (!self::validPluginName($name) || !class_exists(\Plugin::class) || !method_exists(\Plugin::class, 'isActivated') || !(new \Plugin())->isActivated($name)) return false;
+        $ownedPlugin = (string) \Config::getConfigurationValue('glpinewentity', 'transfer_owned_plugin');
+        $owned = json_decode((string) \Config::getConfigurationValue('glpinewentity', 'transfer_owned_members'), true);
+        if ($ownedPlugin === '' && !empty($owned)) $ownedPlugin = 'transferticketentity';
+        if ($ownedPlugin !== '' && $ownedPlugin !== $name && !empty($owned)) return false;
+        foreach (['Settings', 'Entity', 'Profile'] as $class) {
+            if (!class_exists(self::pluginClass($class))) return false;
+        }
+        foreach (['getLastApplied', 'rememberApplied', 'getAssignedGroupId'] as $method) {
+            if (!is_callable([self::pluginClass('Settings'), $method])) return false;
+        }
+        foreach (['checkRights', 'getEntityGroups', 'availableCategories'] as $method) {
+            if (!is_callable([self::pluginClass('Entity'), $method])) return false;
+        }
+        return is_callable([self::pluginClass('Profile'), 'getAllRights']);
     }
 
     public static function enabled($value): bool
@@ -25,6 +61,7 @@ final class TransferBridge
 
     public static function entityEnabled(int $id): bool
     {
+        if (!self::active()) return false;
         if (in_array($id, array_map('intval', (array)((self::pluginClass('Settings'))::getLastApplied('entities')['entities'] ?? [])), true)) return true;
         $row = (self::pluginClass('Entity'))::checkRights($id);
         return self::enabled($row['allow_transfer'] ?? 0);
@@ -32,6 +69,7 @@ final class TransferBridge
 
     public static function profileEnabled(int $id): bool
     {
+        if (!self::active()) return false;
         if (in_array($id, array_map('intval', (array)((self::pluginClass('Settings'))::getLastApplied('profiles')['profiles'] ?? [])), true)) return true;
         $fields = array_column((self::pluginClass('Profile'))::getAllRights(), 'field');
         foreach (\ProfileRight::getProfileRights($id, $fields) as $value) {
@@ -42,12 +80,14 @@ final class TransferBridge
 
     public static function selectedGroups(): array
     {
+        if (!self::active()) return [];
         return array_map('intval', (array) ((self::pluginClass('Settings'))::getLastApplied('groups')['groups'] ?? []));
     }
 
     /** Validate against the prospective parent before any structure is modified. */
     public static function validate(array $input, int $entityId, int $parentId): ?string
     {
+        if (!self::active()) return null;
         global $DB;
         foreach ((array) ($input['subgroups'] ?? []) as $group) {
             if (self::enabled($group['transfer'] ?? 0)) {
@@ -101,6 +141,7 @@ final class TransferBridge
 
     public static function apply(int $entityId, bool $entitySelected, array $profiles, array $removedProfiles, array $groups, array $oldGroups): void
     {
+        if (!self::active()) return;
         global $DB;
         $entityLast = (self::pluginClass('Settings'))::getLastApplied('entities');
         $allow = $entitySelected && self::enabled($entityLast['allow_transfer'] ?? 0);
@@ -108,7 +149,7 @@ final class TransferBridge
         $keepCategory = $allow && self::enabled($entityLast['keep_category'] ?? 0);
         $DB->beginTransaction();
         try {
-            if (!$DB->updateOrInsert('glpi_plugin_' . self::TRANSFER_PLUGIN . '_entities_settings', [
+            if (!$DB->updateOrInsert('glpi_plugin_' . self::pluginName() . '_entities_settings', [
                 'allow_transfer' => (int) $allow,
                 'allow_entity_only_transfer' => (int) $required,
                 'groups_id' => $required ? (int) ($entityLast['groups_id'] ?? (self::pluginClass('Settings'))::getAssignedGroupId()) : 0,
@@ -184,6 +225,9 @@ final class TransferBridge
                 $owned[$target][] = $user;
             }
         }
-        \Config::setConfigurationValues('glpinewentity', ['transfer_owned_members' => json_encode($owned)]);
+        \Config::setConfigurationValues('glpinewentity', [
+            'transfer_owned_members' => json_encode($owned),
+            'transfer_owned_plugin' => self::pluginName(),
+        ]);
     }
 }
